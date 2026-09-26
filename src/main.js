@@ -15,12 +15,16 @@ class SergioApp {
     this.loopEnabled = true;
     this.playbackSpeed = 1.0;
     
-    // Âncoras absolutas de tempo de alta precisão (Sample-Accurate Grid)
+    // Motor de Áudio Pré-Renderizado (OfflineAudioContext)
+    this.pieceAudioBuffer = null;
+    this.isRenderingBuffer = false;
+    this.pendingBufferRegen = false;
     this.audioAnchorTime = 0;
     this.pieceAnchorTime = 0;
-    this.nextBeatMeasureIdx = 0;
-    this.nextBeatIdx = 0;
-    this.lookaheadTimer = null;
+
+    // Rastreamento de batimento para flash da agulha (zero timers)
+    this.lastBeatMeasureIdx = -1;
+    this.lastBeatIdx = -1;
 
     // Cache de performance de DOM
     this.cachedCards = [];
@@ -36,12 +40,14 @@ class SergioApp {
 
   init() {
     this.cacheDom();
-    this.initAudioScheduler();
     this.initRenderer();
     this.initEventListeners();
     this.initPresetsDropdown();
     this.renderMeasuresList();
     this.updateHUD(0);
+
+    // Pré-gera a peça toda na memória RAM (~5ms)
+    this.preparePieceAudio();
 
     // Pré-ativação do AudioContext no primeiro toque/clique do usuário
     const unlockAudio = () => {
@@ -151,20 +157,64 @@ class SergioApp {
   }
 
   // =========================================================================
-  // MOTOR DE TEMPO PRECISO (SAMPLE-ACCURATE WEB AUDIO SCHEDULER)
-  // Elimina qualquer atraso ao iniciar e lentidão na troca de compassos.
+  // MOTOR DE ÁUDIO PRÉ-RENDERIZADO (OFFLINE AUDIO BUFFER)
+  // Sem timers (zero setInterval/setTimeout). A peça inteira é sintetizada
+  // na memória e tocada diretamente pelo hardware de áudio.
   // =========================================================================
 
-  initAudioScheduler() {
-    audio.onBeat((beatInfo) => {
-      if (this.renderer) {
-        this.renderer.triggerBeatHit(beatInfo.isAccent);
+  async preparePieceAudio(forceRestart = false) {
+    if (this.isRenderingBuffer) {
+      this.pendingBufferRegen = true;
+      return;
+    }
+    this.isRenderingBuffer = true;
+
+    try {
+      this.pieceAudioBuffer = await audio.renderPieceBuffer(
+        state.measureTimings,
+        state.totalDuration,
+        audio.soundType
+      );
+    } catch (err) {
+      console.error("Erro ao pré-renderizar buffer de áudio:", err);
+    } finally {
+      this.isRenderingBuffer = false;
+    }
+
+    if (this.pendingBufferRegen) {
+      this.pendingBufferRegen = false;
+      return this.preparePieceAudio(forceRestart);
+    }
+
+    if (this.isPlaying && forceRestart && audio.ctx) {
+      const curTime = this.getCurrentPlaybackTime();
+      this.startAudioSource(curTime);
+    }
+  }
+
+  startAudioSource(offsetSeconds) {
+    if (!audio.ctx || !this.pieceAudioBuffer) return;
+    const offset = Math.max(0, Math.min(state.totalDuration, offsetSeconds));
+    this.audioAnchorTime = audio.ctx.currentTime;
+    this.pieceAnchorTime = offset;
+
+    audio.play(
+      this.pieceAudioBuffer,
+      offset,
+      this.playbackSpeed,
+      this.loopEnabled,
+      state.totalDuration,
+      () => {
+        if (!this.loopEnabled && this.isPlaying) {
+          this.pausePlayback();
+          this.playbackTime = state.totalDuration;
+          this.updateHUD(this.playbackTime);
+        }
       }
-    });
+    );
   }
 
   async startPlayback() {
-    // Garante que o AudioContext está inicializado e desbloqueado
     await audio.init();
     if (this.isPlaying) return;
 
@@ -172,31 +222,21 @@ class SergioApp {
       this.playbackTime = 0;
     }
 
+    if (!this.pieceAudioBuffer) {
+      await this.preparePieceAudio();
+    }
+
     this.isPlaying = true;
     this.updatePlayPauseIcon();
-
-    // Fix de lentidão: define âncora absoluta limpa com 35ms de folga de estabilização
-    const leadTime = 0.035;
-    this.audioAnchorTime = audio.ctx.currentTime + leadTime;
-    this.pieceAnchorTime = this.playbackTime;
-
-    this.resetBeatSchedulePointer();
-
-    // Agenda os primeiros tempos imediatamente
-    this.scheduleAudioBeats();
-
-    if (this.lookaheadTimer) clearInterval(this.lookaheadTimer);
-    this.lookaheadTimer = setInterval(() => this.scheduleAudioBeats(), 25);
+    this.startAudioSource(this.playbackTime);
   }
 
   pausePlayback() {
     if (!this.isPlaying) return;
+    this.playbackTime = this.getCurrentPlaybackTime();
     this.isPlaying = false;
     this.updatePlayPauseIcon();
-    if (this.lookaheadTimer) {
-      clearInterval(this.lookaheadTimer);
-      this.lookaheadTimer = null;
-    }
+    audio.stop();
   }
 
   togglePlayPause() {
@@ -215,85 +255,25 @@ class SergioApp {
   seekTo(seconds) {
     this.playbackTime = Math.max(0, Math.min(state.totalDuration, seconds));
     if (this.isPlaying && audio.ctx) {
-      this.audioAnchorTime = audio.ctx.currentTime + 0.02;
-      this.pieceAnchorTime = this.playbackTime;
-      this.resetBeatSchedulePointer();
+      this.startAudioSource(this.playbackTime);
     }
     this.updateHUD(this.playbackTime);
   }
 
-  resetBeatSchedulePointer() {
-    const pos = state.getPositionAtTime(this.pieceAnchorTime);
-    this.nextBeatMeasureIdx = pos.measureIndex;
-    this.nextBeatIdx = pos.beatIndex;
-  }
-
-  /**
-   * Agendamento contínuo em grade matemática exata.
-   * Não depende de 'delays variáveis' ou estimativas de timer, garantindo
-   * transições entre compassos sem qualquer hesitação ou estiramento de tempo.
-   */
-  scheduleAudioBeats() {
-    if (!this.isPlaying || !audio.ctx) return;
-
-    const timings = state.measureTimings;
-    if (!timings || timings.length === 0) return;
-
-    const lookAheadWindow = 0.16; // 160ms
-    const maxAudioScheduleTime = audio.ctx.currentTime + lookAheadWindow;
-
-    while (this.nextBeatMeasureIdx < timings.length) {
-      const t = timings[this.nextBeatMeasureIdx];
-      const beatPieceTime = t.startTime + (this.nextBeatIdx * t.beatDuration);
-
-      // Conversão matemática exata e invariável do tempo da peça para tempo de áudio
-      const audioTime = this.audioAnchorTime + (beatPieceTime - this.pieceAnchorTime) / this.playbackSpeed;
-
-      // Se o próximo beat ainda está além da janela de agendamento, interrompe o loop
-      if (audioTime > maxAudioScheduleTime) {
-        break;
-      }
-
-      // Se o beat está no futuro próximo (ou acabou de acontecer no frame atual)
-      if (audioTime >= audio.ctx.currentTime - 0.015) {
-        const isAccent = (this.nextBeatIdx === 0);
-        const schedTime = Math.max(audio.ctx.currentTime, audioTime);
-
-        audio.scheduleSound(schedTime, isAccent);
-
-        // Agendamento do impacto visual correspondente
-        const delayMs = Math.max(0, (schedTime - audio.ctx.currentTime) * 1000);
-        const mIdx = this.nextBeatMeasureIdx;
-        const bIdx = this.nextBeatIdx;
-
-        setTimeout(() => {
-          if (this.isPlaying) {
-            audio.notifyBeat({
-              measureIndex: mIdx,
-              beatIndex: bIdx,
-              isAccent: isAccent
-            });
-          }
-        }, delayMs);
-      }
-
-      // Avança o ponteiro de beat para o próximo tempo
-      this.nextBeatIdx++;
-      if (this.nextBeatIdx >= t.beats) {
-        this.nextBeatIdx = 0;
-        this.nextBeatMeasureIdx++;
-      }
+  getCurrentPlaybackTime() {
+    if (!this.isPlaying || !audio.ctx) {
+      return this.playbackTime;
     }
-
-    // Se chegou ao fim de todos os compassos da peça
-    if (this.nextBeatMeasureIdx >= timings.length) {
-      if (this.loopEnabled) {
-        // Encadeia o próximo loop sem interrupção de tempo
-        this.audioAnchorTime += (state.totalDuration - this.pieceAnchorTime) / this.playbackSpeed;
-        this.pieceAnchorTime = 0;
-        this.nextBeatMeasureIdx = 0;
-        this.nextBeatIdx = 0;
+    const elapsedAudio = (audio.ctx.currentTime - this.audioAnchorTime) * this.playbackSpeed;
+    if (this.loopEnabled) {
+      const total = state.totalDuration || 1;
+      return (this.pieceAnchorTime + elapsedAudio) % total;
+    } else {
+      const current = this.pieceAnchorTime + elapsedAudio;
+      if (current >= state.totalDuration) {
+        return state.totalDuration;
       }
+      return current;
     }
   }
 
@@ -316,18 +296,20 @@ class SergioApp {
     this.lastFrameTime = timestamp;
 
     if (this.isPlaying && audio.ctx) {
-      const elapsedAudio = (audio.ctx.currentTime - this.audioAnchorTime) * this.playbackSpeed;
-      if (elapsedAudio >= 0) {
-        this.playbackTime = this.pieceAnchorTime + elapsedAudio;
+      this.playbackTime = this.getCurrentPlaybackTime();
+      if (!this.loopEnabled && this.playbackTime >= state.totalDuration) {
+        this.playbackTime = state.totalDuration;
+        this.pausePlayback();
+      }
 
-        if (this.playbackTime >= state.totalDuration) {
-          if (this.loopEnabled) {
-            this.playbackTime = this.playbackTime % state.totalDuration;
-          } else {
-            this.playbackTime = state.totalDuration;
-            this.pausePlayback();
-          }
+      // Detecção de batimento precisa sincronizada com o relógio de som (sem timers)
+      const pos = state.getPositionAtTime(this.playbackTime);
+      if (pos.measureIndex !== this.lastBeatMeasureIdx || pos.beatIndex !== this.lastBeatIdx) {
+        if (this.renderer) {
+          this.renderer.triggerBeatHit(pos.beatIndex === 0);
         }
+        this.lastBeatMeasureIdx = pos.measureIndex;
+        this.lastBeatIdx = pos.beatIndex;
       }
     }
 
@@ -490,11 +472,6 @@ class SergioApp {
       const num = parseInt(val, 10);
       if (!isNaN(num) && num >= 20 && num <= 400) {
         state.setBaseBpm(num);
-        if (this.isPlaying && audio.ctx) {
-          this.audioAnchorTime = audio.ctx.currentTime + 0.02;
-          this.pieceAnchorTime = this.playbackTime;
-          this.resetBeatSchedulePointer();
-        }
       }
       syncBpmInput();
     };
@@ -571,6 +548,9 @@ class SergioApp {
     this.dom.btnLoop.addEventListener('click', () => {
       this.loopEnabled = !this.loopEnabled;
       this.dom.btnLoop.classList.toggle('active', this.loopEnabled);
+      if (this.isPlaying && audio.ctx) {
+        this.startAudioSource(this.getCurrentPlaybackTime());
+      }
     });
 
     // Velocidade de Estudo
@@ -580,9 +560,10 @@ class SergioApp {
         btn.classList.add('active');
         this.playbackSpeed = parseFloat(btn.dataset.speed) || 1.0;
         if (this.isPlaying && audio.ctx) {
-          this.audioAnchorTime = audio.ctx.currentTime + 0.02;
-          this.pieceAnchorTime = this.playbackTime;
-          this.resetBeatSchedulePointer();
+          const curTime = this.getCurrentPlaybackTime();
+          this.audioAnchorTime = audio.ctx.currentTime;
+          this.pieceAnchorTime = curTime;
+          audio.setPlaybackRate(this.playbackSpeed);
         }
       });
     });
@@ -597,6 +578,7 @@ class SergioApp {
 
     this.dom.selectSoundType.addEventListener('change', (e) => {
       audio.setSoundType(e.target.value);
+      this.preparePieceAudio(true);
     });
 
     // Adicionar Compasso
@@ -627,6 +609,7 @@ class SergioApp {
       if (this.renderer) {
         this.renderer.resize();
       }
+      this.preparePieceAudio(true);
     });
 
     // Atalhos de teclado
