@@ -344,84 +344,110 @@ class SergioApp {
 
   // =========================================================================
   // ATUALIZAÇÃO DO HUD AO VIVO (DISPLAY DIGITAL)
+  // Otimizado: sem innerHTML, sem querySelector, sem layout thrashing
   // =========================================================================
 
   updateHUD(seconds) {
-    const curTimeStr = this.formatTime(seconds);
-    const totalTimeStr = this.formatTime(state.totalDuration);
-
-    this.dom.hudCurrentTime.textContent = curTimeStr;
-    this.dom.hudTotalTime.textContent = totalTimeStr;
-
     const pos = state.getPositionAtTime(seconds);
     if (!pos || !pos.measure) return;
 
-    // Compasso & Apelido
-    const badgeText = `c. ${pos.measureIndex + 1}`;
-    if (this.dom.hudMeasureBadge.textContent !== badgeText) {
-      this.dom.hudMeasureBadge.textContent = badgeText;
+    // Tempo digital (só escreve se mudou)
+    const curTimeStr = this.formatTime(seconds);
+    if (this._lastCurTimeStr !== curTimeStr) {
+      this._lastCurTimeStr = curTimeStr;
+      this.dom.hudCurrentTime.textContent = curTimeStr;
     }
 
-    const nickname = pos.measure.nickname || `Compasso ${pos.measureIndex + 1}`;
-    if (this.dom.hudMeasureNickname.textContent !== nickname) {
-      this.dom.hudMeasureNickname.textContent = nickname;
+    const totalTimeStr = this.formatTime(state.totalDuration);
+    if (this._lastTotalTimeStr !== totalTimeStr) {
+      this._lastTotalTimeStr = totalTimeStr;
+      this.dom.hudTotalTime.textContent = totalTimeStr;
     }
 
-    // Grupo
-    const grp = state.getGroupByMeasureIndex(pos.measureIndex);
-    if (grp) {
-      this.dom.hudGroupPill.style.display = 'inline-flex';
-      this.dom.hudGroupName.textContent = grp.name;
-      this.dom.hudGroupPill.querySelector('.group-dot').style.color = grp.color;
-    } else {
-      this.dom.hudGroupPill.style.display = 'none';
+    // Compasso badge & apelido (só escreve se trocou de compasso)
+    if (this._lastMeasureIdx !== pos.measureIndex) {
+      this._lastMeasureIdx = pos.measureIndex;
+
+      this.dom.hudMeasureBadge.textContent = `c. ${pos.measureIndex + 1}`;
+      this.dom.hudMeasureNickname.textContent = pos.measure.nickname || `Compasso ${pos.measureIndex + 1}`;
+
+      // Grupo (só busca quando muda de compasso, não a cada frame)
+      const grp = state.getGroupByMeasureIndex(pos.measureIndex);
+      if (grp) {
+        this.dom.hudGroupPill.style.display = 'inline-flex';
+        this.dom.hudGroupName.textContent = grp.name;
+        // Cache do elemento .group-dot para evitar querySelector a cada frame
+        if (!this._groupDotEl) {
+          this._groupDotEl = this.dom.hudGroupPill.querySelector('.group-dot');
+        }
+        if (this._groupDotEl) this._groupDotEl.style.color = grp.color;
+      } else {
+        this.dom.hudGroupPill.style.display = 'none';
+      }
+
+      // BPM Efetivo e Ratio (só muda com compasso)
+      this.dom.hudBpmValue.textContent = Math.round(pos.effectiveBpm);
+
+      if (pos.measure.tempoMode === "ratio") {
+        if (pos.measure.ratioNum === 1 && pos.measure.ratioDen === 1) {
+          this.dom.hudTempoRatio.textContent = "1:1";
+        } else {
+          const mult = (pos.measure.ratioNum / pos.measure.ratioDen).toFixed(2);
+          this.dom.hudTempoRatio.textContent = `${pos.measure.ratioNum}/${pos.measure.ratioDen} (${mult}x)`;
+        }
+      } else {
+        this.dom.hudTempoRatio.textContent = "Fixo";
+      }
+
+      // Realce no cartão
+      this.highlightActiveMeasureCard(pos.measureIndex);
     }
 
-    // Batimento
-    const beatStr = `Tempo ${pos.beatIndex + 1} / ${pos.timing.beats} (${pos.timing.beats}/${pos.timing.beatUnit})`;
+    // Batimento e pontos de beat (muda a cada beat, não a cada frame)
+    this.renderBeatDots(pos.timing.beats, pos.beatIndex);
+
+    // Texto do beat
+    const beatStr = `${pos.beatIndex + 1} / ${pos.timing.beats}`;
     if (this.lastBeatText !== beatStr) {
       this.lastBeatText = beatStr;
       this.dom.hudBeatText.textContent = beatStr;
     }
-
-    // Luzes de batimento
-    this.renderBeatDots(pos.timing.beats, pos.beatIndex);
-
-    // BPM Efetivo
-    const effBpm = Math.round(pos.effectiveBpm);
-    this.dom.hudBpmValue.textContent = effBpm;
-
-    if (pos.measure.tempoMode === "ratio") {
-      if (pos.measure.ratioNum === 1 && pos.measure.ratioDen === 1) {
-        this.dom.hudTempoRatio.textContent = "1:1 (Andamento Base)";
-      } else {
-        const mult = (pos.measure.ratioNum / pos.measure.ratioDen).toFixed(2);
-        this.dom.hudTempoRatio.textContent = `${pos.measure.ratioNum}/${pos.measure.ratioDen} (${mult}x do Base)`;
-      }
-    } else {
-      this.dom.hudTempoRatio.textContent = "Andamento Fixo";
-    }
-
-    // Realce no cartão do compasso (otimizado sem querySelectorAll em cada frame)
-    this.highlightActiveMeasureCard(pos.measureIndex);
   }
 
+  /**
+   * Pontos de beat: pre-cria os elementos uma vez por compasso
+   * e depois só troca classes, sem nunca destruir e recriar DOM.
+   */
   renderBeatDots(totalBeats, activeIdx) {
-    if (this.lastTotalBeats === totalBeats && this.lastActiveBeatIdx === activeIdx) {
-      return;
-    }
-    this.lastTotalBeats = totalBeats;
-    this.lastActiveBeatIdx = activeIdx;
+    // Se mudou o número de tempos, recria a pool de dots
+    if (this.lastTotalBeats !== totalBeats) {
+      this.lastTotalBeats = totalBeats;
+      this.lastActiveBeatIdx = -1;
 
-    let html = '';
-    for (let i = 0; i < totalBeats; i++) {
-      let cls = 'beat-dot';
-      if (i === activeIdx) {
-        cls += (i === 0 ? ' accent' : ' active');
+      const container = this.dom.hudBeatDots;
+      container.textContent = ''; // Limpa sem innerHTML
+      this._beatDotEls = [];
+
+      for (let i = 0; i < totalBeats; i++) {
+        const dot = document.createElement('div');
+        dot.className = 'beat-dot';
+        container.appendChild(dot);
+        this._beatDotEls.push(dot);
       }
-      html += `<div class="${cls}"></div>`;
     }
-    this.dom.hudBeatDots.innerHTML = html;
+
+    // Se mudou o beat ativo, troca classe direta (zero allocation)
+    if (this.lastActiveBeatIdx !== activeIdx && this._beatDotEls) {
+      // Remove do anterior
+      if (this.lastActiveBeatIdx >= 0 && this._beatDotEls[this.lastActiveBeatIdx]) {
+        this._beatDotEls[this.lastActiveBeatIdx].className = 'beat-dot';
+      }
+      // Ativa o novo
+      if (this._beatDotEls[activeIdx]) {
+        this._beatDotEls[activeIdx].className = activeIdx === 0 ? 'beat-dot accent' : 'beat-dot active';
+      }
+      this.lastActiveBeatIdx = activeIdx;
+    }
   }
 
   highlightActiveMeasureCard(activeIndex) {
