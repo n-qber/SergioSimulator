@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sérgio Simulator | Simulador Rítmico & Modulação Métrica para Percussão</title>
+  <meta name="description" content="Simulador de visão corrida estilo DJ para estudo de peças de percussão com compassos variados, métricas mistas e modulações métricas matemáticas.">
+  
+  <!-- Fontes Google Modernas (Outfit, Space Grotesk, JetBrains Mono) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="/src/style.css">
+</head>
+<body>
+  <div id="app" class="app-container">
+    
+    <!-- BARRA SUPERIOR (HEADER) -->
+    <header class="top-header">
+      <!-- Lado Esquerdo: Base BPM e Nome do App -->
+      <div class="header-left">
+        <div class="brand">
+          <div class="brand-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 2v20M2 12h20M4.93 4.93l14.14 14.14M4.93 19.07l14.14-14.14"/>
+            </svg>
+          </div>
+          <div class="brand-text">
+            <h1 class="brand-title">SÉRGIO SIMULATOR</h1>
+            <span class="brand-subtitle">Rhythmic & Metric Modulation</span>
+          </div>
+        </div>
+
+        <!-- Seletor de BPM Base (Fix: sem bugs de digitação) -->
+        <div class="base-bpm-card" id="baseBpmCard" title="Andamento Base da Peça">
+          <div class="base-bpm-label">
+            <span>BASE BPM</span>
+            <span class="base-bpm-hint">♩ =</span>
+          </div>
+          <div class="base-bpm-controls">
+            <button type="button" class="bpm-btn" id="btnBpmMinus5" title="-5 BPM">-5</button>
+            <button type="button" class="bpm-btn" id="btnBpmMinus1" title="-1 BPM">-1</button>
+            <div class="bpm-input-wrapper">
+              <input type="text" id="inputBaseBpm" value="120" maxlength="3" autocomplete="off" spellcheck="false" inputmode="numeric">
+            </div>
+            <button type="button" class="bpm-btn" id="btnBpmPlus1" title="+1 BPM">+1</button>
+            <button type="button" class="bpm-btn" id="btnBpmPlus5" title="+5 BPM">+5</button>
+            <button type="button" class="bpm-tap-btn" id="btnTapTempo" title="Toque no ritmo para definir o BPM">TAP</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Centro: Nome da Peça Editável -->
+      <div class="header-center">
+        <div class="piece-title-container">
+          <input type="text" id="inputPieceName" class="piece-name-input" value="Estudo de Modulações Rítmicas (3/2 & 4/3)" placeholder="Nome da Peça de Percussão" title="Clique para renomear a peça">
+          <span class="piece-name-edit-icon">✎</span>
+        </div>
+      </div>
+
+      <!-- Lado Direito: Presets, Import/Export, Áudio -->
+      <div class="header-right">
+        <!-- Seletor de Peças Didáticas Prontas -->
+        <div class="select-wrapper">
+          <select id="selectPreset" class="preset-select" title="Carregar Peça de Exemplo">
+            <option value="" disabled selected>Carregar Exemplo...</option>
+          </select>
+        </div>
+
+        <!-- Importar / Exportar JSON -->
+        <div class="io-buttons">
+          <button type="button" id="btnExport" class="btn-secondary" title="Exportar Peça (.json)">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+            Exportar
+          </button>
+          <label class="btn-secondary file-upload-btn" title="Importar Peça (.json)">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+            Importar
+            <input type="file" id="fileImport" accept=".json" style="display:none">
+          </label>
+        </div>
+
+        <!-- Volume e Tipo de Percussão -->
+        <div class="audio-quick-controls">
+          <button type="button" id="btnMute" class="icon-toggle-btn active" title="Silenciar / Ativar Som (M)">
+            <span id="muteIcon">🔊</span>
+          </button>
+          <select id="selectSoundType" class="sound-select" title="Timbre de Percussão">
+            <option value="woodblock">Bloco de Madeira</option>
+            <option value="clave">Clave / Rimshot</option>
+            <option value="click">Click Digital</option>
+            <option value="beep">Bip Senoidal</option>
+          </select>
+        </div>
+      </div>
+    </header>
+
+    <!-- PALCO PRINCIPAL CENTRALIZADO (DJ RUNNING VIEW) -->
+    <main class="main-stage">
+      
+      <!-- HUD DE TEMPO E INFORMAÇÕES AO VIVO -->
+      <section class="live-hud-panel">
+        <!-- Mostrador Digital de Tempo -->
+        <div class="hud-item time-display-box">
+          <div class="hud-label">TEMPO ATUAL / TOTAL</div>
+          <div class="hud-time-digits">
+            <span id="hudCurrentTime" class="digit-current">00:00.0</span>
+            <span class="digit-separator">/</span>
+            <span id="hudTotalTime" class="digit-total">00:00.0</span>
+          </div>
+        </div>
+
+        <!-- Compasso e Apelido Atual (Em Grande Destaque!) -->
+        <div class="hud-item measure-info-box">
+          <div class="hud-label">COMPASSO ATUAL</div>
+          <div class="hud-measure-title-row">
+            <span id="hudMeasureBadge" class="hud-measure-badge">c. 1</span>
+            <span id="hudMeasureNickname" class="hud-measure-nickname">Chamada de Caixa</span>
+          </div>
+          <div class="hud-group-pill" id="hudGroupPill">
+            <span class="group-dot">●</span>
+            <span id="hudGroupName">Introdução & Pulso Base</span>
+          </div>
+        </div>
+
+        <!-- Batimento e Métrica Ao Vivo -->
+        <div class="hud-item meter-info-box">
+          <div class="hud-label">TEMPO DA PEÇA & MÉTRICA</div>
+          <div class="hud-beat-counter">
+            <span id="hudBeatText" class="beat-text">Tempo 1 / 4</span>
+            <div id="hudBeatDots" class="beat-dots-container"></div>
+          </div>
+        </div>
+
+        <!-- Andamento Efetivo Atual com Relação Matemática -->
+        <div class="hud-item tempo-math-box">
+          <div class="hud-label">ANDAMENTO EFETIVO</div>
+          <div class="hud-effective-tempo">
+            <span id="hudBpmValue" class="effective-bpm-value">120</span>
+            <span class="bpm-unit">BPM</span>
+          </div>
+          <div id="hudTempoRatio" class="tempo-ratio-badge">1:1 (Andamento Base)</div>
+        </div>
+      </section>
+
+      <!-- VISUALIZADOR CORRIDO ESTILO DJ (CENTRALIZADO) -->
+      <section class="dj-runner-container">
+        
+        <!-- Minimapa / Overview da Peça -->
+        <div class="minimap-wrapper" title="Visão Geral da Peça - Clique para navegar">
+          <canvas id="minimapCanvas" class="minimap-canvas"></canvas>
+        </div>
+
+        <!-- Canvas Principal da Visão Corrida com Agulha Central -->
+        <div class="runner-viewport" id="runnerViewport">
+          <canvas id="djCanvas" class="dj-canvas"></canvas>
+          
+          <!-- Selo central de agulha -->
+          <div class="playhead-center-tag">
+            <span>AGULHA</span>
+          </div>
+        </div>
+
+        <!-- BARRA DE TRANSPORTE / PLAYBACK CONTROLS -->
+        <div class="transport-bar">
+          <div class="transport-left">
+            <button type="button" id="btnPrevMeasure" class="btn-transport" title="Compasso Anterior (←)">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
+            </button>
+            
+            <button type="button" id="btnPlayPause" class="btn-play-pause" title="Tocar / Pausar (Espaço)">
+              <svg id="playIcon" width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+              <svg id="pauseIcon" width="22" height="22" viewBox="0 0 24 24" fill="currentColor" style="display:none"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+            </button>
+
+            <button type="button" id="btnStopRewind" class="btn-transport" title="Voltar ao Início (R)">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h12v12H6z"/></svg>
+            </button>
+
+            <button type="button" id="btnNextMeasure" class="btn-transport" title="Próximo Compasso (→)">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
+            </button>
+          </div>
+
+          <div class="transport-center">
+            <!-- Controle de velocidade de estudo para músicos (0.5x, 0.75x, 1x) -->
+            <div class="practice-speed-selector">
+              <span class="speed-label">Estudo:</span>
+              <button type="button" class="speed-btn" data-speed="0.5">50%</button>
+              <button type="button" class="speed-btn" data-speed="0.75">75%</button>
+              <button type="button" class="speed-btn active" data-speed="1.0">100%</button>
+              <button type="button" class="speed-btn" data-speed="1.25">125%</button>
+            </div>
+
+            <!-- Loop da peça -->
+            <button type="button" id="btnLoop" class="btn-loop active" title="Repetir a peça continuamente">
+              🔁 Loop Peça
+            </button>
+          </div>
+
+          <div class="transport-right">
+            <!-- Ações rápidas de compasso e grupo -->
+            <button type="button" id="btnAddMeasureQuick" class="btn-primary-action">
+              + Adicionar Compasso
+            </button>
+            <button type="button" id="btnManageGroups" class="btn-secondary-action">
+              🗂️ Agrupar Compassos
+            </button>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- GERENCIADOR INFERIOR DE COMPASSOS & GRUPOS (NÃO ATRAPALHA A TELA) -->
+      <section class="measures-manager-section">
+        <div class="section-header">
+          <div class="section-title-box">
+            <h2 class="section-title">Compassos & Estrutura da Peça</h2>
+            <span class="section-subtitle" id="measureCountBadge">16 compassos configurados</span>
+          </div>
+          <div class="section-actions">
+            <button type="button" id="btnOpenGroupModal" class="btn-outline-white">
+              Novo Grupo de Compassos
+            </button>
+            <button type="button" id="btnAddMeasureBottom" class="btn-red-action">
+              + Compasso no Fim
+            </button>
+          </div>
+        </div>
+
+        <!-- Grade de Cartões dos Compassos (Agrupados Visualmente) -->
+        <div id="measuresGrid" class="measures-grid">
+          <!-- Gerado dinamicamente via JS -->
+        </div>
+      </section>
+
+    </main>
+
+    <!-- MODAL DE EDIÇÃO DE COMPASSO (CLEAN, NÃO POLUI A TELA) -->
+    <div id="modalMeasureEdit" class="modal-overlay" style="display:none">
+      <div class="modal-card">
+        <div class="modal-header">
+          <div class="modal-title-wrap">
+            <span class="modal-badge" id="modalMeasureIdx">Compasso 1</span>
+            <h3 class="modal-title">Configurar Compasso</h3>
+          </div>
+          <button type="button" class="modal-close-btn" id="btnModalClose">&times;</button>
+        </div>
+
+        <form id="formMeasureEdit" class="modal-form">
+          <input type="hidden" id="editMeasureIndex" value="-1">
+
+          <!-- Apelido do Compasso (O mais importante!) -->
+          <div class="form-group highlight-group">
+            <label for="editNickname" class="form-label">
+              <span>APELIDO / NOME DO COMPASSO</span>
+              <span class="label-desc">Nome em destaque na visão de DJ</span>
+            </label>
+            <input type="text" id="editNickname" class="form-input text-prominent" placeholder="ex: Chamada de Caixa, Clímax 7/8, Solo" required>
+          </div>
+
+          <!-- Métrica: Quantas notas / tempos tem o compasso -->
+          <div class="form-row">
+            <div class="form-group">
+              <label for="editBeats" class="form-label">Quantidade de Tempos (Notas)</label>
+              <input type="number" id="editBeats" class="form-input" min="1" max="32" value="4" required>
+            </div>
+            <div class="form-group">
+              <label for="editBeatUnit" class="form-label">Unidade do Tempo</label>
+              <select id="editBeatUnit" class="form-select">
+                <option value="4">Semínima (/4)</option>
+                <option value="8">Colcheia (/8)</option>
+                <option value="16">Semicolcheia (/16)</option>
+                <option value="2">Mínima (/2)</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Mudança de Andamento / Modulação Matemática -->
+          <div class="form-group">
+            <label class="form-label">
+              <span>MUDANÇA DE ANDAMENTO (MATEMÁTICA / MODULAÇÃO)</span>
+              <span class="label-desc">Cálculo proporcional com base no andamento original</span>
+            </label>
+            
+            <div class="radio-toggle-group">
+              <label class="radio-tab">
+                <input type="radio" name="tempoMode" value="ratio" checked id="radioModeRatio">
+                <span>Relação Matemática (Frações)</span>
+              </label>
+              <label class="radio-tab">
+                <input type="radio" name="tempoMode" value="fixed" id="radioModeFixed">
+                <span>BPM Fixo Específico</span>
+              </label>
+            </div>
+
+            <!-- Painel de Fração Matemática -->
+            <div id="panelTempoRatio" class="tempo-subpanel">
+              <div class="ratio-presets-row">
+                <button type="button" class="preset-ratio-btn active" data-num="1" data-den="1">1:1 (Base)</button>
+                <button type="button" class="preset-ratio-btn" data-num="3" data-den="2">3/2 (1.5x)</button>
+                <button type="button" class="preset-ratio-btn" data-num="4" data-den="3">4/3 (1.33x)</button>
+                <button type="button" class="preset-ratio-btn" data-num="2" data-den="3">2/3 (0.67x)</button>
+                <button type="button" class="preset-ratio-btn" data-num="5" data-den="4">5/4 (1.25x)</button>
+                <button type="button" class="preset-ratio-btn" data-num="3" data-den="4">3/4 (0.75x)</button>
+              </div>
+
+              <div class="fraction-inputs-row">
+                <div class="fraction-box">
+                  <label>Numerador</label>
+                  <input type="number" id="editRatioNum" class="form-input num-center" min="1" max="64" value="1">
+                </div>
+                <span class="fraction-slash">/</span>
+                <div class="fraction-box">
+                  <label>Denominador</label>
+                  <input type="number" id="editRatioDen" class="form-input num-center" min="1" max="64" value="1">
+                </div>
+                <div class="ratio-result-box">
+                  <span class="result-label">Resultará em:</span>
+                  <span id="calcEffectiveBpm" class="result-bpm">120 BPM</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Painel de BPM Fixo -->
+            <div id="panelTempoFixed" class="tempo-subpanel" style="display:none">
+              <div class="fixed-bpm-row">
+                <label for="editCustomBpm">BPM Fixo deste compasso:</label>
+                <input type="number" id="editCustomBpm" class="form-input" min="20" max="400" value="120">
+              </div>
+            </div>
+          </div>
+
+          <!-- Cor do Compasso -->
+          <div class="form-group">
+            <label class="form-label">Cor de Identificação</label>
+            <div class="color-palette-row">
+              <button type="button" class="color-swatch-btn" style="background:#ff334b" data-color="#ff334b"></button>
+              <button type="button" class="color-swatch-btn" style="background:#dc2626" data-color="#dc2626"></button>
+              <button type="button" class="color-swatch-btn" style="background:#3b82f6" data-color="#3b82f6"></button>
+              <button type="button" class="color-swatch-btn" style="background:#10b981" data-color="#10b981"></button>
+              <button type="button" class="color-swatch-btn" style="background:#8b5cf6" data-color="#8b5cf6"></button>
+              <button type="button" class="color-swatch-btn" style="background:#ec4899" data-color="#ec4899"></button>
+              <button type="button" class="color-swatch-btn" style="background:#64748b" data-color="#64748b"></button>
+              <input type="color" id="editColorPicker" value="#ff334b" class="custom-color-input" title="Personalizar cor">
+            </div>
+          </div>
+
+          <!-- Botões do Rodapé do Modal -->
+          <div class="modal-footer">
+            <button type="button" id="btnDeleteMeasureModal" class="btn-danger-outline">Excluir Compasso</button>
+            <div class="modal-footer-right">
+              <button type="button" id="btnDuplicateMeasureModal" class="btn-secondary">Duplicar</button>
+              <button type="submit" class="btn-primary-action">Salvar Alterações</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- MODAL DE GERENCIAMENTO DE GRUPOS (AGRUPAR COMPASSOS VIZINHOS) -->
+    <div id="modalGroupManage" class="modal-overlay" style="display:none">
+      <div class="modal-card">
+        <div class="modal-header">
+          <div class="modal-title-wrap">
+            <span class="modal-badge">Agrupamentos</span>
+            <h3 class="modal-title">Agrupar Compassos Vizinhos</h3>
+          </div>
+          <button type="button" class="modal-close-btn" id="btnGroupModalClose">&times;</button>
+        </div>
+
+        <div class="group-modal-body">
+          <p class="modal-description">
+            Crie seções temáticas (ex: Introdução, Desenvolvimento 3/2, Solo) envolvendo compassos vizinhos com uma cor e nome de destaque.
+          </p>
+
+          <!-- Formulário de Criar/Editar Grupo -->
+          <form id="formCreateGroup" class="create-group-form">
+            <div class="form-group">
+              <label for="newGroupName" class="form-label">Nome do Grupo / Seção</label>
+              <input type="text" id="newGroupName" class="form-input" placeholder="ex: Introdução, Polirritmia A, Coda" required>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label for="newGroupStart" class="form-label">Compasso Inicial</label>
+                <select id="newGroupStart" class="form-select"></select>
+              </div>
+              <div class="form-group">
+                <label for="newGroupEnd" class="form-label">Compasso Final</label>
+                <select id="newGroupEnd" class="form-select"></select>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Cor do Grupo</label>
+              <div class="color-palette-row">
+                <button type="button" class="group-color-btn selected" style="background:#ff334b" data-color="#ff334b"></button>
+                <button type="button" class="group-color-btn" style="background:#3b82f6" data-color="#3b82f6"></button>
+                <button type="button" class="group-color-btn" style="background:#10b981" data-color="#10b981"></button>
+                <button type="button" class="group-color-btn" style="background:#8b5cf6" data-color="#8b5cf6"></button>
+                <button type="button" class="group-color-btn" style="background:#ec4899" data-color="#ec4899"></button>
+                <button type="button" class="group-color-btn" style="background:#f97316" data-color="#f97316"></button>
+                <input type="color" id="newGroupColorPicker" value="#3b82f6" class="custom-color-input">
+              </div>
+            </div>
+
+            <button type="submit" class="btn-primary-action" style="width:100%">
+              + Criar / Salvar Grupo
+            </button>
+          </form>
+
+          <!-- Lista de Grupos Existentes -->
+          <div class="existing-groups-section">
+            <h4 class="existing-groups-title">Grupos Existentes</h4>
+            <div id="existingGroupsList" class="existing-groups-list">
+              <!-- Preenchido dinamicamente -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RODAPÉ DISCRETO -->
+    <footer class="app-footer">
+      <div class="footer-content">
+        <span>🥁 <strong>Sérgio Simulator</strong> — Estudo Percussivo de Modulação Métrica e Métricas Mistas</span>
+        <div class="footer-shortcuts">
+          <kbd>Espaço</kbd> Play/Pause
+          <kbd>R</kbd> Reiniciar
+          <kbd>←</kbd> <kbd>→</kbd> Navegar Compassos
+          <kbd>M</kbd> Mute
+        </div>
+      </div>
+    </footer>
+
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

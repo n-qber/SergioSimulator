@@ -1,0 +1,15 @@
+{
+  "name": "sergio-simulator",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Simulador Rítmico de Modulação Métrica e Visão Corrida estilo DJ para Percussão",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --port 3000 --host",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "vite": "^6.2.0"
+  }
+}
