@@ -8,37 +8,26 @@ class PercussionAudioEngine {
   constructor() {
     this.ctx = null;
     this.masterGain = null;
-    this.isPlaying = false;
     this.isMuted = false;
     this.volume = 0.8;
     this.soundType = "woodblock"; // 'woodblock', 'clave', 'click', 'beep'
-
-    // Lookahead scheduler settings
-    this.lookaheadMs = 25.0; // Frequência do timer em ms
-    this.scheduleAheadTime = 0.12; // Janela de agendamento em segundos (120ms)
-    this.timerId = null;
-
-    // Estado de reprodução
-    this.currentPlaybackTime = 0; // Posição virtual na peça (segundos)
-    this.playbackStartTime = 0;
-    this.audioStartOffset = 0;
-    this.lastScheduledBeatTime = -1;
 
     // Callbacks para sincronização visual
     this.onBeatListeners = new Set();
   }
 
-  init() {
+  async init() {
     if (!this.ctx) {
       const AudioCtx = window.AudioContext || window.webkitAudioContext;
-      this.ctx = new AudioCtx();
+      this.ctx = new AudioCtx({ latencyHint: 'interactive' });
       this.masterGain = this.ctx.createGain();
       this.masterGain.gain.setValueAtTime(this.isMuted ? 0 : this.volume, this.ctx.currentTime);
       this.masterGain.connect(this.ctx.destination);
     }
     if (this.ctx.state === "suspended") {
-      this.ctx.resume();
+      await this.ctx.resume();
     }
+    return this.ctx;
   }
 
   setVolume(val) {
@@ -75,7 +64,7 @@ class PercussionAudioEngine {
   }
 
   /**
-   * Síntese de percussão analógica usando nós nativos do Web Audio API
+   * Síntese de percussão analógica com liberação limpa de nós de áudio (zero GC stutter)
    */
   scheduleSound(time, isAccent = false) {
     if (!this.ctx || this.isMuted) return;
@@ -103,24 +92,32 @@ class PercussionAudioEngine {
     const filter = this.ctx.createBiquadFilter();
 
     filter.type = "bandpass";
-    const baseFreq = isAccent ? 1050 : 720;
+    const baseFreq = isAccent ? 1080 : 740;
     filter.frequency.setValueAtTime(baseFreq, time);
-    filter.Q.setValueAtTime(12, time);
+    filter.Q.setValueAtTime(14, time);
 
     osc.type = "sine";
-    osc.frequency.setValueAtTime(baseFreq * 1.5, time);
-    osc.frequency.exponentialRampToValueAtTime(baseFreq, time + 0.015);
+    osc.frequency.setValueAtTime(baseFreq * 1.6, time);
+    osc.frequency.exponentialRampToValueAtTime(baseFreq, time + 0.012);
 
-    gain.gain.setValueAtTime(0.001, time);
-    gain.gain.exponentialRampToValueAtTime(isAccent ? 1.0 : 0.65, time + 0.002);
-    gain.gain.exponentialRampToValueAtTime(0.0001, time + (isAccent ? 0.08 : 0.055));
+    gain.gain.setValueAtTime(0.0001, time);
+    gain.gain.exponentialRampToValueAtTime(isAccent ? 1.0 : 0.65, time + 0.0015);
+    gain.gain.exponentialRampToValueAtTime(0.0001, time + (isAccent ? 0.075 : 0.05));
 
     osc.connect(filter);
     filter.connect(gain);
     gain.connect(this.masterGain);
 
     osc.start(time);
-    osc.stop(time + 0.09);
+    const stopTime = time + 0.08;
+    osc.stop(stopTime);
+
+    // Desconecta nós de áudio após finalização para evitar vazamento de memória e travamentos do GC
+    osc.onended = () => {
+      osc.disconnect();
+      filter.disconnect();
+      gain.disconnect();
+    };
   }
 
   playClave(time, isAccent) {
@@ -128,17 +125,17 @@ class PercussionAudioEngine {
     const osc2 = this.ctx.createOscillator();
     const gain = this.ctx.createGain();
 
-    const freq1 = isAccent ? 2450 : 1900;
-    const freq2 = isAccent ? 2900 : 2300;
+    const freq1 = isAccent ? 2500 : 1950;
+    const freq2 = isAccent ? 3000 : 2350;
 
     osc1.type = "sine";
     osc2.type = "sine";
     osc1.frequency.setValueAtTime(freq1, time);
     osc2.frequency.setValueAtTime(freq2, time);
 
-    gain.gain.setValueAtTime(0.001, time);
-    gain.gain.exponentialRampToValueAtTime(isAccent ? 0.9 : 0.55, time + 0.002);
-    gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.045);
+    gain.gain.setValueAtTime(0.0001, time);
+    gain.gain.exponentialRampToValueAtTime(isAccent ? 0.9 : 0.55, time + 0.0015);
+    gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.04);
 
     osc1.connect(gain);
     osc2.connect(gain);
@@ -146,8 +143,15 @@ class PercussionAudioEngine {
 
     osc1.start(time);
     osc2.start(time);
-    osc1.stop(time + 0.05);
-    osc2.stop(time + 0.05);
+    const stopTime = time + 0.045;
+    osc1.stop(stopTime);
+    osc2.stop(stopTime);
+
+    osc1.onended = () => {
+      osc1.disconnect();
+      osc2.disconnect();
+      gain.disconnect();
+    };
   }
 
   playClick(time, isAccent) {
@@ -156,17 +160,23 @@ class PercussionAudioEngine {
 
     osc.type = "triangle";
     osc.frequency.setValueAtTime(isAccent ? 1600 : 900, time);
-    osc.frequency.exponentialRampToValueAtTime(200, time + 0.025);
+    osc.frequency.exponentialRampToValueAtTime(150, time + 0.02);
 
-    gain.gain.setValueAtTime(0.001, time);
+    gain.gain.setValueAtTime(0.0001, time);
     gain.gain.exponentialRampToValueAtTime(isAccent ? 1.0 : 0.6, time + 0.001);
-    gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.03);
+    gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.025);
 
     osc.connect(gain);
     gain.connect(this.masterGain);
 
     osc.start(time);
-    osc.stop(time + 0.035);
+    const stopTime = time + 0.03;
+    osc.stop(stopTime);
+
+    osc.onended = () => {
+      osc.disconnect();
+      gain.disconnect();
+    };
   }
 
   playBeep(time, isAccent) {
@@ -176,15 +186,21 @@ class PercussionAudioEngine {
     osc.type = "sine";
     osc.frequency.setValueAtTime(isAccent ? 1200 : 800, time);
 
-    gain.gain.setValueAtTime(0.001, time);
-    gain.gain.exponentialRampToValueAtTime(isAccent ? 0.8 : 0.45, time + 0.003);
-    gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.04);
+    gain.gain.setValueAtTime(0.0001, time);
+    gain.gain.exponentialRampToValueAtTime(isAccent ? 0.8 : 0.45, time + 0.002);
+    gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.035);
 
     osc.connect(gain);
     gain.connect(this.masterGain);
 
     osc.start(time);
-    osc.stop(time + 0.045);
+    const stopTime = time + 0.04;
+    osc.stop(stopTime);
+
+    osc.onended = () => {
+      osc.disconnect();
+      gain.disconnect();
+    };
   }
 }
 
