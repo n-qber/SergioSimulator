@@ -98,7 +98,7 @@ class SergioApp {
       btnPrevMeasure: document.getElementById('btnPrevMeasure'),
       btnNextMeasure: document.getElementById('btnNextMeasure'),
       btnLoop: document.getElementById('btnLoop'),
-      speedBtns: document.querySelectorAll('.speed-btn'),
+      speedBtns: document.querySelectorAll('.speed-opt'),
       btnAddMeasureQuick: document.getElementById('btnAddMeasureQuick'),
       btnManageGroups: document.getElementById('btnManageGroups'),
       btnAddMeasureBottom: document.getElementById('btnAddMeasureBottom'),
@@ -725,7 +725,7 @@ class SergioApp {
     this.dom.radioModeRatio.addEventListener('change', () => this.toggleTempoModePanels());
     this.dom.radioModeFixed.addEventListener('change', () => this.toggleTempoModePanels());
 
-    const ratioBtns = modal.querySelectorAll('.preset-ratio-btn');
+    const ratioBtns = modal.querySelectorAll('.btn-ratio-preset, .preset-ratio-btn');
     ratioBtns.forEach(btn => {
       btn.addEventListener('click', () => {
         ratioBtns.forEach(b => b.classList.remove('active'));
