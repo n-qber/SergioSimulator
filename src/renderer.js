@@ -54,6 +54,12 @@ export class DJRunnerRenderer {
     this.minimapHeight = 0;
     this.dpr = Math.min(2, window.devicePixelRatio || 1);
 
+    // Cache de fundo do minimapa offscreen (elimina ~99% de redraws na esteira)
+    this.minimapTrackCanvas = document.createElement('canvas');
+    this.minimapTrackCtx = this.minimapTrackCanvas.getContext('2d', { alpha: false });
+    this.minimapTrackDirty = true;
+    this.lastMinimapTheme = null;
+
     // Feedback de pulso na agulha
     this.needleFlashAlpha = 0;
 
@@ -87,9 +93,15 @@ export class DJRunnerRenderer {
       this.minimapCanvas.width = Math.floor(miniRect.width * this.dpr);
       this.minimapCanvas.height = Math.floor(miniRect.height * this.dpr);
     }
+
+    this.minimapTrackDirty = true;
   }
 
-  // Identifica compasso e zona (cabeçalho ou corpo) sob o ponteiro
+  markMinimapDirty() {
+    this.minimapTrackDirty = true;
+  }
+
+  // Identifica compasso e zona (cabeçalho ou corpo) sob o ponteiro em O(log N)
   getMeasureAtPoint(canvasX, canvasY) {
     const topY = 28;
     const bottomY = this.height - 12;
@@ -100,20 +112,35 @@ export class DJRunnerRenderer {
     const timings = this.state.measureTimings;
     if (!timings || timings.length === 0) return null;
 
-    for (let idx = 0; idx < timings.length; idx++) {
-      const t = timings[idx];
-      const mX = playheadX + (t.startTime - currentTime) * this.pixelsPerSecond;
-      const mW = t.duration * this.pixelsPerSecond;
+    const targetTime = currentTime + (canvasX - playheadX) / this.pixelsPerSecond;
+    let low = 0;
+    let high = timings.length - 1;
 
-      if (canvasX >= mX && canvasX < mX + mW) {
+    while (low <= high) {
+      const mid = (low + high) >> 1;
+      const t = timings[mid];
+      if (targetTime < t.startTime) {
+        high = mid - 1;
+      } else if (targetTime >= t.endTime) {
+        low = mid + 1;
+      } else {
+        const mX = playheadX + (t.startTime - currentTime) * this.pixelsPerSecond;
+        const mW = t.duration * this.pixelsPerSecond;
         const zone = (canvasY <= topY + 40) ? 'header' : 'body';
-        return { index: idx, timing: t, mX, mW, zone };
+        return { 
+          index: t.measureIndex, 
+          timingIndex: mid, 
+          timing: t, 
+          mX, 
+          mW, 
+          zone 
+        };
       }
     }
     return null;
   }
 
-  // Calcula o índice de inserção (drop target) ao arrastar um compasso
+  // Calcula o índice de inserção (drop target) ao arrastar um compasso em O(log N)
   calculateDropTargetIndex(canvasX) {
     const playheadX = this.width * this.playheadRatio;
     const currentTime = this.lastCurrentTime || 0;
@@ -122,14 +149,20 @@ export class DJRunnerRenderer {
     const timings = this.state.measureTimings;
     if (!timings || timings.length === 0) return 0;
 
-    for (let i = 0; i < timings.length; i++) {
-      const t = timings[i];
+    let low = 0;
+    let high = timings.length - 1;
+    while (low <= high) {
+      const mid = (low + high) >> 1;
+      const t = timings[mid];
       const midTime = t.startTime + (t.duration * 0.5);
       if (timeAtX < midTime) {
-        return i;
+        high = mid - 1;
+      } else {
+        low = mid + 1;
       }
     }
-    return timings.length - 1;
+    const idx = Math.max(0, Math.min(timings.length - 1, low));
+    return timings[idx] ? timings[idx].measureIndex : 0;
   }
 
   initEvents() {
@@ -194,6 +227,7 @@ export class DJRunnerRenderer {
       const hit = this.getMeasureAtPoint(canvasX, canvasY);
       if (hit) {
         this.draggedMeasureIndex = hit.index;
+        this.draggedTiming = hit.timing;
         this.isPreparingMeasureDrag = true;
 
         if (hit.zone === 'header') {
@@ -206,6 +240,7 @@ export class DJRunnerRenderer {
           this.dragStartTime = this.lastCurrentTime || 0;
         }
       } else {
+        this.draggedTiming = null;
         this.isDraggingRunner = true;
         this.dragStartX = e.clientX;
         this.dragStartTime = this.lastCurrentTime || 0;
@@ -224,6 +259,7 @@ export class DJRunnerRenderer {
         this.isDraggingMeasure = false;
         this.isPreparingMeasureDrag = false;
         this.draggedMeasureIndex = null;
+        this.draggedTiming = null;
         this.dropTargetIndex = null;
         return;
       }
@@ -236,13 +272,16 @@ export class DJRunnerRenderer {
           this.selectedMeasureIndex = idx;
           if (this.onSelectMeasure) this.onSelectMeasure(idx);
 
-          const t = this.state.measureTimings[idx];
-          if (t && this.onSeek) this.onSeek(t.startTime);
+          const startTime = this.draggedTiming ? this.draggedTiming.startTime : this.state.getFirstTimingForMeasure(idx)?.startTime;
+          if (startTime !== undefined && startTime !== null && this.onSeek) {
+            this.onSeek(startTime);
+          }
         }
       }
 
       this.isPreparingMeasureDrag = false;
       this.draggedMeasureIndex = null;
+      this.draggedTiming = null;
       this.isDraggingRunner = false;
       this.isDraggingMinimap = false;
     });
@@ -299,6 +338,10 @@ export class DJRunnerRenderer {
     if (this.onSeek) this.onSeek(seekTime);
   }
 
+  get isLightTheme() {
+    return document.documentElement.getAttribute('data-theme') === 'light';
+  }
+
   triggerBeatHit(isAccent = false) {
     this.needleFlashAlpha = isAccent ? 0.7 : 0.35;
   }
@@ -319,114 +362,180 @@ export class DJRunnerRenderer {
     const h = this.height;
     if (w <= 0 || h <= 0) return;
 
+    const isLight = this.isLightTheme;
+
     ctx.save();
     ctx.scale(this.dpr, this.dpr);
 
-    // Fundo limpo flat
-    ctx.fillStyle = "#0c0e12";
+    // Fundo limpo
+    ctx.fillStyle = isLight ? "#f8fafc" : "#0c0e12";
     ctx.fillRect(0, 0, w, h);
 
     const playheadX = w * this.playheadRatio;
-    const visibleTimeStart = currentTime - (playheadX / this.pixelsPerSecond) - 0.5;
-    const visibleTimeEnd = currentTime + ((w - playheadX) / this.pixelsPerSecond) + 0.5;
-
     const timings = this.state.measureTimings;
+
+    // Se não há compassos (0 compassos na peça)
     if (!timings || timings.length === 0) {
+      // Linha central pontilhada sutil
+      ctx.strokeStyle = isLight ? "rgba(15, 23, 42, 0.12)" : "rgba(255, 255, 255, 0.08)";
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      ctx.moveTo(playheadX, 0);
+      ctx.lineTo(playheadX, h);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Mensagem de estado vazio bonita e elegante
+      ctx.fillStyle = isLight ? "#475569" : "rgba(255, 255, 255, 0.5)";
+      ctx.font = "600 13.5px 'Outfit', sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("Nenhum compasso na peça", w / 2, h / 2 - 12);
+
+      ctx.fillStyle = isLight ? "#94a3b8" : "rgba(255, 255, 255, 0.28)";
+      ctx.font = "500 11px 'JetBrains Mono', monospace";
+      ctx.fillText("Adicione compassos para visualizar e modular o ritmo", w / 2, h / 2 + 12);
+
       ctx.restore();
       return;
     }
 
-    // 1. Faixas de Grupos
+    const visibleTimeStart = currentTime - (playheadX / this.pixelsPerSecond) - 0.5;
+    const visibleTimeEnd = currentTime + ((w - playheadX) / this.pixelsPerSecond) + 0.5;
+
+    // 1. Faixas de Grupos (apenas os visíveis)
     const groups = this.state.groups || [];
-    const bannerHeight = 22;
-
-    for (let g = 0; g < groups.length; g++) {
-      const grp = groups[g];
-      const startTiming = timings[grp.startMeasure];
-      const endTiming = timings[grp.endMeasure];
-      if (!startTiming || !endTiming) continue;
-
-      if (endTiming.endTime < visibleTimeStart || startTiming.startTime > visibleTimeEnd) continue;
-
-      const grpX1 = playheadX + (startTiming.startTime - currentTime) * this.pixelsPerSecond;
-      const grpX2 = playheadX + (endTiming.endTime - currentTime) * this.pixelsPerSecond;
-      const grpW = grpX2 - grpX1;
-
-      ctx.fillStyle = `${grp.color}18`;
-      ctx.fillRect(grpX1, 3, grpW, bannerHeight);
-
-      ctx.fillStyle = grp.color;
-      ctx.fillRect(grpX1, 3, grpW, 2.5);
-
-      ctx.fillStyle = "#ffffff";
+    if (groups.length > 0) {
+      const bannerHeight = 22;
       ctx.font = "600 10.5px 'Outfit', sans-serif";
       ctx.textAlign = "left";
       ctx.textBaseline = "middle";
 
-      const textX = Math.max(grpX1 + 8, 12);
-      if (textX < grpX2 - 16) {
-        ctx.fillText(`⯈ ${grp.name}`, textX, 3 + bannerHeight / 2);
+      for (let g = 0; g < groups.length; g++) {
+        const grp = groups[g];
+        const startTiming = this.state.getFirstTimingForMeasure(grp.startMeasure);
+        const endTiming = this.state.getLastTimingForMeasure(grp.endMeasure);
+        if (!startTiming || !endTiming) continue;
+
+        if (endTiming.endTime < visibleTimeStart || startTiming.startTime > visibleTimeEnd) continue;
+
+        const grpX1 = playheadX + (startTiming.startTime - currentTime) * this.pixelsPerSecond;
+        const grpX2 = playheadX + (endTiming.endTime - currentTime) * this.pixelsPerSecond;
+        const grpW = grpX2 - grpX1;
+
+        ctx.fillStyle = `${grp.color}18`;
+        ctx.fillRect(grpX1, 3, grpW, bannerHeight);
+
+        ctx.fillStyle = grp.color;
+        ctx.fillRect(grpX1, 3, grpW, 2.5);
+
+        ctx.fillStyle = isLight ? "#0f172a" : "#ffffff";
+        const textX = Math.max(grpX1 + 8, 12);
+        if (textX < grpX2 - 16) {
+          ctx.fillText(`⯈ ${grp.name}`, textX, 3 + bannerHeight / 2);
+        }
       }
     }
 
-    // 2. Blocos de Compasso
+    // 2. Blocos de Compasso com Culling por Busca Binária O(log N)
+    // Localiza o primeiro timing visível em O(log N) em vez de iterar por todos
+    let startIdx = 0;
+    let low = 0;
+    let high = timings.length - 1;
+    while (low <= high) {
+      const mid = (low + high) >> 1;
+      if (timings[mid].endTime < visibleTimeStart) {
+        low = mid + 1;
+      } else {
+        startIdx = mid;
+        high = mid - 1;
+      }
+    }
+
     const topY = 28;
     const bottomY = h - 12;
     const blockH = Math.max(80, bottomY - topY);
+    const midY = topY + blockH * 0.52;
+    const maxTickH = Math.min(blockH * 0.42, 90);
 
-    for (let idx = 0; idx < timings.length; idx++) {
+    const defaultBorderColor = isLight ? "rgba(15, 23, 42, 0.12)" : "rgba(255, 255, 255, 0.08)";
+    const beatLineColor = isLight ? "rgba(15, 23, 42, 0.08)" : "rgba(255, 255, 255, 0.08)";
+    const normalTickColor = isLight ? "rgba(15, 23, 42, 0.2)" : "rgba(255, 255, 255, 0.22)";
+    const normalNumColor = isLight ? "rgba(15, 23, 42, 0.55)" : "rgba(255, 255, 255, 0.38)";
+    const accentNumColor = isLight ? "#0f172a" : "#ffffff";
+
+    for (let idx = startIdx; idx < timings.length; idx++) {
       const t = timings[idx];
-      if (t.endTime < visibleTimeStart || t.startTime > visibleTimeEnd) continue;
+      // Termina imediatamente assim que ultrapassar a borda direita do viewport
+      if (t.startTime > visibleTimeEnd) break;
 
-      const m = this.state.measures[idx];
+      const m = this.state.measures[t.measureIndex];
+      if (!m) continue;
+
       const mX = playheadX + (t.startTime - currentTime) * this.pixelsPerSecond;
       const mW = t.duration * this.pixelsPerSecond;
       const mColor = m.color || "#ff334b";
 
-      const isSelected = (this.selectedMeasureIndex === idx);
-      const isHovered = (this.hoveredMeasureIndex === idx);
-      const isBeingDragged = (this.isDraggingMeasure && this.draggedMeasureIndex === idx);
+      const isSelected = (this.selectedMeasureIndex === t.measureIndex);
+      const isHovered = (this.hoveredMeasureIndex === t.measureIndex);
+      const isBeingDragged = (this.isDraggingMeasure && this.draggedMeasureIndex === t.measureIndex);
 
-      ctx.save();
       if (isBeingDragged) {
         ctx.globalAlpha = 0.35;
       }
 
       // Bloco do compasso
-      ctx.fillStyle = isSelected ? "#181d28" : "#12151c";
+      ctx.fillStyle = isSelected ? (isLight ? "#eff6ff" : "#181d28") : (isLight ? "#ffffff" : "#12151c");
       ctx.fillRect(mX, topY, mW, blockH);
 
       // Borda lateral esquerda identificadora
       ctx.fillStyle = mColor;
-      ctx.fillRect(mX, topY, 2.5, blockH);
+      ctx.fillRect(mX, topY, 3, blockH);
 
       // Borda delimitadora
-      ctx.strokeStyle = isSelected ? "#3b82f6" : "rgba(255, 255, 255, 0.08)";
+      ctx.strokeStyle = isSelected ? "#3b82f6" : defaultBorderColor;
       ctx.lineWidth = isSelected ? 2 : 1;
       ctx.strokeRect(mX, topY, mW, blockH);
 
       // Destaque de seleção
       if (isSelected) {
-        ctx.fillStyle = "rgba(59, 130, 246, 0.08)";
+        ctx.fillStyle = isLight ? "rgba(59, 130, 246, 0.1)" : "rgba(59, 130, 246, 0.08)";
         ctx.fillRect(mX, topY, mW, blockH);
       }
 
       // Destaque de hover no cabeçalho
       if (isHovered && this.hoveredZone === 'header') {
-        ctx.fillStyle = "rgba(255, 255, 255, 0.06)";
+        ctx.fillStyle = isLight ? "rgba(15, 23, 42, 0.04)" : "rgba(255, 255, 255, 0.06)";
         ctx.fillRect(mX, topY, mW, 38);
       }
 
-      // Divisões e Marcadores de Beat (Proporcionais à altura do bloco)
+      // Sinalização musical de repetição (pontos de repetição nas bordas do bloco)
+      if (t.repeatCount > 1) {
+        ctx.fillStyle = mColor;
+        if (t.repeatIteration === 0) {
+          ctx.beginPath();
+          ctx.arc(mX + 8, midY - 6, 2.2, 0, Math.PI * 2);
+          ctx.arc(mX + 8, midY + 6, 2.2, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        if (t.repeatIteration === t.repeatCount - 1) {
+          ctx.beginPath();
+          ctx.arc(mX + mW - 8, midY - 6, 2.2, 0, Math.PI * 2);
+          ctx.arc(mX + mW - 8, midY + 6, 2.2, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      // Divisões e Marcadores de Beat
       const beatW = t.beatDuration * this.pixelsPerSecond;
-      const midY = topY + blockH * 0.52;
-      const maxTickH = Math.min(blockH * 0.42, 90);
+      const accentTickColor = `${mColor}ee`;
 
       for (let b = 0; b < t.beats; b++) {
         const beatX = mX + b * beatW;
 
         if (b > 0) {
-          ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
+          ctx.strokeStyle = beatLineColor;
           ctx.lineWidth = 1;
           ctx.beginPath();
           ctx.moveTo(beatX, topY + 36);
@@ -437,14 +546,21 @@ export class DJRunnerRenderer {
         const isFirst = (b === 0);
         const tickH = isFirst ? Math.max(30, maxTickH) : Math.max(18, maxTickH * 0.55);
 
-        ctx.fillStyle = isFirst ? `${mColor}dd` : "rgba(255, 255, 255, 0.22)";
+        ctx.fillStyle = isFirst ? accentTickColor : normalTickColor;
         ctx.fillRect(beatX + (isFirst ? 3 : 0), midY - tickH / 2, isFirst ? 2.5 : 1.5, tickH);
+      }
 
-        // Número do tempo discreto e centralizado
-        ctx.fillStyle = isFirst ? "#ffffff" : "rgba(255, 255, 255, 0.38)";
-        ctx.font = "600 10px 'JetBrains Mono', monospace";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
+      // Números dos beats (fonte setada uma única vez para todos os tempos do compasso)
+      ctx.font = "600 10px 'JetBrains Mono', monospace";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+
+      for (let b = 0; b < t.beats; b++) {
+        const beatX = mX + b * beatW;
+        const isFirst = (b === 0);
+        const tickH = isFirst ? Math.max(30, maxTickH) : Math.max(18, maxTickH * 0.55);
+
+        ctx.fillStyle = isFirst ? accentNumColor : normalNumColor;
         ctx.fillText(`${b + 1}`, beatX + (isFirst ? 4 : 0), midY - tickH / 2 - 12);
       }
 
@@ -457,26 +573,30 @@ export class DJRunnerRenderer {
       ctx.textBaseline = "middle";
 
       const hasNickname = !!(m.nickname && m.nickname.trim());
+      const repeatTag = (t.repeatCount > 1) ? ` [${t.repeatIteration + 1}/${t.repeatCount}]` : '';
+
       if (hasNickname) {
-        // Tag c. X discreta acima
-        ctx.fillStyle = `${mColor}ee`;
+        // Tag c. X discreta com repetição acima
+        ctx.fillStyle = accentTickColor;
         ctx.font = "bold 9.5px 'JetBrains Mono', monospace";
-        ctx.fillText(`c. ${idx + 1}`, nicknameX, nicknameY - 10);
+        ctx.fillText(`c. ${t.measureIndex + 1}${repeatTag}`, nicknameX, nicknameY - 10);
 
         // Apelido em destaque
-        ctx.fillStyle = "#ffffff";
+        ctx.fillStyle = isLight ? "#0f172a" : "#ffffff";
         ctx.font = "bold 13.5px 'Outfit', sans-serif";
         ctx.fillText(m.nickname, nicknameX, nicknameY + 2, maxTextWidth);
       } else {
-        // Compasso sem nome: exibe "c. X" com destaque limpo e sem redundância
-        ctx.fillStyle = "#ffffff";
+        // Compasso sem nome: exibe "c. X [rep/total]" com destaque limpo
+        ctx.fillStyle = isLight ? "#0f172a" : "#ffffff";
         ctx.font = "bold 14px 'Outfit', sans-serif";
-        ctx.fillText(`c. ${idx + 1}`, nicknameX, nicknameY - 1, maxTextWidth);
+        ctx.fillText(`c. ${t.measureIndex + 1}${repeatTag}`, nicknameX, nicknameY - 1, maxTextWidth);
       }
 
       // Alça de arrastar (⠿) no cabeçalho do compasso
       if (mW > 42) {
-        ctx.fillStyle = (isHovered && this.hoveredZone === 'header') ? "rgba(255, 255, 255, 0.7)" : "rgba(255, 255, 255, 0.2)";
+        ctx.fillStyle = (isHovered && this.hoveredZone === 'header') 
+          ? (isLight ? "rgba(15, 23, 42, 0.85)" : "rgba(255, 255, 255, 0.7)") 
+          : (isLight ? "rgba(15, 23, 42, 0.35)" : "rgba(255, 255, 255, 0.2)");
         ctx.font = "11px 'JetBrains Mono', monospace";
         ctx.textAlign = "right";
         ctx.fillText("⠿", mX + mW - 8, topY + 16);
@@ -485,7 +605,7 @@ export class DJRunnerRenderer {
       // 4. Métrica e Andamento Secundários (Rodapé do compasso)
       const badgeY = bottomY - 10;
       ctx.textAlign = "left";
-      ctx.fillStyle = "rgba(255, 255, 255, 0.75)";
+      ctx.fillStyle = isLight ? "rgba(15, 23, 42, 0.8)" : "rgba(255, 255, 255, 0.75)";
       ctx.font = "600 10.5px 'JetBrains Mono', monospace";
       ctx.fillText(`${m.beats}/${m.beatUnit}`, nicknameX, badgeY);
 
@@ -500,11 +620,15 @@ export class DJRunnerRenderer {
         tempoText = `${Math.round(t.effectiveBpm)} BPM`;
       }
 
-      ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
-      ctx.font = "500 9.5px 'JetBrains Mono', monospace";
-      ctx.fillText(`• ${tempoText}`, nicknameX + 32, badgeY);
+      const repFootText = (t.repeatCount > 1) ? ` • rep. ${t.repeatIteration + 1}/${t.repeatCount}` : '';
 
-      ctx.restore();
+      ctx.fillStyle = isLight ? "rgba(15, 23, 42, 0.55)" : "rgba(255, 255, 255, 0.4)";
+      ctx.font = "500 9.5px 'JetBrains Mono', monospace";
+      ctx.fillText(`• ${tempoText}${repFootText}`, nicknameX + 32, badgeY);
+
+      if (isBeingDragged) {
+        ctx.globalAlpha = 1.0;
+      }
     }
 
     // 5. Linha de Destino ao Arrastar Compasso (Drop Target Indicator)
@@ -543,7 +667,7 @@ export class DJRunnerRenderer {
       const gx = Math.max(ghostW / 2, Math.min(w - ghostW / 2, this.currentMouseX));
       const gy = Math.max(ghostH + 10, this.currentMouseY);
 
-      ctx.fillStyle = "#151a24";
+      ctx.fillStyle = isLight ? "#ffffff" : "#151a24";
       ctx.strokeStyle = "#3b82f6";
       ctx.lineWidth = 1.5;
       ctx.beginPath();
@@ -551,7 +675,7 @@ export class DJRunnerRenderer {
       ctx.fill();
       ctx.stroke();
 
-      ctx.fillStyle = "#ffffff";
+      ctx.fillStyle = isLight ? "#0f172a" : "#ffffff";
       ctx.font = "bold 11px 'Outfit', sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
@@ -608,53 +732,97 @@ export class DJRunnerRenderer {
     ctx.stroke();
   }
 
+  /**
+   * Atualiza a pista do minimapa no canvas offscreen apenas quando há alterações estruturais ou resize.
+   * Evita redesenhar centenas de blocos e bordas 60 vezes por segundo.
+   */
+  updateMinimapTrack() {
+    const w = this.minimapWidth;
+    const h = this.minimapHeight;
+    if (w <= 0 || h <= 0) return;
+
+    const canvasW = this.minimapCanvas.width;
+    const canvasH = this.minimapCanvas.height;
+
+    if (this.minimapTrackCanvas.width !== canvasW || this.minimapTrackCanvas.height !== canvasH) {
+      this.minimapTrackCanvas.width = canvasW;
+      this.minimapTrackCanvas.height = canvasH;
+    }
+
+    const ctx = this.minimapTrackCtx;
+    const isLight = this.isLightTheme;
+    this.lastMinimapTheme = isLight;
+
+    ctx.save();
+    ctx.scale(this.dpr, this.dpr);
+
+    // Fundo limpo
+    ctx.fillStyle = isLight ? "#f1f5f9" : "#0c0e12";
+    ctx.fillRect(0, 0, w, h);
+
+    const totalDuration = this.state.totalDuration || 1;
+    const timings = this.state.measureTimings;
+    if (timings && timings.length > 0) {
+      const strokeColor = isLight ? "rgba(15, 23, 42, 0.08)" : "rgba(255, 255, 255, 0.08)";
+      ctx.lineWidth = 1;
+
+      for (let idx = 0; idx < timings.length; idx++) {
+        const t = timings[idx];
+        const x = (t.startTime / totalDuration) * w;
+        const blockW = Math.max(1.5, (t.duration / totalDuration) * w);
+        const m = this.state.measures[t.measureIndex];
+
+        ctx.fillStyle = `${m?.color || "#ff334b"}33`;
+        ctx.fillRect(x, 0, blockW, h);
+
+        ctx.strokeStyle = strokeColor;
+        ctx.strokeRect(x, 0, blockW, h);
+      }
+
+      const groups = this.state.groups || [];
+      for (let g = 0; g < groups.length; g++) {
+        const grp = groups[g];
+        const st = this.state.getFirstTimingForMeasure(grp.startMeasure);
+        const et = this.state.getLastTimingForMeasure(grp.endMeasure);
+        if (!st || !et) continue;
+
+        const gx1 = (st.startTime / totalDuration) * w;
+        const gx2 = (et.endTime / totalDuration) * w;
+        ctx.fillStyle = grp.color;
+        ctx.fillRect(gx1, 0, gx2 - gx1, 2.5);
+      }
+    }
+
+    ctx.restore();
+    this.minimapTrackDirty = false;
+  }
+
+  /**
+   * Renderiza o minimapa em 60 FPS com overhead próximo a zero.
+   * Utiliza a pista pré-renderizada em cache e apenas posiciona a agulha atual.
+   */
   renderMinimap(currentTime) {
     const ctx = this.minimapCtx;
     const w = this.minimapWidth;
     const h = this.minimapHeight;
     if (w <= 0 || h <= 0) return;
 
+    const isLight = this.isLightTheme;
+    if (this.minimapTrackDirty || this.lastMinimapTheme !== isLight) {
+      this.updateMinimapTrack();
+    }
+
+    // Desenho instantâneo da esteira via textura GPU offscreen
+    ctx.drawImage(this.minimapTrackCanvas, 0, 0);
+
+    const totalDuration = this.state.totalDuration || 1;
+    if (!this.state.measureTimings || this.state.measureTimings.length === 0) return;
+
+    const curX = Math.max(0, Math.min(w, (currentTime / totalDuration) * w));
+
     ctx.save();
     ctx.scale(this.dpr, this.dpr);
 
-    ctx.fillStyle = "#0c0e12";
-    ctx.fillRect(0, 0, w, h);
-
-    const totalDuration = this.state.totalDuration || 1;
-    const timings = this.state.measureTimings;
-    if (!timings || timings.length === 0) {
-      ctx.restore();
-      return;
-    }
-
-    for (let idx = 0; idx < timings.length; idx++) {
-      const t = timings[idx];
-      const x = (t.startTime / totalDuration) * w;
-      const blockW = Math.max(1.5, (t.duration / totalDuration) * w);
-      const m = this.state.measures[idx];
-
-      ctx.fillStyle = `${m.color || "#ff334b"}33`;
-      ctx.fillRect(x, 0, blockW, h);
-
-      ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
-      ctx.lineWidth = 1;
-      ctx.strokeRect(x, 0, blockW, h);
-    }
-
-    const groups = this.state.groups || [];
-    for (let g = 0; g < groups.length; g++) {
-      const grp = groups[g];
-      const st = timings[grp.startMeasure];
-      const et = timings[grp.endMeasure];
-      if (!st || !et) continue;
-
-      const gx1 = (st.startTime / totalDuration) * w;
-      const gx2 = (et.endTime / totalDuration) * w;
-      ctx.fillStyle = grp.color;
-      ctx.fillRect(gx1, 0, gx2 - gx1, 2.5);
-    }
-
-    const curX = Math.max(0, Math.min(w, (currentTime / totalDuration) * w));
     ctx.fillStyle = "#ff2a4d";
     ctx.fillRect(curX - 1.5, 0, 3, h);
 

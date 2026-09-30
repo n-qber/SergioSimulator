@@ -42,7 +42,16 @@
 
       <!-- Lado Direito: Ações Rápidas -->
       <div class="header-right">
-        <select id="selectPreset" class="clean-select" title="Carregar Exemplo">
+        <div id="saveIndicator" class="save-status-pill" title="Peça salva automaticamente no navegador">
+          <span class="save-dot"></span>
+          <span class="save-text">Salvo</span>
+        </div>
+
+        <button type="button" id="btnNewPiece" class="btn-text-action btn-new-piece" title="Iniciar Nova Peça em Branco (Ctrl+N)">
+          <span class="btn-icon">📄</span> Novo
+        </button>
+
+        <select id="selectPreset" class="clean-select" title="Carregar Exemplo ou Nova Peça">
           <option value="" disabled selected>Peças de Exemplo...</option>
         </select>
         
@@ -51,6 +60,10 @@
           Importar
           <input type="file" id="fileImport" accept=".json" style="display:none">
         </label>
+
+        <button type="button" id="btnThemeToggle" class="btn-icon-action" title="Alternar Tema Claro / Escuro (T)">
+          <span id="themeIcon">☀️</span>
+        </button>
 
         <button type="button" id="btnMute" class="btn-icon-mute active" title="Mudo (M)">
           <span id="muteIcon">🔊</span>
@@ -177,6 +190,7 @@
             <span id="measureCountBadge" class="count-tag">16 compassos</span>
           </div>
           <div class="section-top-buttons">
+            <button type="button" id="btnClearAllMeasures" class="btn-ghost-sm" title="Remover todos os compassos da peça">Limpar Peça</button>
             <button type="button" id="btnOpenGroupModal" class="btn-ghost-sm">Novo Grupo</button>
             <button type="button" id="btnAddMeasureBottom" class="btn-red-sm">+ Compasso</button>
           </div>
@@ -206,7 +220,7 @@
             <input type="text" id="editNickname" class="clean-input nickname-input" placeholder="ex: Chamada de Caixa, Clímax (opcional)">
           </div>
 
-          <!-- Métrica (Notas e Unidade) -->
+          <!-- Métrica e Repetições -->
           <div class="field-row">
             <div class="field-group">
               <label for="editBeats" class="field-label">Tempos (Notas)</label>
@@ -220,6 +234,10 @@
                 <option value="16">Semicolcheia (/16)</option>
                 <option value="2">Mínima (/2)</option>
               </select>
+            </div>
+            <div class="field-group">
+              <label for="editRepeat" class="field-label" title="Quantas vezes este compasso se repete continuamente">Repetições (x)</label>
+              <input type="number" id="editRepeat" class="clean-input" min="1" max="999" value="1" required>
             </div>
           </div>
 
@@ -338,6 +356,38 @@
             <span class="field-label" style="margin-bottom:8px; display:block">Grupos Criados</span>
             <div id="existingGroupsList" class="clean-groups-list"></div>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL DE CONFIRMAÇÃO: NOVO ARQUIVO / LIMPAR TUDO (DOUBLE CHECK) -->
+    <div id="modalConfirmNewPiece" class="modal-overlay" style="display:none">
+      <div class="modal-window modal-confirm-window">
+        <div class="modal-top">
+          <span class="modal-measure-tag tag-warning">Novo Arquivo</span>
+          <h3 class="modal-heading">Criar Nova Peça em Branco?</h3>
+          <button type="button" class="modal-x" id="btnConfirmNewClose">&times;</button>
+        </div>
+
+        <div class="modal-body-clean confirm-body">
+          <div class="confirm-icon-box">
+            <span class="confirm-emoji">📄</span>
+          </div>
+          <div class="confirm-content">
+            <h4 class="confirm-title">Deseja realmente limpar tudo?</h4>
+            <p class="confirm-desc">
+              Esta ação irá remover todos os compassos, grupos e redefinir a linha do tempo para uma peça vazia.
+            </p>
+            <div class="confirm-alert-box">
+              <span class="confirm-alert-icon">⚠️</span>
+              <span class="confirm-alert-text">Quaisquer alterações não exportadas em arquivo JSON serão descartadas.</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-bottom confirm-bottom">
+          <button type="button" class="btn-ghost-sm" id="btnCancelNewPiece">Cancelar</button>
+          <button type="button" class="btn-red-sm btn-danger-confirm" id="btnExecuteNewPiece">Sim, Limpar e Iniciar Nova</button>
         </div>
       </div>
     </div>

@@ -5,9 +5,32 @@
 
 import { PRESETS } from './presets.js';
 
+const STORAGE_KEY = 'sergio_piece_data';
+
 class PieceState {
   constructor() {
     this.listeners = new Set();
+    this.loadInitialState();
+  }
+
+  loadInitialState() {
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+      this.resetToDefault();
+      return;
+    }
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        const pieceData = parsed.piece || parsed;
+        if (pieceData && Array.isArray(pieceData.measures)) {
+          this.loadPieceData(pieceData);
+          return;
+        }
+      }
+    } catch (e) {
+      console.warn("Não foi possível carregar peça salva:", e);
+    }
     this.resetToDefault();
   }
 
@@ -19,7 +42,7 @@ class PieceState {
 
   loadPieceData(data) {
     this.id = data.id || `piece-${Date.now()}`;
-    this.name = data.name || "Peça nº 1";
+    this.name = data.name !== undefined ? data.name : "Peça nº 1";
     this.description = data.description || "";
     this.baseBpm = Math.max(20, Math.min(400, Number(data.baseBpm) || 120));
     
@@ -32,30 +55,21 @@ class PieceState {
       ratioNum: Math.max(1, parseInt(m.ratioNum, 10) || 1),
       ratioDen: Math.max(1, parseInt(m.ratioDen, 10) || 1),
       customBpm: Math.max(20, Math.min(500, Number(m.customBpm) || this.baseBpm)),
-      color: m.color || "#ff334b"
+      color: m.color || "#ff334b",
+      repeat: Math.max(1, Math.min(999, parseInt(m.repeat, 10) || 1))
     }));
 
-    if (this.measures.length === 0) {
-      this.measures.push({
-        id: `m-init`,
-        nickname: "",
-        beats: 4,
-        beatUnit: 4,
-        tempoMode: "ratio",
-        ratioNum: 1,
-        ratioDen: 1,
-        customBpm: this.baseBpm,
-        color: "#ff334b"
-      });
-    }
-
-    this.groups = (data.groups || []).map((g, idx) => ({
-      id: g.id || `grp-${Date.now()}-${idx}`,
-      name: g.name || `Grupo ${idx + 1}`,
-      color: g.color || "#3b82f6",
-      startMeasure: Math.max(0, parseInt(g.startMeasure, 10) || 0),
-      endMeasure: Math.min(this.measures.length - 1, Math.max(0, parseInt(g.endMeasure, 10) || 0))
-    }));
+    const maxIdx = this.measures.length > 0 ? this.measures.length - 1 : -1;
+    this.groups = (data.groups || [])
+      .filter(() => this.measures.length > 0)
+      .map((g, idx) => ({
+        id: g.id || `grp-${Date.now()}-${idx}`,
+        name: g.name || `Grupo ${idx + 1}`,
+        color: g.color || "#3b82f6",
+        startMeasure: Math.max(0, Math.min(maxIdx, parseInt(g.startMeasure, 10) || 0)),
+        endMeasure: Math.max(0, Math.min(maxIdx, parseInt(g.endMeasure, 10) || 0))
+      }))
+      .filter(g => g.startMeasure <= g.endMeasure);
 
     this.recalculateTimings();
     this.notify();
@@ -78,6 +92,12 @@ class PieceState {
     this.notify();
   }
 
+  // Total de compassos tocados considerando repetições
+  getTotalMeasureCount() {
+    if (this.measures.length === 0) return 0;
+    return this.measures.reduce((acc, m) => acc + (m.repeat || 1), 0);
+  }
+
   // Adicionar compasso
   addMeasure(index = -1, template = null) {
     const newIdx = index === -1 ? this.measures.length : index;
@@ -92,7 +112,8 @@ class PieceState {
       ratioNum: template?.ratioNum || prevMeasure?.ratioNum || 1,
       ratioDen: template?.ratioDen || prevMeasure?.ratioDen || 1,
       customBpm: template?.customBpm || prevMeasure?.customBpm || this.baseBpm,
-      color: template?.color || prevMeasure?.color || "#ff334b"
+      color: template?.color || prevMeasure?.color || "#ff334b",
+      repeat: Math.max(1, Math.min(999, parseInt(template?.repeat, 10) || 1))
     };
 
     if (index === -1 || index >= this.measures.length) {
@@ -117,7 +138,8 @@ class PieceState {
     const target = this.measures[index];
     this.addMeasure(index + 1, {
       ...target,
-      nickname: target.nickname ? `${target.nickname} (cópia)` : ""
+      nickname: target.nickname ? `${target.nickname} (cópia)` : "",
+      repeat: target.repeat || 1
     });
   }
 
@@ -158,29 +180,50 @@ class PieceState {
     return true;
   }
 
-  // Remover compasso
+  // Remover compasso (permite ficar com 0 compassos)
   removeMeasure(index) {
-    if (this.measures.length <= 1) {
-      alert("A peça precisa ter pelo menos 1 compasso.");
-      return;
-    }
+    if (this.measures.length === 0) return;
     if (index < 0 || index >= this.measures.length) return;
 
     this.measures.splice(index, 1);
 
-    // Ajusta grupos após remoção
-    this.groups = this.groups.filter(g => {
-      if (index >= g.startMeasure && index <= g.endMeasure) {
-        // Se o grupo tinha 1 compasso e foi removido
-        if (g.startMeasure === g.endMeasure) return false;
-        g.endMeasure--;
-      } else if (index < g.startMeasure) {
-        g.startMeasure--;
-        g.endMeasure--;
-      }
-      return g.startMeasure <= g.endMeasure && g.startMeasure < this.measures.length;
-    });
+    if (this.measures.length === 0) {
+      this.groups = [];
+    } else {
+      // Ajusta grupos após remoção
+      this.groups = this.groups.filter(g => {
+        if (index >= g.startMeasure && index <= g.endMeasure) {
+          // Se o grupo tinha 1 compasso e foi removido
+          if (g.startMeasure === g.endMeasure) return false;
+          g.endMeasure--;
+        } else if (index < g.startMeasure) {
+          g.startMeasure--;
+          g.endMeasure--;
+        }
+        return g.startMeasure <= g.endMeasure && g.startMeasure < this.measures.length;
+      });
+    }
 
+    this.recalculateTimings();
+    this.notify();
+  }
+
+  // Esvazia todos os compassos da peça
+  clearAllMeasures() {
+    this.measures = [];
+    this.groups = [];
+    this.recalculateTimings();
+    this.notify();
+  }
+
+  // Reinicia para um arquivo/peça completamente nova
+  createNewPiece(name = "Nova Peça", baseBpm = 120) {
+    this.id = `piece-${Date.now()}`;
+    this.name = name;
+    this.description = "";
+    this.baseBpm = Math.max(20, Math.min(400, parseInt(baseBpm, 10) || 120));
+    this.measures = [];
+    this.groups = [];
     this.recalculateTimings();
     this.notify();
   }
@@ -198,6 +241,7 @@ class PieceState {
     if (updates.ratioDen !== undefined) m.ratioDen = Math.max(1, parseInt(updates.ratioDen, 10) || 1);
     if (updates.customBpm !== undefined) m.customBpm = Math.max(20, Math.min(500, Number(updates.customBpm) || this.baseBpm));
     if (updates.color !== undefined) m.color = updates.color;
+    if (updates.repeat !== undefined) m.repeat = Math.max(1, Math.min(999, parseInt(updates.repeat, 10) || 1));
 
     this.recalculateTimings();
     this.notify();
@@ -205,6 +249,7 @@ class PieceState {
 
   // Agrupamento: criar ou atualizar grupo
   addGroup(name, color, startMeasure, endMeasure) {
+    if (this.measures.length === 0) return null;
     const start = Math.max(0, Math.min(startMeasure, endMeasure));
     const end = Math.min(this.measures.length - 1, Math.max(startMeasure, endMeasure));
 
@@ -216,7 +261,6 @@ class PieceState {
       endMeasure: end
     };
 
-    // Remove sobreposições exatas ou ajusta
     this.groups.push(newGroup);
     this.notify();
     return newGroup;
@@ -228,7 +272,7 @@ class PieceState {
 
     if (updates.name !== undefined) grp.name = updates.name.trim() || "Grupo";
     if (updates.color !== undefined) grp.color = updates.color;
-    if (updates.startMeasure !== undefined && updates.endMeasure !== undefined) {
+    if (updates.startMeasure !== undefined && updates.endMeasure !== undefined && this.measures.length > 0) {
       grp.startMeasure = Math.max(0, Math.min(updates.startMeasure, updates.endMeasure));
       grp.endMeasure = Math.min(this.measures.length - 1, Math.max(updates.startMeasure, updates.endMeasure));
     }
@@ -242,15 +286,47 @@ class PieceState {
 
   // Retorna o grupo ao qual pertence o compasso, se houver
   getGroupByMeasureIndex(measureIndex) {
+    if (measureIndex < 0 || this.measures.length === 0) return null;
     return this.groups.find(g => measureIndex >= g.startMeasure && measureIndex <= g.endMeasure) || null;
   }
 
-  // Recálculo matemático de tempos precisos
+  // Retorna o primeiro timing (repetição 0) de um compasso (O(1))
+  getFirstTimingForMeasure(measureIndex) {
+    if (!this.firstTimingByMeasure) return null;
+    return this.firstTimingByMeasure.get(measureIndex) || null;
+  }
+
+  // Retorna o último timing (última repetição) de um compasso (O(1))
+  getLastTimingForMeasure(measureIndex) {
+    if (!this.lastTimingByMeasure) return null;
+    return this.lastTimingByMeasure.get(measureIndex) || null;
+  }
+
+  // Retorna o timing de uma repetição específica de um compasso
+  getTimingForMeasure(measureIndex, repeatIteration = 0) {
+    if (this.measureTimings.length === 0) return null;
+    const match = this.measureTimings.find(t => t.measureIndex === measureIndex && t.repeatIteration === repeatIteration);
+    return match || this.getFirstTimingForMeasure(measureIndex);
+  }
+
+  // Recálculo matemático de tempos precisos considerando repetições
   recalculateTimings() {
     let accumulatedTime = 0;
     this.measureTimings = [];
+    this.firstTimingByMeasure = new Map();
+    this.lastTimingByMeasure = new Map();
+
+    if (this.measures.length === 0) {
+      this.totalDuration = 0;
+      return;
+    }
+
+    let globalTimingIndex = 0;
 
     this.measures.forEach((m, idx) => {
+      // Garante repetição válida (padrão 1, mínimo 1, máximo 999)
+      m.repeat = Math.max(1, Math.min(999, parseInt(m.repeat, 10) || 1));
+
       // Cálculo do BPM efetivo para a semínima
       let effectiveBpm = this.baseBpm;
       if (m.tempoMode === "ratio") {
@@ -265,85 +341,137 @@ class PieceState {
       const beatDuration = (60 / effectiveBpm) * (4 / m.beatUnit);
       const measureDuration = m.beats * beatDuration;
 
-      const timing = {
-        measureIndex: idx,
-        startTime: accumulatedTime,
-        endTime: accumulatedTime + measureDuration,
-        duration: measureDuration,
-        effectiveBpm: effectiveBpm,
-        beatDuration: beatDuration,
-        beats: m.beats,
-        beatUnit: m.beatUnit
-      };
+      for (let r = 0; r < m.repeat; r++) {
+        const timing = {
+          timingIndex: globalTimingIndex++,
+          measureIndex: idx,
+          repeatIteration: r,
+          repeatCount: m.repeat,
+          startTime: accumulatedTime,
+          endTime: accumulatedTime + measureDuration,
+          duration: measureDuration,
+          effectiveBpm: effectiveBpm,
+          beatDuration: beatDuration,
+          beats: m.beats,
+          beatUnit: m.beatUnit
+        };
 
-      this.measureTimings.push(timing);
-      accumulatedTime += measureDuration;
+        this.measureTimings.push(timing);
+        if (!this.firstTimingByMeasure.has(idx)) {
+          this.firstTimingByMeasure.set(idx, timing);
+        }
+        this.lastTimingByMeasure.set(idx, timing);
+
+        accumulatedTime += measureDuration;
+      }
     });
 
     this.totalDuration = accumulatedTime;
   }
 
-  // Busca compasso e tempo atual dado um tempo em segundos
+  // Busca compasso e tempo atual dado um tempo em segundos via Busca Binária O(log N)
   getPositionAtTime(seconds) {
-    if (seconds <= 0 || this.measureTimings.length === 0) {
-      const first = this.measureTimings[0];
+    if (this.measures.length === 0 || this.measureTimings.length === 0) {
       return {
-        measureIndex: 0,
+        measureIndex: -1,
+        timingIndex: 0,
+        repeatIteration: 0,
+        repeatCount: 1,
         beatIndex: 0,
         beatProgress: 0,
-        measure: this.measures[0],
+        measure: null,
+        timing: null,
+        effectiveBpm: this.baseBpm
+      };
+    }
+
+    if (seconds <= 0) {
+      const first = this.measureTimings[0];
+      return {
+        measureIndex: first.measureIndex,
+        timingIndex: 0,
+        repeatIteration: first.repeatIteration,
+        repeatCount: first.repeatCount,
+        beatIndex: 0,
+        beatProgress: 0,
+        measure: this.measures[first.measureIndex] || null,
         timing: first,
         effectiveBpm: first?.effectiveBpm || this.baseBpm
       };
     }
 
     if (seconds >= this.totalDuration) {
-      const lastIdx = this.measures.length - 1;
-      const lastTiming = this.measureTimings[lastIdx];
+      const lastTiming = this.measureTimings[this.measureTimings.length - 1];
+      const mIdx = lastTiming ? lastTiming.measureIndex : 0;
       return {
-        measureIndex: lastIdx,
-        beatIndex: lastTiming.beats - 1,
+        measureIndex: mIdx,
+        timingIndex: this.measureTimings.length - 1,
+        repeatIteration: lastTiming ? lastTiming.repeatIteration : 0,
+        repeatCount: lastTiming ? lastTiming.repeatCount : 1,
+        beatIndex: lastTiming ? lastTiming.beats - 1 : 0,
         beatProgress: 1,
-        measure: this.measures[lastIdx],
-        timing: lastTiming,
-        effectiveBpm: lastTiming.effectiveBpm
+        measure: this.measures[mIdx] || null,
+        timing: lastTiming || null,
+        effectiveBpm: lastTiming?.effectiveBpm || this.baseBpm
       };
     }
 
-    // Busca binária ou linear já que a lista de compassos é tipicamente < 200
-    for (let i = 0; i < this.measureTimings.length; i++) {
-      const t = this.measureTimings[i];
-      if (seconds >= t.startTime && seconds < t.endTime) {
-        const timeInMeasure = seconds - t.startTime;
-        const beatIndex = Math.min(t.beats - 1, Math.floor(timeInMeasure / t.beatDuration));
-        const beatProgress = (timeInMeasure - (beatIndex * t.beatDuration)) / t.beatDuration;
+    // Busca binária O(log N) de alto desempenho (máximo 8 iterações mesmo com 500 compassos)
+    let low = 0;
+    let high = this.measureTimings.length - 1;
+    let foundIdx = -1;
 
-        return {
-          measureIndex: i,
-          beatIndex: beatIndex,
-          beatProgress: Math.min(1, Math.max(0, beatProgress)),
-          measure: this.measures[i],
-          timing: t,
-          effectiveBpm: t.effectiveBpm
-        };
+    while (low <= high) {
+      const mid = (low + high) >> 1;
+      const t = this.measureTimings[mid];
+      if (seconds < t.startTime) {
+        high = mid - 1;
+      } else if (seconds >= t.endTime) {
+        low = mid + 1;
+      } else {
+        foundIdx = mid;
+        break;
       }
     }
 
+    const t = foundIdx !== -1 ? this.measureTimings[foundIdx] : (this.measureTimings[Math.max(0, Math.min(this.measureTimings.length - 1, low))]);
+    if (t) {
+      const timeInMeasure = Math.max(0, seconds - t.startTime);
+      const beatIndex = Math.min(t.beats - 1, Math.max(0, Math.floor(timeInMeasure / t.beatDuration)));
+      const beatProgress = Math.min(1, Math.max(0, (timeInMeasure - (beatIndex * t.beatDuration)) / t.beatDuration));
+
+      return {
+        measureIndex: t.measureIndex,
+        timingIndex: t.timingIndex,
+        repeatIteration: t.repeatIteration,
+        repeatCount: t.repeatCount,
+        beatIndex: beatIndex,
+        beatProgress: beatProgress,
+        measure: this.measures[t.measureIndex] || null,
+        timing: t,
+        effectiveBpm: t.effectiveBpm
+      };
+    }
+
     const last = this.measureTimings[this.measureTimings.length - 1];
+    const mIdx = last ? last.measureIndex : 0;
     return {
-      measureIndex: this.measures.length - 1,
-      beatIndex: last.beats - 1,
+      measureIndex: mIdx,
+      timingIndex: this.measureTimings.length - 1,
+      repeatIteration: last ? last.repeatIteration : 0,
+      repeatCount: last ? last.repeatCount : 1,
+      beatIndex: last ? last.beats - 1 : 0,
       beatProgress: 1,
-      measure: this.measures[this.measures.length - 1],
-      timing: last,
-      effectiveBpm: last.effectiveBpm
+      measure: this.measures[mIdx] || null,
+      timing: last || null,
+      effectiveBpm: last?.effectiveBpm || this.baseBpm
     };
   }
 
-  // Tempo em segundos a partir do início de um compasso
-  getTimeAtMeasure(measureIndex, beatIndex = 0) {
-    const idx = Math.max(0, Math.min(this.measures.length - 1, measureIndex));
-    const timing = this.measureTimings[idx];
+  // Tempo em segundos a partir do início de um compasso (opcionalmente escolhendo a repetição)
+  getTimeAtMeasure(measureIndex, beatIndex = 0, repeatIteration = 0) {
+    if (this.measures.length === 0 || this.measureTimings.length === 0) return 0;
+    const timing = this.getTimingForMeasure(measureIndex, repeatIteration);
     if (!timing) return 0;
     return timing.startTime + (Math.max(0, Math.min(timing.beats - 1, beatIndex)) * timing.beatDuration);
   }
@@ -354,7 +482,34 @@ class PieceState {
     return () => this.listeners.delete(callback);
   }
 
+  // Salvar no localStorage automaticamente
+  saveToLocalStorage() {
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined') return;
+    try {
+      const data = {
+        app: "Sérgio Simulator",
+        version: "1.0.0",
+        savedAt: new Date().toISOString(),
+        piece: {
+          id: this.id,
+          name: this.name,
+          description: this.description,
+          baseBpm: this.baseBpm,
+          groups: this.groups,
+          measures: this.measures
+        }
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      window.dispatchEvent(new CustomEvent('sergio:saved', { 
+        detail: { count: this.measures.length, name: this.name } 
+      }));
+    } catch (e) {
+      console.warn("Erro ao salvar no localStorage:", e);
+    }
+  }
+
   notify() {
+    this.saveToLocalStorage();
     for (const cb of this.listeners) {
       try {
         cb(this);

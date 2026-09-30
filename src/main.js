@@ -40,6 +40,8 @@ class SergioApp {
 
   init() {
     this.cacheDom();
+    this.initTheme();
+    this.setupSaveIndicator();
     this.initRenderer();
     this.initEventListeners();
     this.setupRunnerInteractions();
@@ -64,6 +66,48 @@ class SergioApp {
     requestAnimationFrame((t) => this.renderLoop(t));
   }
 
+  initTheme() {
+    const savedTheme = localStorage.getItem('sergio_theme') || 
+      (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+    this.setTheme(savedTheme);
+
+    this.dom.btnThemeToggle?.addEventListener('click', () => {
+      const current = document.documentElement.getAttribute('data-theme') || 'dark';
+      const next = current === 'light' ? 'dark' : 'light';
+      this.setTheme(next);
+      if (this.renderer) {
+        this.renderer.render(this.playbackTime);
+      }
+    });
+  }
+
+  setTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('sergio_theme', theme);
+    if (this.dom.themeIcon) {
+      this.dom.themeIcon.textContent = theme === 'light' ? '🌙' : '☀️';
+    }
+    if (this.dom.btnThemeToggle) {
+      this.dom.btnThemeToggle.title = theme === 'light' ? 'Mudar para Tema Escuro (T)' : 'Mudar para Tema Claro (T)';
+    }
+    if (this.renderer) {
+      this.renderer.markMinimapDirty?.();
+    }
+  }
+
+  setupSaveIndicator() {
+    let saveTimeout = null;
+    window.addEventListener('sergio:saved', () => {
+      const ind = this.dom.saveIndicator;
+      if (!ind) return;
+      ind.classList.add('just-saved');
+      clearTimeout(saveTimeout);
+      saveTimeout = setTimeout(() => {
+        ind.classList.remove('just-saved');
+      }, 1600);
+    });
+  }
+
   cacheDom() {
     this.dom = {
       // Header
@@ -77,6 +121,10 @@ class SergioApp {
       selectPreset: document.getElementById('selectPreset'),
       btnExport: document.getElementById('btnExport'),
       fileImport: document.getElementById('fileImport'),
+      btnNewPiece: document.getElementById('btnNewPiece'),
+      btnThemeToggle: document.getElementById('btnThemeToggle'),
+      themeIcon: document.getElementById('themeIcon'),
+      saveIndicator: document.getElementById('saveIndicator'),
       btnMute: document.getElementById('btnMute'),
       muteIcon: document.getElementById('muteIcon'),
       selectSoundType: document.getElementById('selectSoundType'),
@@ -109,6 +157,7 @@ class SergioApp {
       btnAddMeasureQuick: document.getElementById('btnAddMeasureQuick'),
       btnManageGroups: document.getElementById('btnManageGroups'),
       btnAddMeasureBottom: document.getElementById('btnAddMeasureBottom'),
+      btnClearAllMeasures: document.getElementById('btnClearAllMeasures'),
       btnOpenGroupModal: document.getElementById('btnOpenGroupModal'),
 
       // Lista de Compassos
@@ -124,6 +173,7 @@ class SergioApp {
       editNickname: document.getElementById('editNickname'),
       editBeats: document.getElementById('editBeats'),
       editBeatUnit: document.getElementById('editBeatUnit'),
+      editRepeat: document.getElementById('editRepeat'),
       radioModeRatio: document.getElementById('radioModeRatio'),
       radioModeFixed: document.getElementById('radioModeFixed'),
       panelTempoRatio: document.getElementById('panelTempoRatio'),
@@ -145,6 +195,12 @@ class SergioApp {
       newGroupEnd: document.getElementById('newGroupEnd'),
       newGroupColorPicker: document.getElementById('newGroupColorPicker'),
       existingGroupsList: document.getElementById('existingGroupsList'),
+
+      // Modal de Confirmação Novo Arquivo (Double Check)
+      modalConfirmNewPiece: document.getElementById('modalConfirmNewPiece'),
+      btnConfirmNewClose: document.getElementById('btnConfirmNewClose'),
+      btnCancelNewPiece: document.getElementById('btnCancelNewPiece'),
+      btnExecuteNewPiece: document.getElementById('btnExecuteNewPiece'),
 
       // Redimensionamento e Barra de Ferramentas da Visão Corrida
       runnerViewport: document.getElementById('runnerViewport'),
@@ -225,7 +281,12 @@ class SergioApp {
   startAudioSource(offsetSeconds) {
     if (!audio.ctx || !this.pieceAudioBuffer) return;
     const offset = Math.max(0, Math.min(state.totalDuration, offsetSeconds));
-    this.audioAnchorTime = audio.ctx.currentTime;
+
+    // Lookahead de 25ms para sincronização precisa entre o hardware de áudio e a tela
+    // Permite que o driver de som prepare o buffer DMA, eliminando micro-atrasos e estalos iniciais
+    const lookahead = 0.025;
+    const when = audio.ctx.currentTime + lookahead;
+    this.audioAnchorTime = when;
     this.pieceAnchorTime = offset;
 
     audio.play(
@@ -240,11 +301,13 @@ class SergioApp {
           this.playbackTime = state.totalDuration;
           this.updateHUD(this.playbackTime);
         }
-      }
+      },
+      when
     );
   }
 
   async startPlayback() {
+    if (state.measures.length === 0) return;
     await audio.init();
     if (this.isPlaying) return;
 
@@ -273,6 +336,7 @@ class SergioApp {
     if (this.isPlaying) {
       this.pausePlayback();
     } else {
+      if (state.measures.length === 0) return;
       this.startPlayback();
     }
   }
@@ -283,6 +347,11 @@ class SergioApp {
   }
 
   seekTo(seconds) {
+    if (state.measures.length === 0) {
+      this.playbackTime = 0;
+      this.updateHUD(0);
+      return;
+    }
     this.playbackTime = Math.max(0, Math.min(state.totalDuration, seconds));
     if (this.isPlaying && audio.ctx) {
       this.startAudioSource(this.playbackTime);
@@ -294,7 +363,12 @@ class SergioApp {
     if (!this.isPlaying || !audio.ctx) {
       return this.playbackTime;
     }
-    const elapsedAudio = (audio.ctx.currentTime - this.audioAnchorTime) * this.playbackSpeed;
+    const now = audio.ctx.currentTime;
+    if (now < this.audioAnchorTime) {
+      // Mantém a agulha visualmente alinhada com o início enquanto o hardware engatilha o áudio (25ms)
+      return this.pieceAnchorTime;
+    }
+    const elapsedAudio = (now - this.audioAnchorTime) * this.playbackSpeed;
     if (this.loopEnabled) {
       const total = state.totalDuration || 1;
       return (this.pieceAnchorTime + elapsedAudio) % total;
@@ -334,11 +408,12 @@ class SergioApp {
 
       // Detecção de batimento precisa sincronizada com o relógio de som (sem timers)
       const pos = state.getPositionAtTime(this.playbackTime);
-      if (pos.measureIndex !== this.lastBeatMeasureIdx || pos.beatIndex !== this.lastBeatIdx) {
+      if (pos.measureIndex !== this.lastBeatMeasureIdx || pos.repeatIteration !== this.lastBeatRepeatIdx || pos.beatIndex !== this.lastBeatIdx) {
         if (this.renderer) {
           this.renderer.triggerBeatHit(pos.beatIndex === 0);
         }
         this.lastBeatMeasureIdx = pos.measureIndex;
+        this.lastBeatRepeatIdx = pos.repeatIteration;
         this.lastBeatIdx = pos.beatIndex;
       }
     }
@@ -360,8 +435,28 @@ class SergioApp {
   // =========================================================================
 
   updateHUD(seconds) {
+    if (state.measures.length === 0) {
+      this.dom.hudCurrentTime.textContent = '00:00.0';
+      this.dom.hudTotalTime.textContent = '00:00.0';
+      this.dom.hudMeasureBadge.textContent = '0 compassos';
+      this.dom.hudMeasureNickname.textContent = '';
+      this.dom.hudMeasureNickname.style.display = 'none';
+      this.dom.hudGroupPill.style.display = 'none';
+      this.dom.hudBeatText.textContent = '- / -';
+      this.dom.hudBeatDots.textContent = '';
+      this.dom.hudBpmValue.textContent = state.baseBpm;
+      this.dom.hudTempoRatio.textContent = '-';
+      this._lastMeasureIdx = -1;
+      this._lastRepeatIdx = -1;
+      this._lastCurTimeStr = '00:00.0';
+      this._lastTotalTimeStr = '00:00.0';
+      this.lastBeatText = '- / -';
+      this.highlightActiveMeasureCard(-1);
+      return;
+    }
+
     const pos = state.getPositionAtTime(seconds);
-    if (!pos || !pos.measure) return;
+    if (!pos || !pos.measure || !pos.timing) return;
 
     // Tempo digital (só escreve se mudou)
     const curTimeStr = this.formatTime(seconds);
@@ -376,11 +471,13 @@ class SergioApp {
       this.dom.hudTotalTime.textContent = totalTimeStr;
     }
 
-    // Compasso badge & apelido (só escreve se trocou de compasso)
-    if (this._lastMeasureIdx !== pos.measureIndex) {
+    // Compasso badge & apelido (escreve se trocou de compasso ou repetição)
+    if (this._lastMeasureIdx !== pos.measureIndex || this._lastRepeatIdx !== pos.repeatIteration) {
       this._lastMeasureIdx = pos.measureIndex;
+      this._lastRepeatIdx = pos.repeatIteration;
 
-      this.dom.hudMeasureBadge.textContent = `c. ${pos.measureIndex + 1}`;
+      const repInfo = (pos.repeatCount > 1) ? ` (rep. ${pos.repeatIteration + 1}/${pos.repeatCount})` : '';
+      this.dom.hudMeasureBadge.textContent = `c. ${pos.measureIndex + 1}${repInfo}`;
       if (pos.measure.nickname && pos.measure.nickname.trim()) {
         this.dom.hudMeasureNickname.textContent = pos.measure.nickname;
         this.dom.hudMeasureNickname.style.display = '';
@@ -569,15 +666,28 @@ class SergioApp {
     this.dom.btnStopRewind.addEventListener('click', () => this.stopPlayback());
 
     this.dom.btnPrevMeasure.addEventListener('click', () => {
+      if (state.measures.length === 0) return;
       const pos = state.getPositionAtTime(this.playbackTime);
-      const targetMeasure = Math.max(0, pos.measureIndex - 1);
-      this.seekTo(state.getTimeAtMeasure(targetMeasure));
+      const timings = state.measureTimings;
+      const curIdx = pos.timingIndex ?? 0;
+      const curTiming = timings[curIdx];
+      if (curTiming && this.playbackTime > curTiming.startTime + 0.4) {
+        this.seekTo(curTiming.startTime);
+      } else if (curIdx > 0) {
+        this.seekTo(timings[curIdx - 1].startTime);
+      } else {
+        this.seekTo(0);
+      }
     });
 
     this.dom.btnNextMeasure.addEventListener('click', () => {
+      if (state.measures.length === 0) return;
       const pos = state.getPositionAtTime(this.playbackTime);
-      const targetMeasure = Math.min(state.measures.length - 1, pos.measureIndex + 1);
-      this.seekTo(state.getTimeAtMeasure(targetMeasure));
+      const timings = state.measureTimings;
+      const curIdx = pos.timingIndex ?? 0;
+      if (curIdx < timings.length - 1) {
+        this.seekTo(timings[curIdx + 1].startTime);
+      }
     });
 
     // Loop
@@ -628,6 +738,35 @@ class SergioApp {
       this.renderMeasuresList();
     });
 
+    // Botão Novo Arquivo & Limpar com double-check
+    this.dom.btnNewPiece?.addEventListener('click', () => {
+      this.openConfirmNewModal();
+    });
+
+    if (this.dom.btnClearAllMeasures) {
+      this.dom.btnClearAllMeasures.addEventListener('click', () => {
+        this.openConfirmNewModal();
+      });
+    }
+
+    this.dom.btnConfirmNewClose?.addEventListener('click', () => {
+      this.closeConfirmNewModal();
+    });
+
+    this.dom.btnCancelNewPiece?.addEventListener('click', () => {
+      this.closeConfirmNewModal();
+    });
+
+    this.dom.btnExecuteNewPiece?.addEventListener('click', () => {
+      this.executeCreateNewPiece();
+    });
+
+    this.dom.modalConfirmNewPiece?.addEventListener('click', (e) => {
+      if (e.target === this.dom.modalConfirmNewPiece) {
+        this.closeConfirmNewModal();
+      }
+    });
+
     // Exportar e Importar
     this.dom.btnExport.addEventListener('click', () => this.exportPieceFile());
     this.dom.fileImport.addEventListener('change', (e) => this.handleImportFile(e));
@@ -643,6 +782,7 @@ class SergioApp {
       this.renderMeasuresList();
       this.updateHUD(this.playbackTime);
       if (this.renderer) {
+        this.renderer.markMinimapDirty?.();
         this.renderer.resize();
       }
       this.preparePieceAudio(true);
@@ -652,6 +792,19 @@ class SergioApp {
     window.addEventListener('keydown', (e) => {
       if (['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName)) return;
 
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'n') {
+        e.preventDefault();
+        this.openConfirmNewModal();
+        return;
+      }
+
+      if (e.key === 'Escape') {
+        if (this.dom.modalConfirmNewPiece && this.dom.modalConfirmNewPiece.style.display === 'flex') {
+          this.closeConfirmNewModal();
+          return;
+        }
+      }
+
       if (e.code === 'Space') {
         e.preventDefault();
         this.togglePlayPause();
@@ -660,6 +813,10 @@ class SergioApp {
         this.stopPlayback();
       } else if (e.key === 'm' || e.key === 'M') {
         this.dom.btnMute.click();
+      } else if (e.key === 't' || e.key === 'T') {
+        if (!e.ctrlKey && !e.metaKey && !e.altKey) {
+          this.dom.btnThemeToggle?.click();
+        }
       } else if (e.altKey && e.key === 'ArrowLeft') {
         e.preventDefault();
         const selIdx = this.renderer?.selectedMeasureIndex;
@@ -928,20 +1085,46 @@ class SergioApp {
   renderMeasuresList() {
     const grid = this.dom.measuresGrid;
     const measures = state.measures;
-    const timings = state.measureTimings;
 
-    this.dom.measureCountBadge.textContent = `${measures.length} ${measures.length === 1 ? 'compasso' : 'compassos'} configurados`;
+    const totalCount = state.getTotalMeasureCount();
+    const uniqueCount = measures.length;
+    this.dom.measureCountBadge.textContent = (totalCount !== uniqueCount)
+      ? `${totalCount} compassos no total (${uniqueCount} ${uniqueCount === 1 ? 'cartão' : 'cartões'})`
+      : `${uniqueCount} ${uniqueCount === 1 ? 'compasso' : 'compassos'}`;
 
     grid.innerHTML = '';
     this.cachedCards = [];
     this.lastHighlightedIdx = -1;
 
+    if (measures.length === 0) {
+      grid.innerHTML = `
+        <div class="empty-measures-state">
+          <div class="empty-icon">🥁</div>
+          <h3 class="empty-title">Nenhum compasso na peça</h3>
+          <p class="empty-desc">Esta peça está sem compassos no momento. Adicione compassos para construir sua partitura ou escolha uma peça de exemplo no menu superior.</p>
+          <div class="empty-actions">
+            <button type="button" class="btn-empty-add" id="btnEmptyAddMeasure">+ Adicionar Primeiro Compasso</button>
+          </div>
+        </div>
+      `;
+      const btnAdd = grid.querySelector('#btnEmptyAddMeasure');
+      if (btnAdd) {
+        btnAdd.addEventListener('click', () => {
+          state.addMeasure();
+        });
+      }
+      return;
+    }
+
     measures.forEach((m, idx) => {
-      const timing = timings[idx] || { effectiveBpm: state.baseBpm };
+      const timing = state.getFirstTimingForMeasure(idx) || { effectiveBpm: state.baseBpm };
       const grp = state.getGroupByMeasureIndex(idx);
 
       const card = document.createElement('div');
       card.className = 'measure-card';
+      if ((m.repeat || 1) > 1) {
+        card.classList.add('has-repeats');
+      }
       if (this.renderer?.selectedMeasureIndex === idx) {
         card.classList.add('is-selected');
       }
@@ -966,10 +1149,14 @@ class SergioApp {
         tempoDesc = `${Math.round(timing.effectiveBpm)} BPM (Fixo)`;
       }
 
+      const repeatTagHtml = ((m.repeat || 1) > 1)
+        ? `<span class="measure-card-repeat-tag" title="Este compasso se repete continuamente ${m.repeat} vezes">×${m.repeat}</span>`
+        : '';
+
       const hasNickname = !!(m.nickname && m.nickname.trim());
       const headerIndexHtml = hasNickname 
-        ? `<span class="measure-card-idx" style="color:${m.color || '#ff334b'}">c. ${idx + 1}</span>` 
-        : `<span></span>`;
+        ? `<div class="card-idx-wrap"><span class="measure-card-idx" style="color:${m.color || '#ff334b'}">c. ${idx + 1}</span>${repeatTagHtml}</div>` 
+        : `<div class="card-idx-wrap">${repeatTagHtml}</div>`;
 
       const titleHtml = hasNickname
         ? `<h3 class="measure-card-nickname" title="${m.nickname}">${m.nickname}</h3>`
@@ -989,6 +1176,16 @@ class SergioApp {
           <span class="measure-card-tempo">${tempoDesc}</span>
         </div>
 
+        <!-- CONTROLE RÁPIDO DE REPETIÇÕES -->
+        <div class="measure-card-repeat-row">
+          <span class="repeat-row-label">Repetir:</span>
+          <div class="repeat-stepper">
+            <button type="button" class="btn-repeat-step btn-repeat-minus" title="Diminuir repetições">-</button>
+            <input type="number" class="input-card-repeat" min="1" max="999" value="${m.repeat || 1}" title="Número de vezes que este compasso se repete">
+            <button type="button" class="btn-repeat-step btn-repeat-plus" title="Aumentar repetições">+</button>
+          </div>
+        </div>
+
         <div class="measure-card-actions">
           <button type="button" class="btn-card-icon btn-card-move-left" title="Mover Compasso para Trás (←)" ${idx === 0 ? 'disabled style="opacity:0.3;pointer-events:none"' : ''}>◀</button>
           <button type="button" class="btn-card-icon btn-card-move-right" title="Mover Compasso para Frente (→)" ${idx === measures.length - 1 ? 'disabled style="opacity:0.3;pointer-events:none"' : ''}>▶</button>
@@ -997,6 +1194,44 @@ class SergioApp {
           <button type="button" class="btn-card-edit">Configurar</button>
         </div>
       `;
+
+      // Eventos do controle de repetições rápido
+      const btnMinus = card.querySelector('.btn-repeat-minus');
+      const btnPlus = card.querySelector('.btn-repeat-plus');
+      const inputRepeat = card.querySelector('.input-card-repeat');
+
+      if (btnMinus) {
+        btnMinus.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const cur = Math.max(1, (m.repeat || 1) - 1);
+          state.updateMeasure(idx, { repeat: cur });
+        });
+      }
+
+      if (btnPlus) {
+        btnPlus.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const cur = Math.min(999, (m.repeat || 1) + 1);
+          state.updateMeasure(idx, { repeat: cur });
+        });
+      }
+
+      if (inputRepeat) {
+        inputRepeat.addEventListener('click', (e) => e.stopPropagation());
+        inputRepeat.addEventListener('keydown', (e) => {
+          e.stopPropagation();
+          if (e.key === 'Enter') {
+            inputRepeat.blur();
+          }
+        });
+        inputRepeat.addEventListener('change', (e) => {
+          e.stopPropagation();
+          const parsed = Math.max(1, Math.min(999, parseInt(inputRepeat.value, 10) || 1));
+          if (parsed !== (m.repeat || 1)) {
+            state.updateMeasure(idx, { repeat: parsed });
+          }
+        });
+      }
 
       // Eventos de clique nas ações e no cartão
       card.addEventListener('click', (e) => {
@@ -1015,6 +1250,9 @@ class SergioApp {
         if (e.target.closest('.btn-card-del')) {
           e.stopPropagation();
           state.removeMeasure(idx);
+          if (state.measures.length === 0) {
+            this.closeMeasureToolbar();
+          }
           return;
         }
         if (e.target.closest('.btn-card-dup')) {
@@ -1030,7 +1268,7 @@ class SergioApp {
 
         // Clique no cartão seleciona e navega
         this.handleMeasureSelected(idx);
-        const t = timings[idx];
+        const t = state.getFirstTimingForMeasure(idx);
         if (t) this.seekTo(t.startTime);
       });
 
@@ -1071,6 +1309,33 @@ class SergioApp {
       grid.appendChild(card);
       this.cachedCards.push(card);
     });
+  }
+
+  // =========================================================================
+  // MODAL DE CONFIRMAÇÃO: NOVO ARQUIVO (DOUBLE CHECK)
+  // =========================================================================
+
+  openConfirmNewModal() {
+    if (this.dom.modalConfirmNewPiece) {
+      this.dom.modalConfirmNewPiece.style.display = 'flex';
+      this.dom.btnExecuteNewPiece?.focus();
+    }
+  }
+
+  closeConfirmNewModal() {
+    if (this.dom.modalConfirmNewPiece) {
+      this.dom.modalConfirmNewPiece.style.display = 'none';
+    }
+  }
+
+  executeCreateNewPiece() {
+    this.stopPlayback();
+    this.closeMeasureToolbar();
+    state.createNewPiece("Nova Peça", 120);
+    if (this.dom.inputPieceName) this.dom.inputPieceName.value = state.name;
+    if (this.dom.inputBaseBpm) this.dom.inputBaseBpm.value = state.baseBpm;
+    if (this.dom.selectPreset) this.dom.selectPreset.value = "";
+    this.closeConfirmNewModal();
   }
 
   // =========================================================================
@@ -1123,6 +1388,9 @@ class SergioApp {
       const idx = parseInt(this.dom.editMeasureIndex.value, 10);
       modal.style.display = 'none';
       state.removeMeasure(idx);
+      if (state.measures.length === 0) {
+        this.closeMeasureToolbar();
+      }
     });
 
     this.dom.btnDuplicateMeasureModal.addEventListener('click', () => {
@@ -1145,6 +1413,7 @@ class SergioApp {
         nickname: this.dom.editNickname.value,
         beats: parseInt(this.dom.editBeats.value, 10) || 4,
         beatUnit: parseInt(this.dom.editBeatUnit.value, 10) || 4,
+        repeat: Math.max(1, Math.min(999, parseInt(this.dom.editRepeat.value, 10) || 1)),
         tempoMode: tempoMode,
         ratioNum: num,
         ratioDen: den,
@@ -1178,6 +1447,7 @@ class SergioApp {
     this.dom.editNickname.value = m.nickname || '';
     this.dom.editBeats.value = m.beats;
     this.dom.editBeatUnit.value = m.beatUnit;
+    this.dom.editRepeat.value = m.repeat || 1;
 
     if (m.tempoMode === 'fixed') {
       this.dom.radioModeFixed.checked = true;
@@ -1237,6 +1507,7 @@ class SergioApp {
 
     this.dom.formCreateGroup.addEventListener('submit', (e) => {
       e.preventDefault();
+      if (state.measures.length === 0) return;
       const name = this.dom.newGroupName.value.trim();
       const start = parseInt(this.dom.newGroupStart.value, 10);
       const end = parseInt(this.dom.newGroupEnd.value, 10);
@@ -1254,9 +1525,19 @@ class SergioApp {
   populateGroupSelects() {
     const startSelect = this.dom.newGroupStart;
     const endSelect = this.dom.newGroupEnd;
+    const submitBtn = this.dom.formCreateGroup?.querySelector('button[type="submit"]');
 
     startSelect.innerHTML = '';
     endSelect.innerHTML = '';
+
+    if (state.measures.length === 0) {
+      startSelect.innerHTML = '<option value="" disabled selected>Nenhum compasso disponível</option>';
+      endSelect.innerHTML = '<option value="" disabled selected>Nenhum compasso disponível</option>';
+      if (submitBtn) submitBtn.disabled = true;
+      return;
+    }
+
+    if (submitBtn) submitBtn.disabled = false;
 
     state.measures.forEach((m, idx) => {
       const optText = (m.nickname && m.nickname.trim())
@@ -1266,10 +1547,8 @@ class SergioApp {
       endSelect.innerHTML += `<option value="${idx}">${optText}</option>`;
     });
 
-    if (state.measures.length > 0) {
-      startSelect.selectedIndex = 0;
-      endSelect.selectedIndex = Math.min(3, state.measures.length - 1);
-    }
+    startSelect.selectedIndex = 0;
+    endSelect.selectedIndex = Math.min(3, state.measures.length - 1);
   }
 
   renderExistingGroupsList() {
@@ -1311,20 +1590,63 @@ class SergioApp {
 
   initPresetsDropdown() {
     const select = this.dom.selectPreset;
+    select.innerHTML = '';
+
+    const defaultOpt = document.createElement('option');
+    defaultOpt.value = '';
+    defaultOpt.disabled = true;
+    defaultOpt.selected = true;
+    defaultOpt.textContent = 'Peças & Modelos...';
+    select.appendChild(defaultOpt);
+
+    const actionGroup = document.createElement('optgroup');
+    actionGroup.label = 'Ações da Peça';
+
+    const emptyOpt = document.createElement('option');
+    emptyOpt.value = '__empty__';
+    emptyOpt.textContent = '📄 Nova Peça Vazia (0 compassos)';
+    actionGroup.appendChild(emptyOpt);
+
+    const resetOpt = document.createElement('option');
+    resetOpt.value = '__reset_default__';
+    resetOpt.textContent = '🔄 Restaurar Estudo Padrão';
+    actionGroup.appendChild(resetOpt);
+
+    select.appendChild(actionGroup);
+
+    const presetsGroup = document.createElement('optgroup');
+    presetsGroup.label = 'Estudos Didáticos';
+
     PRESETS.forEach(p => {
       const opt = document.createElement('option');
       opt.value = p.id;
       opt.textContent = p.name;
-      select.appendChild(opt);
+      presetsGroup.appendChild(opt);
     });
 
+    select.appendChild(presetsGroup);
+
     select.addEventListener('change', (e) => {
-      const presetId = e.target.value;
-      const found = PRESETS.find(p => p.id === presetId);
+      const val = e.target.value;
+      if (val === '__empty__') {
+        select.value = '';
+        this.openConfirmNewModal();
+        return;
+      }
+      if (val === '__reset_default__') {
+        this.pausePlayback();
+        state.resetToDefault();
+        this.seekTo(0);
+        this.closeMeasureToolbar();
+        select.value = '';
+        return;
+      }
+      const found = PRESETS.find(p => p.id === val);
       if (found) {
         this.pausePlayback();
         state.loadPieceData(JSON.parse(JSON.stringify(found)));
         this.seekTo(0);
+        this.closeMeasureToolbar();
         select.value = '';
       }
     });
