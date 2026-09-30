@@ -113,6 +113,31 @@
           <canvas id="djCanvas" class="dj-canvas"></canvas>
         </div>
 
+        <!-- Barra de Redimensionamento da Visão Corrida -->
+        <div class="runner-resizer" id="runnerResizer" title="Arraste para redimensionar a altura da visão corrida (ou dê duplo clique para restaurar)">
+          <div class="resizer-handle">
+            <span class="resizer-line"></span>
+            <span class="resizer-pill">⠿ Redimensionar</span>
+            <span class="resizer-line"></span>
+          </div>
+        </div>
+
+        <!-- Barra de Ações Rápidas do Compasso Selecionado na Visão Corrida -->
+        <div id="runnerMeasureToolbar" class="runner-measure-toolbar" style="display:none">
+          <div class="toolbar-info">
+            <span class="toolbar-badge" id="toolbarMeasureBadge">c. 1</span>
+            <span class="toolbar-name" id="toolbarMeasureName"></span>
+          </div>
+          <div class="toolbar-actions">
+            <button type="button" id="btnMoveMeasureLeft" class="btn-toolbar-opt" title="Mover Compasso para Trás (Alt + ←)">◀ Mover</button>
+            <button type="button" id="btnMoveMeasureRight" class="btn-toolbar-opt" title="Mover Compasso para Frente (Alt + →)">Mover ▶</button>
+            <button type="button" id="btnConfigureSelectedMeasure" class="btn-toolbar-opt primary" title="Configurar Métrica e Andamento">⚙ Configurar</button>
+            <button type="button" id="btnDuplicateSelectedMeasure" class="btn-toolbar-opt" title="Duplicar Compasso">⧉ Duplicar</button>
+            <button type="button" id="btnDeleteSelectedMeasure" class="btn-toolbar-opt danger" title="Excluir Compasso">✕</button>
+            <button type="button" id="btnCloseToolbar" class="btn-toolbar-close" title="Desmarcar">✕</button>
+          </div>
+        </div>
+
         <!-- Barra de Controles de Transporte (Limpa & Direta) -->
         <div class="clean-transport-bar">
           <div class="transport-controls">
@@ -136,6 +161,7 @@
           </div>
 
           <div class="quick-add-actions">
+            <button type="button" id="btnToggleWideMode" class="btn-action-ghost" title="Alternar Modo Amplo (Toma toda a largura da tela)">⤢ Amplo</button>
             <button type="button" id="btnAddMeasureQuick" class="btn-action-red">+ Compasso</button>
             <button type="button" id="btnManageGroups" class="btn-action-ghost">Agrupar...</button>
           </div>
@@ -174,10 +200,10 @@
         <form id="formMeasureEdit" class="modal-body-clean">
           <input type="hidden" id="editMeasureIndex" value="-1">
 
-          <!-- Apelido / Nome do Compasso (O mais importante!) -->
+          <!-- Apelido / Nome do Compasso (Opcional) -->
           <div class="field-group hero-field">
-            <label for="editNickname" class="field-label">APELIDO DO COMPASSO (DESTAQUE NA VISÃO DJ)</label>
-            <input type="text" id="editNickname" class="clean-input nickname-input" placeholder="ex: Chamada de Caixa, Clímax 7/8" required>
+            <label for="editNickname" class="field-label">APELIDO DO COMPASSO (OPCIONAL)</label>
+            <input type="text" id="editNickname" class="clean-input nickname-input" placeholder="ex: Chamada de Caixa, Clímax (opcional)">
           </div>
 
           <!-- Métrica (Notas e Unidade) -->
@@ -316,10 +342,21 @@
       </div>
     </div>
 
+    <!-- MENU DE CONTEXTO PARA COMPASSOS NA VISÃO CORRIDA -->
+    <div id="runnerContextMenu" class="runner-context-menu" style="display:none">
+      <div class="context-menu-header" id="ctxMenuHeader">Compasso 1</div>
+      <button type="button" class="ctx-item" id="ctxEdit">⚙ Configurar Compasso</button>
+      <button type="button" class="ctx-item" id="ctxMoveLeft">◀ Mover para a Esquerda</button>
+      <button type="button" class="ctx-item" id="ctxMoveRight">▶ Mover para a Direita</button>
+      <button type="button" class="ctx-item" id="ctxDuplicate">⧉ Duplicar</button>
+      <div class="ctx-divider"></div>
+      <button type="button" class="ctx-item danger" id="ctxDelete">✕ Excluir Compasso</button>
+    </div>
+
     <!-- RODAPÉ COMPACTO -->
     <footer class="app-footer">
       <span>🥁 Sérgio Simulator — Simulador Rítmico de Modulação Métrica para Percussão</span>
-      <span class="shortcuts-hint"><kbd>Espaço</kbd> Play/Pause &nbsp; <kbd>R</kbd> Início &nbsp; <kbd>←</kbd> <kbd>→</kbd> Compassos</span>
+      <span class="shortcuts-hint"><kbd>Espaço</kbd> Play/Pause &nbsp; <kbd>R</kbd> Início &nbsp; <kbd>←</kbd> <kbd>→</kbd> Navegar &nbsp; <kbd>Alt</kbd>+<kbd>←</kbd>/<kbd>→</kbd> Mover Compasso</span>
     </footer>
 
   </div>

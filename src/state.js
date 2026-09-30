@@ -25,7 +25,7 @@ class PieceState {
     
     this.measures = (data.measures || []).map((m, idx) => ({
       id: m.id || `m-${Date.now()}-${idx}-${Math.random().toString(36).substr(2, 4)}`,
-      nickname: m.nickname || `Compasso ${idx + 1}`,
+      nickname: (m.nickname || "").trim(),
       beats: Math.max(1, Math.min(32, parseInt(m.beats, 10) || 4)),
       beatUnit: [2, 4, 8, 16].includes(parseInt(m.beatUnit, 10)) ? parseInt(m.beatUnit, 10) : 4,
       tempoMode: m.tempoMode === "fixed" ? "fixed" : "ratio",
@@ -38,7 +38,7 @@ class PieceState {
     if (this.measures.length === 0) {
       this.measures.push({
         id: `m-init`,
-        nickname: "Compasso Inicial",
+        nickname: "",
         beats: 4,
         beatUnit: 4,
         tempoMode: "ratio",
@@ -85,7 +85,7 @@ class PieceState {
 
     const newMeasure = {
       id: `m-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-      nickname: template?.nickname || (prevMeasure ? `${prevMeasure.nickname} (var)` : `Compasso ${newIdx + 1}`),
+      nickname: template?.nickname ? template.nickname.trim() : "",
       beats: template?.beats || prevMeasure?.beats || 4,
       beatUnit: template?.beatUnit || prevMeasure?.beatUnit || 4,
       tempoMode: template?.tempoMode || prevMeasure?.tempoMode || "ratio",
@@ -117,8 +117,45 @@ class PieceState {
     const target = this.measures[index];
     this.addMeasure(index + 1, {
       ...target,
-      nickname: `${target.nickname} (cópia)`
+      nickname: target.nickname ? `${target.nickname} (cópia)` : ""
     });
+  }
+
+  // Mover / reordenar compasso
+  moveMeasure(fromIndex, toIndex) {
+    if (fromIndex === toIndex) return false;
+    if (fromIndex < 0 || fromIndex >= this.measures.length) return false;
+    if (toIndex < 0 || toIndex >= this.measures.length) return false;
+
+    // Vincula cada compasso ao seu ID de grupo atual antes de mover
+    this.measures.forEach((m, idx) => {
+      const grp = this.groups.find(g => idx >= g.startMeasure && idx <= g.endMeasure);
+      m._assignedGroupId = grp ? grp.id : null;
+    });
+
+    const [moved] = this.measures.splice(fromIndex, 1);
+    this.measures.splice(toIndex, 0, moved);
+
+    // Atualiza limites dos grupos conforme a nova distribuição dos compassos
+    this.groups.forEach(grp => {
+      const indices = [];
+      this.measures.forEach((m, idx) => {
+        if (m._assignedGroupId === grp.id) {
+          indices.push(idx);
+        }
+      });
+      if (indices.length > 0) {
+        grp.startMeasure = Math.min(...indices);
+        grp.endMeasure = Math.max(...indices);
+      }
+    });
+
+    // Remove tags temporárias
+    this.measures.forEach(m => delete m._assignedGroupId);
+
+    this.recalculateTimings();
+    this.notify();
+    return true;
   }
 
   // Remover compasso
@@ -153,7 +190,7 @@ class PieceState {
     if (index < 0 || index >= this.measures.length) return;
     const m = this.measures[index];
     
-    if (updates.nickname !== undefined) m.nickname = updates.nickname.trim() || `Compasso ${index + 1}`;
+    if (updates.nickname !== undefined) m.nickname = (updates.nickname || "").trim();
     if (updates.beats !== undefined) m.beats = Math.max(1, Math.min(32, parseInt(updates.beats, 10) || 4));
     if (updates.beatUnit !== undefined) m.beatUnit = parseInt(updates.beatUnit, 10) || 4;
     if (updates.tempoMode !== undefined) m.tempoMode = updates.tempoMode;

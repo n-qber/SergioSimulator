@@ -42,6 +42,7 @@ class SergioApp {
     this.cacheDom();
     this.initRenderer();
     this.initEventListeners();
+    this.setupRunnerInteractions();
     this.initPresetsDropdown();
     this.renderMeasuresList();
     this.updateHUD(0);
@@ -143,7 +144,30 @@ class SergioApp {
       newGroupStart: document.getElementById('newGroupStart'),
       newGroupEnd: document.getElementById('newGroupEnd'),
       newGroupColorPicker: document.getElementById('newGroupColorPicker'),
-      existingGroupsList: document.getElementById('existingGroupsList')
+      existingGroupsList: document.getElementById('existingGroupsList'),
+
+      // Redimensionamento e Barra de Ferramentas da Visão Corrida
+      runnerViewport: document.getElementById('runnerViewport'),
+      runnerResizer: document.getElementById('runnerResizer'),
+      runnerMeasureToolbar: document.getElementById('runnerMeasureToolbar'),
+      toolbarMeasureBadge: document.getElementById('toolbarMeasureBadge'),
+      toolbarMeasureName: document.getElementById('toolbarMeasureName'),
+      btnMoveMeasureLeft: document.getElementById('btnMoveMeasureLeft'),
+      btnMoveMeasureRight: document.getElementById('btnMoveMeasureRight'),
+      btnConfigureSelectedMeasure: document.getElementById('btnConfigureSelectedMeasure'),
+      btnDuplicateSelectedMeasure: document.getElementById('btnDuplicateSelectedMeasure'),
+      btnDeleteSelectedMeasure: document.getElementById('btnDeleteSelectedMeasure'),
+      btnCloseToolbar: document.getElementById('btnCloseToolbar'),
+      btnToggleWideMode: document.getElementById('btnToggleWideMode'),
+
+      // Menu de Contexto
+      runnerContextMenu: document.getElementById('runnerContextMenu'),
+      ctxMenuHeader: document.getElementById('ctxMenuHeader'),
+      ctxEdit: document.getElementById('ctxEdit'),
+      ctxMoveLeft: document.getElementById('ctxMoveLeft'),
+      ctxMoveRight: document.getElementById('ctxMoveRight'),
+      ctxDuplicate: document.getElementById('ctxDuplicate'),
+      ctxDelete: document.getElementById('ctxDelete')
     };
   }
 
@@ -152,7 +176,13 @@ class SergioApp {
       this.dom.djCanvas,
       this.dom.minimapCanvas,
       state,
-      (seekSeconds) => this.seekTo(seekSeconds)
+      {
+        onSeek: (seekSeconds) => this.seekTo(seekSeconds),
+        onSelectMeasure: (idx) => this.handleMeasureSelected(idx),
+        onMoveMeasure: (fromIdx, toIdx) => this.handleMeasureMoved(fromIdx, toIdx),
+        onEditMeasure: (idx) => this.openMeasureModal(idx),
+        onContextMenu: (idx, x, y) => this.openContextMenu(idx, x, y)
+      }
     );
   }
 
@@ -351,7 +381,13 @@ class SergioApp {
       this._lastMeasureIdx = pos.measureIndex;
 
       this.dom.hudMeasureBadge.textContent = `c. ${pos.measureIndex + 1}`;
-      this.dom.hudMeasureNickname.textContent = pos.measure.nickname || `Compasso ${pos.measureIndex + 1}`;
+      if (pos.measure.nickname && pos.measure.nickname.trim()) {
+        this.dom.hudMeasureNickname.textContent = pos.measure.nickname;
+        this.dom.hudMeasureNickname.style.display = '';
+      } else {
+        this.dom.hudMeasureNickname.textContent = '';
+        this.dom.hudMeasureNickname.style.display = 'none';
+      }
 
       // Grupo (só busca quando muda de compasso, não a cada frame)
       const grp = state.getGroupByMeasureIndex(pos.measureIndex);
@@ -624,14 +660,265 @@ class SergioApp {
         this.stopPlayback();
       } else if (e.key === 'm' || e.key === 'M') {
         this.dom.btnMute.click();
+      } else if (e.altKey && e.key === 'ArrowLeft') {
+        e.preventDefault();
+        const selIdx = this.renderer?.selectedMeasureIndex;
+        if (selIdx !== null && selIdx !== undefined && selIdx > 0) {
+          state.moveMeasure(selIdx, selIdx - 1);
+          this.handleMeasureSelected(selIdx - 1);
+        }
+      } else if (e.altKey && e.key === 'ArrowRight') {
+        e.preventDefault();
+        const selIdx = this.renderer?.selectedMeasureIndex;
+        if (selIdx !== null && selIdx !== undefined && selIdx < state.measures.length - 1) {
+          state.moveMeasure(selIdx, selIdx + 1);
+          this.handleMeasureSelected(selIdx + 1);
+        }
       } else if (e.key === 'ArrowLeft') {
         e.preventDefault();
         this.dom.btnPrevMeasure.click();
       } else if (e.key === 'ArrowRight') {
         e.preventDefault();
         this.dom.btnNextMeasure.click();
+      } else if (e.key === 'Delete' || e.key === 'Backspace') {
+        const selIdx = this.renderer?.selectedMeasureIndex;
+        if (selIdx !== null && selIdx !== undefined && this.dom.modalMeasureEdit.style.display !== 'flex') {
+          e.preventDefault();
+          state.removeMeasure(selIdx);
+          this.closeMeasureToolbar();
+        }
       }
     });
+  }
+
+  // =========================================================================
+  // INTERAÇÕES DA VISÃO CORRIDA (REDIMENSIONAMENTO, SELEÇÃO E CONTEXTO)
+  // =========================================================================
+
+  setupRunnerInteractions() {
+    // 1. Redimensionador de altura (drag handle)
+    const resizer = this.dom.runnerResizer;
+    const viewport = this.dom.runnerViewport;
+    if (resizer && viewport) {
+      const savedH = localStorage.getItem('sergio_runner_height');
+      if (savedH) {
+        viewport.style.height = `${parseInt(savedH, 10)}px`;
+        this.renderer?.resize();
+      }
+
+      let isResizing = false;
+      let startY = 0;
+      let startH = 0;
+
+      resizer.addEventListener('mousedown', (e) => {
+        isResizing = true;
+        startY = e.clientY;
+        startH = viewport.getBoundingClientRect().height;
+        resizer.classList.add('is-resizing');
+        document.body.style.cursor = 'row-resize';
+        document.body.style.userSelect = 'none';
+        e.preventDefault();
+      });
+
+      window.addEventListener('mousemove', (e) => {
+        if (!isResizing) return;
+        const dy = e.clientY - startY;
+        const newH = Math.max(180, Math.min(window.innerHeight * 0.8, startH + dy));
+        viewport.style.height = `${newH}px`;
+        this.renderer?.resize();
+      });
+
+      window.addEventListener('mouseup', () => {
+        if (!isResizing) return;
+        isResizing = false;
+        resizer.classList.remove('is-resizing');
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+        const finalH = viewport.getBoundingClientRect().height;
+        localStorage.setItem('sergio_runner_height', Math.round(finalH));
+      });
+
+      resizer.addEventListener('dblclick', () => {
+        viewport.style.height = '340px';
+        localStorage.setItem('sergio_runner_height', 340);
+        this.renderer?.resize();
+      });
+    }
+
+    // 2. Modo Amplo (Toma toda a largura da tela)
+    if (this.dom.btnToggleWideMode) {
+      const mainStage = document.querySelector('.main-stage');
+      const isWide = localStorage.getItem('sergio_wide_mode') === 'true';
+      if (isWide && mainStage) {
+        mainStage.classList.add('wide-mode');
+        this.dom.btnToggleWideMode.textContent = '⤡ Padrão';
+      }
+
+      this.dom.btnToggleWideMode.addEventListener('click', () => {
+        if (!mainStage) return;
+        const nowWide = mainStage.classList.toggle('wide-mode');
+        this.dom.btnToggleWideMode.textContent = nowWide ? '⤡ Padrão' : '⤢ Amplo';
+        localStorage.setItem('sergio_wide_mode', nowWide);
+        setTimeout(() => this.renderer?.resize(), 60);
+      });
+    }
+
+    // 3. Barra de ferramentas do compasso selecionado
+    this.dom.btnMoveMeasureLeft?.addEventListener('click', () => {
+      const idx = this.renderer?.selectedMeasureIndex;
+      if (idx !== null && idx !== undefined && idx > 0) {
+        state.moveMeasure(idx, idx - 1);
+        this.handleMeasureSelected(idx - 1);
+      }
+    });
+
+    this.dom.btnMoveMeasureRight?.addEventListener('click', () => {
+      const idx = this.renderer?.selectedMeasureIndex;
+      if (idx !== null && idx !== undefined && idx < state.measures.length - 1) {
+        state.moveMeasure(idx, idx + 1);
+        this.handleMeasureSelected(idx + 1);
+      }
+    });
+
+    this.dom.btnConfigureSelectedMeasure?.addEventListener('click', () => {
+      const idx = this.renderer?.selectedMeasureIndex;
+      if (idx !== null && idx !== undefined) {
+        this.openMeasureModal(idx);
+      }
+    });
+
+    this.dom.btnDuplicateSelectedMeasure?.addEventListener('click', () => {
+      const idx = this.renderer?.selectedMeasureIndex;
+      if (idx !== null && idx !== undefined) {
+        state.duplicateMeasure(idx);
+      }
+    });
+
+    this.dom.btnDeleteSelectedMeasure?.addEventListener('click', () => {
+      const idx = this.renderer?.selectedMeasureIndex;
+      if (idx !== null && idx !== undefined) {
+        state.removeMeasure(idx);
+        this.closeMeasureToolbar();
+      }
+    });
+
+    this.dom.btnCloseToolbar?.addEventListener('click', () => {
+      this.closeMeasureToolbar();
+    });
+
+    // 4. Menu de Contexto
+    this.dom.ctxEdit?.addEventListener('click', () => {
+      if (this._contextMeasureIdx !== undefined) {
+        this.openMeasureModal(this._contextMeasureIdx);
+      }
+      this.closeContextMenu();
+    });
+
+    this.dom.ctxMoveLeft?.addEventListener('click', () => {
+      if (this._contextMeasureIdx !== undefined && this._contextMeasureIdx > 0) {
+        state.moveMeasure(this._contextMeasureIdx, this._contextMeasureIdx - 1);
+        this.handleMeasureSelected(this._contextMeasureIdx - 1);
+      }
+      this.closeContextMenu();
+    });
+
+    this.dom.ctxMoveRight?.addEventListener('click', () => {
+      if (this._contextMeasureIdx !== undefined && this._contextMeasureIdx < state.measures.length - 1) {
+        state.moveMeasure(this._contextMeasureIdx, this._contextMeasureIdx + 1);
+        this.handleMeasureSelected(this._contextMeasureIdx + 1);
+      }
+      this.closeContextMenu();
+    });
+
+    this.dom.ctxDuplicate?.addEventListener('click', () => {
+      if (this._contextMeasureIdx !== undefined) {
+        state.duplicateMeasure(this._contextMeasureIdx);
+      }
+      this.closeContextMenu();
+    });
+
+    this.dom.ctxDelete?.addEventListener('click', () => {
+      if (this._contextMeasureIdx !== undefined) {
+        state.removeMeasure(this._contextMeasureIdx);
+        this.closeMeasureToolbar();
+      }
+      this.closeContextMenu();
+    });
+
+    window.addEventListener('click', (e) => {
+      if (!e.target.closest('#runnerContextMenu')) {
+        this.closeContextMenu();
+      }
+    });
+  }
+
+  handleMeasureSelected(idx) {
+    if (this.renderer) {
+      this.renderer.selectedMeasureIndex = idx;
+    }
+    const m = state.measures[idx];
+    if (!m) {
+      this.closeMeasureToolbar();
+      return;
+    }
+
+    if (this.dom.runnerMeasureToolbar) {
+      this.dom.runnerMeasureToolbar.style.display = 'flex';
+      this.dom.toolbarMeasureBadge.textContent = `c. ${idx + 1}`;
+      this.dom.toolbarMeasureName.textContent = m.nickname || '';
+
+      this.dom.btnMoveMeasureLeft.disabled = (idx === 0);
+      this.dom.btnMoveMeasureRight.disabled = (idx === state.measures.length - 1);
+    }
+
+    // Destaque visual na lista de cartões abaixo
+    const allCards = document.querySelectorAll('.measure-card');
+    allCards.forEach((c, cIdx) => {
+      c.classList.toggle('is-selected', cIdx === idx);
+    });
+
+    const targetCard = allCards[idx];
+    if (targetCard) {
+      targetCard.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+    }
+  }
+
+  handleMeasureMoved(fromIdx, toIdx) {
+    state.moveMeasure(fromIdx, toIdx);
+    this.handleMeasureSelected(toIdx);
+  }
+
+  closeMeasureToolbar() {
+    if (this.renderer) {
+      this.renderer.selectedMeasureIndex = null;
+    }
+    if (this.dom.runnerMeasureToolbar) {
+      this.dom.runnerMeasureToolbar.style.display = 'none';
+    }
+    document.querySelectorAll('.measure-card').forEach(c => c.classList.remove('is-selected'));
+  }
+
+  openContextMenu(idx, clientX, clientY) {
+    const menu = this.dom.runnerContextMenu;
+    if (!menu) return;
+
+    this._contextMeasureIdx = idx;
+    const m = state.measures[idx];
+    const title = m?.nickname ? `c. ${idx + 1} (${m.nickname})` : `Compasso ${idx + 1}`;
+    this.dom.ctxMenuHeader.textContent = title;
+
+    this.dom.ctxMoveLeft.disabled = (idx === 0);
+    this.dom.ctxMoveRight.disabled = (idx === state.measures.length - 1);
+
+    menu.style.display = 'flex';
+    menu.style.left = `${Math.min(window.innerWidth - 200, clientX)}px`;
+    menu.style.top = `${Math.min(window.innerHeight - 200, clientY)}px`;
+  }
+
+  closeContextMenu() {
+    if (this.dom.runnerContextMenu) {
+      this.dom.runnerContextMenu.style.display = 'none';
+    }
   }
 
   // =========================================================================
@@ -655,7 +942,11 @@ class SergioApp {
 
       const card = document.createElement('div');
       card.className = 'measure-card';
+      if (this.renderer?.selectedMeasureIndex === idx) {
+        card.classList.add('is-selected');
+      }
       card.dataset.index = idx;
+      card.draggable = true;
 
       if (grp) {
         card.innerHTML += `<div class="measure-card-group-strip" style="background:${grp.color}"></div>`;
@@ -675,14 +966,23 @@ class SergioApp {
         tempoDesc = `${Math.round(timing.effectiveBpm)} BPM (Fixo)`;
       }
 
+      const hasNickname = !!(m.nickname && m.nickname.trim());
+      const headerIndexHtml = hasNickname 
+        ? `<span class="measure-card-idx" style="color:${m.color || '#ff334b'}">c. ${idx + 1}</span>` 
+        : `<span></span>`;
+
+      const titleHtml = hasNickname
+        ? `<h3 class="measure-card-nickname" title="${m.nickname}">${m.nickname}</h3>`
+        : `<h3 class="measure-card-nickname is-unnamed"><span class="measure-card-idx-large" style="color:${m.color || '#ff334b'}">c. ${idx + 1}</span></h3>`;
+
       card.innerHTML += `
         <div class="measure-card-header">
-          <span class="measure-card-idx" style="color:${m.color || '#ff334b'}">c. ${idx + 1}</span>
+          ${headerIndexHtml}
           ${groupTagHtml}
         </div>
 
-        <!-- APELIDO DO COMPASSO EM DESTAQUE (HERO TEXT) -->
-        <h3 class="measure-card-nickname" title="${m.nickname}">${m.nickname}</h3>
+        <!-- APELIDO DO COMPASSO OU NÚMERO C. X -->
+        ${titleHtml}
 
         <div class="measure-card-details">
           <span class="measure-card-meter">${m.beats}/${m.beatUnit}</span>
@@ -690,13 +990,28 @@ class SergioApp {
         </div>
 
         <div class="measure-card-actions">
+          <button type="button" class="btn-card-icon btn-card-move-left" title="Mover Compasso para Trás (←)" ${idx === 0 ? 'disabled style="opacity:0.3;pointer-events:none"' : ''}>◀</button>
+          <button type="button" class="btn-card-icon btn-card-move-right" title="Mover Compasso para Frente (→)" ${idx === measures.length - 1 ? 'disabled style="opacity:0.3;pointer-events:none"' : ''}>▶</button>
           <button type="button" class="btn-card-icon btn-card-dup" title="Duplicar Compasso">⧉</button>
           <button type="button" class="btn-card-icon btn-card-del" title="Excluir Compasso">✕</button>
           <button type="button" class="btn-card-edit">Configurar</button>
         </div>
       `;
 
+      // Eventos de clique nas ações e no cartão
       card.addEventListener('click', (e) => {
+        if (e.target.closest('.btn-card-move-left')) {
+          e.stopPropagation();
+          state.moveMeasure(idx, idx - 1);
+          this.handleMeasureSelected(idx - 1);
+          return;
+        }
+        if (e.target.closest('.btn-card-move-right')) {
+          e.stopPropagation();
+          state.moveMeasure(idx, idx + 1);
+          this.handleMeasureSelected(idx + 1);
+          return;
+        }
         if (e.target.closest('.btn-card-del')) {
           e.stopPropagation();
           state.removeMeasure(idx);
@@ -707,7 +1022,50 @@ class SergioApp {
           state.duplicateMeasure(idx);
           return;
         }
+        if (e.target.closest('.btn-card-edit')) {
+          e.stopPropagation();
+          this.openMeasureModal(idx);
+          return;
+        }
+
+        // Clique no cartão seleciona e navega
+        this.handleMeasureSelected(idx);
+        const t = timings[idx];
+        if (t) this.seekTo(t.startTime);
+      });
+
+      card.addEventListener('dblclick', () => {
         this.openMeasureModal(idx);
+      });
+
+      // Arrastar e soltar cartões para reordenar
+      card.addEventListener('dragstart', (e) => {
+        e.dataTransfer.setData('text/plain', idx);
+        card.classList.add('is-drag-source');
+      });
+
+      card.addEventListener('dragend', () => {
+        card.classList.remove('is-drag-source');
+        document.querySelectorAll('.measure-card').forEach(c => c.classList.remove('is-drag-target'));
+      });
+
+      card.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        card.classList.add('is-drag-target');
+      });
+
+      card.addEventListener('dragleave', () => {
+        card.classList.remove('is-drag-target');
+      });
+
+      card.addEventListener('drop', (e) => {
+        e.preventDefault();
+        card.classList.remove('is-drag-target');
+        const fromIdx = parseInt(e.dataTransfer.getData('text/plain'), 10);
+        if (!isNaN(fromIdx) && fromIdx !== idx) {
+          state.moveMeasure(fromIdx, idx);
+          this.handleMeasureSelected(idx);
+        }
       });
 
       grid.appendChild(card);
@@ -817,7 +1175,7 @@ class SergioApp {
 
     this.dom.editMeasureIndex.value = index;
     this.dom.modalMeasureIdx.textContent = `Compasso ${index + 1}`;
-    this.dom.editNickname.value = m.nickname;
+    this.dom.editNickname.value = m.nickname || '';
     this.dom.editBeats.value = m.beats;
     this.dom.editBeatUnit.value = m.beatUnit;
 
@@ -901,7 +1259,9 @@ class SergioApp {
     endSelect.innerHTML = '';
 
     state.measures.forEach((m, idx) => {
-      const optText = `c. ${idx + 1} - ${m.nickname}`;
+      const optText = (m.nickname && m.nickname.trim())
+        ? `c. ${idx + 1} - ${m.nickname}`
+        : `c. ${idx + 1}`;
       startSelect.innerHTML += `<option value="${idx}">${optText}</option>`;
       endSelect.innerHTML += `<option value="${idx}">${optText}</option>`;
     });
