@@ -40,7 +40,7 @@ class PieceState {
     this.loadPieceData(JSON.parse(JSON.stringify(defaultPreset)));
   }
 
-  loadPieceData(data) {
+  loadPieceData(data, isRemote = false) {
     this.id = data.id || `piece-${Date.now()}`;
     this.name = data.name !== undefined ? data.name : "Peça nº 1";
     this.description = data.description || "";
@@ -72,7 +72,7 @@ class PieceState {
       .filter(g => g.startMeasure <= g.endMeasure);
 
     this.recalculateTimings();
-    this.notify();
+    this.notify("Dados da peça atualizados", isRemote);
   }
 
   // Define andamento base com validação rigorosa (evita NaN e bugs de digitação)
@@ -81,7 +81,7 @@ class PieceState {
     if (!isNaN(parsed) && parsed >= 20 && parsed <= 400) {
       this.baseBpm = Math.round(parsed);
       this.recalculateTimings();
-      this.notify();
+      this.notify(`Alterou BPM base para ${this.baseBpm}`);
       return true;
     }
     return false;
@@ -89,7 +89,7 @@ class PieceState {
 
   setPieceName(name) {
     this.name = name.trim() || "Peça Sem Nome";
-    this.notify();
+    this.notify(`Renomeou a peça para '${this.name}'`);
   }
 
   // Total de compassos tocados considerando repetições
@@ -128,7 +128,7 @@ class PieceState {
     }
 
     this.recalculateTimings();
-    this.notify();
+    this.notify(`Adicionou compasso (${newMeasure.beats}/${newMeasure.beatUnit})`);
     return newMeasure;
   }
 
@@ -176,7 +176,7 @@ class PieceState {
     this.measures.forEach(m => delete m._assignedGroupId);
 
     this.recalculateTimings();
-    this.notify();
+    this.notify(`Moveu compasso ${fromIndex + 1} para posição ${toIndex + 1}`);
     return true;
   }
 
@@ -205,7 +205,81 @@ class PieceState {
     }
 
     this.recalculateTimings();
-    this.notify();
+    this.notify(`Excluiu compasso ${index + 1}`);
+  }
+
+  // Remover múltiplos compassos de uma vez (seleção múltipla)
+  removeMeasures(indices) {
+    if (!indices || indices.length === 0 || this.measures.length === 0) return;
+    
+    // Converte para Set para eliminar duplicatas e ordena em ordem decrescente
+    const uniqueSorted = Array.from(new Set(indices))
+      .filter(idx => typeof idx === 'number' && idx >= 0 && idx < this.measures.length)
+      .sort((a, b) => b - a);
+
+    if (uniqueSorted.length === 0) return;
+
+    for (const index of uniqueSorted) {
+      this.measures.splice(index, 1);
+      
+      if (this.measures.length === 0) {
+        this.groups = [];
+      } else {
+        this.groups = this.groups.filter(g => {
+          if (index >= g.startMeasure && index <= g.endMeasure) {
+            if (g.startMeasure === g.endMeasure) return false;
+            g.endMeasure--;
+          } else if (index < g.startMeasure) {
+            g.startMeasure--;
+            g.endMeasure--;
+          }
+          return g.startMeasure <= g.endMeasure && g.startMeasure < this.measures.length;
+        });
+      }
+    }
+
+    this.recalculateTimings();
+    this.notify(`Excluiu ${uniqueSorted.length} compasso${uniqueSorted.length > 1 ? 's' : ''}`);
+  }
+
+  // Duplicar múltiplos compassos de uma vez
+  duplicateMeasures(indices) {
+    if (!indices || indices.length === 0 || this.measures.length === 0) return null;
+    const sorted = Array.from(new Set(indices))
+      .filter(idx => typeof idx === 'number' && idx >= 0 && idx < this.measures.length)
+      .sort((a, b) => a - b);
+
+    if (sorted.length === 0) return null;
+
+    const insertIndex = sorted[sorted.length - 1] + 1;
+    const copies = sorted.map(idx => {
+      const target = this.measures[idx];
+      return {
+        id: `m-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+        nickname: target.nickname ? `${target.nickname} (cópia)` : "",
+        beats: target.beats,
+        beatUnit: target.beatUnit,
+        tempoMode: target.tempoMode,
+        ratioNum: target.ratioNum,
+        ratioDen: target.ratioDen,
+        customBpm: target.customBpm,
+        color: target.color,
+        repeat: target.repeat || 1
+      };
+    });
+
+    this.measures.splice(insertIndex, 0, ...copies);
+
+    // Ajusta grupos após inserção em bloco
+    const count = copies.length;
+    this.groups.forEach(g => {
+      if (g.startMeasure >= insertIndex) g.startMeasure += count;
+      if (g.endMeasure >= insertIndex) g.endMeasure += count;
+    });
+
+    this.recalculateTimings();
+    this.notify(`Duplicou ${copies.length} compasso${copies.length > 1 ? 's' : ''}`);
+    return { start: insertIndex, end: insertIndex + count - 1 };
   }
 
   // Esvazia todos os compassos da peça
@@ -213,7 +287,7 @@ class PieceState {
     this.measures = [];
     this.groups = [];
     this.recalculateTimings();
-    this.notify();
+    this.notify("Limpou todos os compassos");
   }
 
   // Reinicia para um arquivo/peça completamente nova
@@ -225,7 +299,7 @@ class PieceState {
     this.measures = [];
     this.groups = [];
     this.recalculateTimings();
-    this.notify();
+    this.notify(`Criou nova peça '${this.name}'`);
   }
 
   // Atualizar compasso existente
@@ -244,7 +318,7 @@ class PieceState {
     if (updates.repeat !== undefined) m.repeat = Math.max(1, Math.min(999, parseInt(updates.repeat, 10) || 1));
 
     this.recalculateTimings();
-    this.notify();
+    this.notify(`Atualizou compasso ${index + 1}`);
   }
 
   // Agrupamento: criar ou atualizar grupo
@@ -262,7 +336,7 @@ class PieceState {
     };
 
     this.groups.push(newGroup);
-    this.notify();
+    this.notify(`Criou grupo '${newGroup.name}'`);
     return newGroup;
   }
 
@@ -276,12 +350,12 @@ class PieceState {
       grp.startMeasure = Math.max(0, Math.min(updates.startMeasure, updates.endMeasure));
       grp.endMeasure = Math.min(this.measures.length - 1, Math.max(updates.startMeasure, updates.endMeasure));
     }
-    this.notify();
+    this.notify(`Atualizou grupo '${grp.name}'`);
   }
 
   removeGroup(groupId) {
     this.groups = this.groups.filter(g => g.id !== groupId);
-    this.notify();
+    this.notify("Removeu grupo");
   }
 
   // Retorna o grupo ao qual pertence o compasso, se houver
@@ -508,11 +582,11 @@ class PieceState {
     }
   }
 
-  notify() {
+  notify(action = "Alteração na peça", isRemote = false) {
     this.saveToLocalStorage();
     for (const cb of this.listeners) {
       try {
-        cb(this);
+        cb(this, action, isRemote);
       } catch (err) {
         console.error("Erro no ouvinte de estado:", err);
       }

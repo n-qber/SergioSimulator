@@ -7,6 +7,7 @@ import { state } from './state.js';
 import { audio } from './audio.js';
 import { PRESETS } from './presets.js';
 import { DJRunnerRenderer } from './renderer.js';
+import { collab } from './collab.js';
 
 class SergioApp {
   constructor() {
@@ -35,6 +36,11 @@ class SergioApp {
 
     // Tap tempo buffer
     this.tapTimes = [];
+
+    // Seleção múltipla de compassos (com Shift e Ctrl/Cmd)
+    this.selectedMeasureIndices = new Set();
+    this.lastSelectedMeasureIdx = null;
+
     this.dom = {};
   }
 
@@ -48,6 +54,9 @@ class SergioApp {
     this.initPresetsDropdown();
     this.renderMeasuresList();
     this.updateHUD(0);
+    this.setupCollab();
+    this.setupShareModal();
+    this.setupHistoryModal();
 
     // Pré-gera a peça toda na memória RAM (~5ms)
     this.preparePieceAudio();
@@ -128,6 +137,38 @@ class SergioApp {
       btnMute: document.getElementById('btnMute'),
       muteIcon: document.getElementById('muteIcon'),
       selectSoundType: document.getElementById('selectSoundType'),
+
+      // Nuvem, Colaboração e Histórico
+      cloudStatusPill: document.getElementById('cloudStatusPill'),
+      cloudStatusText: document.getElementById('cloudStatusText'),
+      presenceRow: document.getElementById('presenceRow'),
+      btnOpenHistory: document.getElementById('btnOpenHistory'),
+      historyBadgeCount: document.getElementById('historyBadgeCount'),
+      btnSharePiece: document.getElementById('btnSharePiece'),
+
+      // Modal de Compartilhar
+      modalSharePiece: document.getElementById('modalSharePiece'),
+      btnShareModalClose: document.getElementById('btnShareModalClose'),
+      inputShareUrl: document.getElementById('inputShareUrl'),
+      btnCopyShareUrl: document.getElementById('btnCopyShareUrl'),
+      copyIcon: document.getElementById('copyIcon'),
+      copyText: document.getElementById('copyText'),
+      userAvatarPreview: document.getElementById('userAvatarPreview'),
+      inputCollabName: document.getElementById('inputCollabName'),
+      avatarColorPicker: document.getElementById('avatarColorPicker'),
+      collabUsersList: document.getElementById('collabUsersList'),
+      onlineCountBadge: document.getElementById('onlineCountBadge'),
+
+      // Modal de Histórico
+      modalVersionHistory: document.getElementById('modalVersionHistory'),
+      btnHistoryModalClose: document.getElementById('btnHistoryModalClose'),
+      historyTotalCount: document.getElementById('historyTotalCount'),
+      historyListContainer: document.getElementById('historyListContainer'),
+
+      // Toast Flutuante
+      toastNotification: document.getElementById('toastNotification'),
+      toastIcon: document.getElementById('toastIcon'),
+      toastMessage: document.getElementById('toastMessage'),
 
       // HUD
       hudCurrentTime: document.getElementById('hudCurrentTime'),
@@ -210,6 +251,7 @@ class SergioApp {
       toolbarMeasureName: document.getElementById('toolbarMeasureName'),
       btnMoveMeasureLeft: document.getElementById('btnMoveMeasureLeft'),
       btnMoveMeasureRight: document.getElementById('btnMoveMeasureRight'),
+      btnGroupSelectedMeasures: document.getElementById('btnGroupSelectedMeasures'),
       btnConfigureSelectedMeasure: document.getElementById('btnConfigureSelectedMeasure'),
       btnDuplicateSelectedMeasure: document.getElementById('btnDuplicateSelectedMeasure'),
       btnDeleteSelectedMeasure: document.getElementById('btnDeleteSelectedMeasure'),
@@ -234,7 +276,7 @@ class SergioApp {
       state,
       {
         onSeek: (seekSeconds) => this.seekTo(seekSeconds),
-        onSelectMeasure: (idx) => this.handleMeasureSelected(idx),
+        onSelectMeasure: (idx, e) => this.handleMeasureSelected(idx, e),
         onMoveMeasure: (fromIdx, toIdx) => this.handleMeasureMoved(fromIdx, toIdx),
         onEditMeasure: (idx) => this.openMeasureModal(idx),
         onContextMenu: (idx, x, y) => this.openContextMenu(idx, x, y)
@@ -776,7 +818,7 @@ class SergioApp {
     this.setupGroupModal();
 
     // Inscrição no estado para re-renderizar quando houver alterações estruturais
-    state.subscribe(() => {
+    state.subscribe((st, action, isRemote) => {
       this.dom.inputPieceName.value = state.name;
       this.dom.inputBaseBpm.value = state.baseBpm;
       this.renderMeasuresList();
@@ -786,6 +828,11 @@ class SergioApp {
         this.renderer.resize();
       }
       this.preparePieceAudio(true);
+
+      // Sincroniza alteração local com o Firebase na nuvem estilo Google Docs
+      if (!isRemote) {
+        collab.commitLocalChange(action, state);
+      }
     });
 
     // Atalhos de teclado
@@ -803,6 +850,39 @@ class SergioApp {
           this.closeConfirmNewModal();
           return;
         }
+        if (this.dom.modalSharePiece && this.dom.modalSharePiece.style.display === 'flex') {
+          this.closeShareModal();
+          return;
+        }
+        if (this.dom.modalVersionHistory && this.dom.modalVersionHistory.style.display === 'flex') {
+          this.closeHistoryModal();
+          return;
+        }
+        if (this.selectedMeasureIndices.size > 0) {
+          this.closeMeasureToolbar();
+          return;
+        }
+      }
+
+      // Atalho de Excluir compasso(s) selecionado(s) com Delete ou Backspace
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (this.selectedMeasureIndices.size > 0) {
+          e.preventDefault();
+          this.deleteSelectedMeasures();
+          return;
+        }
+      }
+
+      // Atalho Ctrl+A / Cmd+A: Selecionar todos os compassos
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
+        e.preventDefault();
+        this.selectedMeasureIndices.clear();
+        for (let i = 0; i < state.measures.length; i++) {
+          this.selectedMeasureIndices.add(i);
+        }
+        this.lastSelectedMeasureIdx = state.measures.length > 0 ? state.measures.length - 1 : null;
+        this.syncSelectionUI();
+        return;
       }
 
       if (e.code === 'Space') {
@@ -937,6 +1017,14 @@ class SergioApp {
       }
     });
 
+    this.dom.btnGroupSelectedMeasures?.addEventListener('click', () => {
+      if (this.selectedMeasureIndices.size === 0) return;
+      const indices = Array.from(this.selectedMeasureIndices);
+      const minIdx = Math.min(...indices);
+      const maxIdx = Math.max(...indices);
+      this.openGroupModalWithRange(minIdx, maxIdx);
+    });
+
     this.dom.btnConfigureSelectedMeasure?.addEventListener('click', () => {
       const idx = this.renderer?.selectedMeasureIndex;
       if (idx !== null && idx !== undefined) {
@@ -945,18 +1033,11 @@ class SergioApp {
     });
 
     this.dom.btnDuplicateSelectedMeasure?.addEventListener('click', () => {
-      const idx = this.renderer?.selectedMeasureIndex;
-      if (idx !== null && idx !== undefined) {
-        state.duplicateMeasure(idx);
-      }
+      this.duplicateSelectedMeasures();
     });
 
     this.dom.btnDeleteSelectedMeasure?.addEventListener('click', () => {
-      const idx = this.renderer?.selectedMeasureIndex;
-      if (idx !== null && idx !== undefined) {
-        state.removeMeasure(idx);
-        this.closeMeasureToolbar();
-      }
+      this.deleteSelectedMeasures();
     });
 
     this.dom.btnCloseToolbar?.addEventListener('click', () => {
@@ -996,8 +1077,16 @@ class SergioApp {
 
     this.dom.ctxDelete?.addEventListener('click', () => {
       if (this._contextMeasureIdx !== undefined) {
-        state.removeMeasure(this._contextMeasureIdx);
-        this.closeMeasureToolbar();
+        const idx = this._contextMeasureIdx;
+        state.removeMeasure(idx);
+        if (state.measures.length > 0) {
+          const nextIdx = Math.min(idx, state.measures.length - 1);
+          this.handleMeasureSelected(nextIdx);
+          const t = state.getFirstTimingForMeasure(nextIdx);
+          if (t) this.seekTo(t.startTime);
+        } else {
+          this.closeMeasureToolbar();
+        }
       }
       this.closeContextMenu();
     });
@@ -1009,35 +1098,165 @@ class SergioApp {
     });
   }
 
-  handleMeasureSelected(idx) {
-    if (this.renderer) {
-      this.renderer.selectedMeasureIndex = idx;
-    }
-    const m = state.measures[idx];
-    if (!m) {
+  handleMeasureSelected(idx, event = null) {
+    if (idx < 0 || idx >= state.measures.length) {
       this.closeMeasureToolbar();
       return;
     }
 
+    if (event && event.shiftKey && this.lastSelectedMeasureIdx !== null) {
+      // Seleção em intervalo contínuo com SHIFT
+      const start = Math.min(this.lastSelectedMeasureIdx, idx);
+      const end = Math.max(this.lastSelectedMeasureIdx, idx);
+
+      if (!event.ctrlKey && !event.metaKey) {
+        this.selectedMeasureIndices.clear();
+      }
+      for (let i = start; i <= end; i++) {
+        this.selectedMeasureIndices.add(i);
+      }
+    } else if (event && (event.ctrlKey || event.metaKey)) {
+      // Toggle individual com CTRL / CMD
+      if (this.selectedMeasureIndices.has(idx)) {
+        this.selectedMeasureIndices.delete(idx);
+      } else {
+        this.selectedMeasureIndices.add(idx);
+        this.lastSelectedMeasureIdx = idx;
+      }
+    } else {
+      // Seleção simples sem modificadores
+      this.selectedMeasureIndices.clear();
+      this.selectedMeasureIndices.add(idx);
+      this.lastSelectedMeasureIdx = idx;
+    }
+
+    this.syncSelectionUI();
+  }
+
+  syncSelectionUI() {
+    const count = this.selectedMeasureIndices.size;
+    if (count === 0) {
+      this.closeMeasureToolbar();
+      return;
+    }
+
+    const indices = Array.from(this.selectedMeasureIndices).sort((a, b) => a - b);
+    const primaryIdx = indices[0];
+    const m = state.measures[primaryIdx];
+
+    if (this.renderer) {
+      this.renderer.setSelectedMeasures(indices);
+      this.renderer.render(this.playbackTime);
+    }
+
     if (this.dom.runnerMeasureToolbar) {
       this.dom.runnerMeasureToolbar.style.display = 'flex';
-      this.dom.toolbarMeasureBadge.textContent = `c. ${idx + 1}`;
-      this.dom.toolbarMeasureName.textContent = m.nickname || '';
 
-      this.dom.btnMoveMeasureLeft.disabled = (idx === 0);
-      this.dom.btnMoveMeasureRight.disabled = (idx === state.measures.length - 1);
+      if (count > 1) {
+        const minIdx = indices[0] + 1;
+        const maxIdx = indices[indices.length - 1] + 1;
+        this.dom.toolbarMeasureBadge.textContent = `${count} compassos (${minIdx} a ${maxIdx})`;
+        this.dom.toolbarMeasureName.textContent = '(Shift para estender seleção)';
+
+        if (this.dom.btnMoveMeasureLeft) this.dom.btnMoveMeasureLeft.style.display = 'none';
+        if (this.dom.btnMoveMeasureRight) this.dom.btnMoveMeasureRight.style.display = 'none';
+        if (this.dom.btnConfigureSelectedMeasure) this.dom.btnConfigureSelectedMeasure.style.display = 'none';
+        if (this.dom.btnGroupSelectedMeasures) this.dom.btnGroupSelectedMeasures.style.display = 'inline-flex';
+        if (this.dom.btnDuplicateSelectedMeasure) {
+          this.dom.btnDuplicateSelectedMeasure.textContent = `⧉ Duplicar (${count})`;
+          this.dom.btnDuplicateSelectedMeasure.style.display = 'inline-flex';
+        }
+        if (this.dom.btnDeleteSelectedMeasure) {
+          this.dom.btnDeleteSelectedMeasure.textContent = `✕ Excluir (${count}) (Del)`;
+          this.dom.btnDeleteSelectedMeasure.style.display = 'inline-flex';
+        }
+      } else {
+        this.dom.toolbarMeasureBadge.textContent = `c. ${primaryIdx + 1}`;
+        this.dom.toolbarMeasureName.textContent = m?.nickname || '';
+
+        if (this.dom.btnMoveMeasureLeft) {
+          this.dom.btnMoveMeasureLeft.style.display = 'inline-flex';
+          this.dom.btnMoveMeasureLeft.disabled = (primaryIdx === 0);
+        }
+        if (this.dom.btnMoveMeasureRight) {
+          this.dom.btnMoveMeasureRight.style.display = 'inline-flex';
+          this.dom.btnMoveMeasureRight.disabled = (primaryIdx === state.measures.length - 1);
+        }
+        if (this.dom.btnConfigureSelectedMeasure) this.dom.btnConfigureSelectedMeasure.style.display = 'inline-flex';
+        if (this.dom.btnGroupSelectedMeasures) this.dom.btnGroupSelectedMeasures.style.display = 'none';
+        if (this.dom.btnDuplicateSelectedMeasure) {
+          this.dom.btnDuplicateSelectedMeasure.textContent = '⧉ Duplicar';
+          this.dom.btnDuplicateSelectedMeasure.style.display = 'inline-flex';
+        }
+        if (this.dom.btnDeleteSelectedMeasure) {
+          this.dom.btnDeleteSelectedMeasure.textContent = '✕ Excluir (Del)';
+          this.dom.btnDeleteSelectedMeasure.style.display = 'inline-flex';
+        }
+      }
     }
 
     // Destaque visual na lista de cartões abaixo
     const allCards = document.querySelectorAll('.measure-card');
     allCards.forEach((c, cIdx) => {
-      c.classList.toggle('is-selected', cIdx === idx);
+      c.classList.toggle('is-selected', this.selectedMeasureIndices.has(cIdx));
     });
 
-    const targetCard = allCards[idx];
-    if (targetCard) {
+    const targetCard = allCards[primaryIdx];
+    if (targetCard && count === 1) {
       targetCard.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
     }
+  }
+
+  deleteSelectedMeasures() {
+    if (this.selectedMeasureIndices.size === 0) return;
+    const indices = Array.from(this.selectedMeasureIndices).sort((a, b) => a - b);
+    const count = indices.length;
+    const firstDeletedIdx = indices[0];
+
+    state.removeMeasures(indices);
+
+    if (state.measures.length > 0) {
+      // Seleciona o mais próximo da direita; se não houver, o da esquerda
+      const nextIdx = Math.min(firstDeletedIdx, state.measures.length - 1);
+      this.selectedMeasureIndices.clear();
+      this.selectedMeasureIndices.add(nextIdx);
+      this.lastSelectedMeasureIdx = nextIdx;
+      this.syncSelectionUI();
+
+      const t = state.getFirstTimingForMeasure(nextIdx);
+      if (t) this.seekTo(t.startTime);
+    } else {
+      this.closeMeasureToolbar();
+    }
+
+    this.showToast(`${count} compasso${count > 1 ? 's' : ''} excluído${count > 1 ? 's' : ''}`, '✕');
+  }
+
+  duplicateSelectedMeasures() {
+    if (this.selectedMeasureIndices.size === 0) return;
+    const indices = Array.from(this.selectedMeasureIndices);
+    const count = indices.length;
+    const res = state.duplicateMeasures(indices);
+    if (res) {
+      this.selectedMeasureIndices.clear();
+      for (let i = res.start; i <= res.end; i++) {
+        this.selectedMeasureIndices.add(i);
+      }
+      this.lastSelectedMeasureIdx = res.end;
+      this.syncSelectionUI();
+      this.showToast(`${count} compasso${count > 1 ? 's' : ''} duplicado${count > 1 ? 's' : ''}`, '⧉');
+    }
+  }
+
+  openGroupModalWithRange(start, end) {
+    const modal = this.dom.modalGroupManage;
+    if (!modal) return;
+    this.populateGroupSelects();
+    if (this.dom.newGroupStart) this.dom.newGroupStart.value = start;
+    if (this.dom.newGroupEnd) this.dom.newGroupEnd.value = end;
+    this.renderExistingGroupsList();
+    modal.style.display = 'flex';
+    this.dom.newGroupName.focus();
   }
 
   handleMeasureMoved(fromIdx, toIdx) {
@@ -1046,8 +1265,11 @@ class SergioApp {
   }
 
   closeMeasureToolbar() {
+    this.selectedMeasureIndices.clear();
+    this.lastSelectedMeasureIdx = null;
     if (this.renderer) {
-      this.renderer.selectedMeasureIndex = null;
+      this.renderer.setSelectedMeasures([]);
+      this.renderer.render(this.playbackTime);
     }
     if (this.dom.runnerMeasureToolbar) {
       this.dom.runnerMeasureToolbar.style.display = 'none';
@@ -1250,7 +1472,12 @@ class SergioApp {
         if (e.target.closest('.btn-card-del')) {
           e.stopPropagation();
           state.removeMeasure(idx);
-          if (state.measures.length === 0) {
+          if (state.measures.length > 0) {
+            const nextIdx = Math.min(idx, state.measures.length - 1);
+            this.handleMeasureSelected(nextIdx);
+            const t = state.getFirstTimingForMeasure(nextIdx);
+            if (t) this.seekTo(t.startTime);
+          } else {
             this.closeMeasureToolbar();
           }
           return;
@@ -1266,10 +1493,10 @@ class SergioApp {
           return;
         }
 
-        // Clique no cartão seleciona e navega
-        this.handleMeasureSelected(idx);
+        // Clique no cartão seleciona e navega (com suporte a Shift e Ctrl)
+        this.handleMeasureSelected(idx, e);
         const t = state.getFirstTimingForMeasure(idx);
-        if (t) this.seekTo(t.startTime);
+        if (t && !e.shiftKey) this.seekTo(t.startTime);
       });
 
       card.addEventListener('dblclick', () => {
@@ -1388,7 +1615,12 @@ class SergioApp {
       const idx = parseInt(this.dom.editMeasureIndex.value, 10);
       modal.style.display = 'none';
       state.removeMeasure(idx);
-      if (state.measures.length === 0) {
+      if (state.measures.length > 0) {
+        const nextIdx = Math.min(idx, state.measures.length - 1);
+        this.handleMeasureSelected(nextIdx);
+        const t = state.getFirstTimingForMeasure(nextIdx);
+        if (t) this.seekTo(t.startTime);
+      } else {
         this.closeMeasureToolbar();
       }
     });
@@ -1650,6 +1882,351 @@ class SergioApp {
         select.value = '';
       }
     });
+  }
+
+  /* ==========================================================================
+     SISTEMA DE COLABORAÇÃO & HISTÓRICO NA NUVEM (GOOGLE CLOUD FIRESTORE)
+     ========================================================================== */
+
+  setupCollab() {
+    collab.onRemoteStateChange = (remoteData) => {
+      state.loadPieceData(remoteData, true);
+      this.showToast(`${remoteData.updatedBy?.name || 'Alguém'} atualizou a peça`, '🔄');
+    };
+
+    collab.onHistoryChange = (historyList) => {
+      if (this.dom.historyBadgeCount) {
+        this.dom.historyBadgeCount.textContent = historyList.length;
+      }
+      if (this.dom.historyTotalCount) {
+        this.dom.historyTotalCount.textContent = `${historyList.length} alterações salvas`;
+      }
+      this.renderHistoryList(historyList);
+    };
+
+    collab.onPresenceChange = (activeUsers) => {
+      this.renderPresenceAvatars(activeUsers);
+      this.renderCollabModalUsers(activeUsers);
+    };
+
+    collab.onSyncStatusChange = (status, text) => {
+      this.updateSyncStatus(status, text);
+    };
+
+    // Conexão inicial: Se houver ?piece= na URL, conecta àquela peça; se não, sincroniza com o ID da peça atual
+    const urlPieceId = collab.getPieceIdFromUrl();
+    if (urlPieceId) {
+      collab.connectToPiece(urlPieceId, state);
+    } else {
+      collab.connectToPiece(state.id, state);
+    }
+  }
+
+  updateSyncStatus(status, text) {
+    const pill = this.dom.cloudStatusPill;
+    const label = this.dom.cloudStatusText;
+    if (!pill || !label) return;
+
+    pill.className = `cloud-status-pill ${status}`;
+    label.textContent = text || (status === 'synced' ? 'Nuvem OK' : 'Sincronizando...');
+    pill.title = `Firebase Firestore (São Paulo): ${text}`;
+  }
+
+  renderPresenceAvatars(activeUsers) {
+    const row = this.dom.presenceRow;
+    if (!row) return;
+    row.innerHTML = '';
+
+    const maxAvatars = 4;
+    const displayUsers = activeUsers.slice(0, maxAvatars);
+
+    displayUsers.forEach(u => {
+      const pill = document.createElement('div');
+      pill.className = 'presence-avatar-pill';
+      pill.style.backgroundColor = u.color || '#3b82f6';
+      const initial = (u.name || 'U').charAt(0).toUpperCase();
+      pill.textContent = initial;
+      pill.title = u.id === collab.localUser.id ? `${u.name} (Você)` : u.name;
+      row.appendChild(pill);
+    });
+
+    if (activeUsers.length > maxAvatars) {
+      const more = document.createElement('div');
+      more.className = 'presence-avatar-pill';
+      more.style.backgroundColor = '#64748b';
+      more.textContent = `+${activeUsers.length - maxAvatars}`;
+      more.title = `${activeUsers.length - maxAvatars} outros colaboradores online`;
+      row.appendChild(more);
+    }
+  }
+
+  renderCollabModalUsers(activeUsers) {
+    if (this.dom.onlineCountBadge) {
+      this.dom.onlineCountBadge.textContent = `${activeUsers.length} online`;
+    }
+    const list = this.dom.collabUsersList;
+    if (!list) return;
+    list.innerHTML = '';
+
+    if (activeUsers.length === 0) {
+      list.innerHTML = `<span style="font-size:0.75rem; color:var(--white-muted)">Apenas você nesta sala</span>`;
+      return;
+    }
+
+    activeUsers.forEach(u => {
+      const isMe = u.id === collab.localUser.id;
+      const chip = document.createElement('div');
+      chip.className = 'collab-user-chip';
+      chip.innerHTML = `
+        <span class="user-chip-dot" style="background:${u.color || '#3b82f6'}">${(u.name || 'U').charAt(0).toUpperCase()}</span>
+        <span>${u.name || 'Anônimo'}</span>
+        ${isMe ? '<span class="user-chip-you">(você)</span>' : ''}
+      `;
+      list.appendChild(chip);
+    });
+  }
+
+  /* ==========================================================================
+     MODAL DE COMPARTILHAMENTO
+     ========================================================================== */
+
+  setupShareModal() {
+    this.dom.btnSharePiece?.addEventListener('click', () => this.openShareModal());
+    this.dom.btnShareModalClose?.addEventListener('click', () => this.closeShareModal());
+
+    // Fechar ao clicar no backdrop
+    this.dom.modalSharePiece?.addEventListener('click', (e) => {
+      if (e.target === this.dom.modalSharePiece) this.closeShareModal();
+    });
+
+    // Copiar Link
+    this.dom.btnCopyShareUrl?.addEventListener('click', () => this.copyShareUrl());
+
+    // Configuração do perfil local
+    if (this.dom.inputCollabName) {
+      this.dom.inputCollabName.value = collab.localUser.name;
+      this.dom.inputCollabName.addEventListener('input', (e) => {
+        collab.updateProfile(e.target.value);
+        this.updateCollabAvatarPreview();
+      });
+    }
+
+    // Gerador de botões de cor
+    if (this.dom.avatarColorPicker) {
+      this.dom.avatarColorPicker.innerHTML = '';
+      const colors = ['#FF334B', '#3B82F6', '#10B981', '#8B5CF6', '#F59E0B', '#EC4899', '#06B6D4', '#14B8A6'];
+      colors.forEach(c => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `avatar-color-btn ${c === collab.localUser.color ? 'selected' : ''}`;
+        btn.style.backgroundColor = c;
+        btn.title = `Cor ${c}`;
+        btn.addEventListener('click', () => {
+          this.dom.avatarColorPicker.querySelectorAll('.avatar-color-btn').forEach(b => b.classList.remove('selected'));
+          btn.classList.add('selected');
+          collab.updateProfile(this.dom.inputCollabName.value, c);
+          this.updateCollabAvatarPreview();
+        });
+        this.dom.avatarColorPicker.appendChild(btn);
+      });
+    }
+
+    this.updateCollabAvatarPreview();
+  }
+
+  updateCollabAvatarPreview() {
+    const preview = this.dom.userAvatarPreview;
+    if (!preview) return;
+    preview.style.backgroundColor = collab.localUser.color;
+    preview.textContent = (collab.localUser.name || 'U').charAt(0).toUpperCase();
+  }
+
+  openShareModal() {
+    if (!this.dom.modalSharePiece) return;
+
+    // Garante que a peça atual está sincronizada na nuvem com o link gerado
+    const shareLink = collab.getShareableLink(state.id);
+    if (this.dom.inputShareUrl) {
+      this.dom.inputShareUrl.value = shareLink;
+    }
+
+    if (this.dom.inputCollabName) {
+      this.dom.inputCollabName.value = collab.localUser.name;
+    }
+    this.updateCollabAvatarPreview();
+    this.renderCollabModalUsers(collab.activeCollaborators);
+
+    this.dom.modalSharePiece.style.display = 'flex';
+  }
+
+  closeShareModal() {
+    if (this.dom.modalSharePiece) {
+      this.dom.modalSharePiece.style.display = 'none';
+    }
+  }
+
+  async copyShareUrl() {
+    const link = this.dom.inputShareUrl?.value || collab.getShareableLink(state.id);
+    if (!link) return;
+
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(link);
+      } else {
+        this.dom.inputShareUrl.select();
+        document.execCommand('copy');
+      }
+
+      if (this.dom.copyText) this.dom.copyText.textContent = "Link Copiado!";
+      if (this.dom.copyIcon) this.dom.copyIcon.textContent = "✓";
+      this.showToast("Link copiado para a área de transferência! Qualquer pessoa pode editar.", "🔗");
+
+      setTimeout(() => {
+        if (this.dom.copyText) this.dom.copyText.textContent = "Copiar Link";
+        if (this.dom.copyIcon) this.dom.copyIcon.textContent = "📋";
+      }, 2500);
+    } catch (err) {
+      console.warn("Falha ao copiar:", err);
+      this.dom.inputShareUrl.select();
+      this.showToast("Selecione e copie o link acima manualmente.", "ℹ️");
+    }
+  }
+
+  /* ==========================================================================
+     MODAL DE HISTÓRICO DE VERSÕES (ATÉ 200 ALTERAÇÕES NA NUVEM)
+     ========================================================================== */
+
+  setupHistoryModal() {
+    this.dom.btnOpenHistory?.addEventListener('click', () => this.openHistoryModal());
+    this.dom.btnHistoryModalClose?.addEventListener('click', () => this.closeHistoryModal());
+
+    // Fechar ao clicar no backdrop
+    this.dom.modalVersionHistory?.addEventListener('click', (e) => {
+      if (e.target === this.dom.modalVersionHistory) this.closeHistoryModal();
+    });
+  }
+
+  openHistoryModal() {
+    if (!this.dom.modalVersionHistory) return;
+    this.renderHistoryList(collab.historyList);
+    this.dom.modalVersionHistory.style.display = 'flex';
+  }
+
+  closeHistoryModal() {
+    if (this.dom.modalVersionHistory) {
+      this.dom.modalVersionHistory.style.display = 'none';
+    }
+  }
+
+  renderHistoryList(historyList) {
+    const container = this.dom.historyListContainer;
+    if (!container) return;
+
+    if (!historyList || historyList.length === 0) {
+      container.innerHTML = `
+        <div class="history-empty-state">
+          <span>🕒</span>
+          <p>Nenhuma alteração registrada ainda nesta peça.</p>
+          <span style="font-size:0.75rem; color:var(--white-muted)">Faça qualquer edição (BPM, compassos ou grupos) para gravar na nuvem.</span>
+        </div>
+      `;
+      return;
+    }
+
+    container.innerHTML = '';
+
+    historyList.forEach((item, idx) => {
+      const card = document.createElement('div');
+      card.className = `history-item-card ${idx === 0 ? 'is-current' : ''}`;
+      
+      const author = item.author || { name: 'Percussionista', color: '#64748b' };
+      const initial = (author.name || 'P').charAt(0).toUpperCase();
+      const timeAgo = this.formatTimeAgo(item.timestamp);
+
+      card.innerHTML = `
+        <div class="history-item-left">
+          <div class="history-author-avatar" style="background:${author.color || '#3b82f6'}" title="${author.name}">
+            ${initial}
+          </div>
+          <div class="history-item-details">
+            <span class="history-action-text">${item.action || 'Alteração na peça'}</span>
+            <div class="history-meta-row">
+              <span class="history-author-name">${author.name}</span>
+              <span>•</span>
+              <span class="history-time">${timeAgo}</span>
+              ${item.summary ? `<span>•</span><span class="history-summary">${item.summary}</span>` : ''}
+            </div>
+          </div>
+        </div>
+        <button type="button" class="btn-restore-version" title="Restaurar a peça para este momento">
+          Restaurar
+        </button>
+      `;
+
+      const btnRestore = card.querySelector('.btn-restore-version');
+      btnRestore.addEventListener('click', () => this.restoreHistoryVersion(item));
+
+      container.appendChild(card);
+    });
+  }
+
+  restoreHistoryVersion(historyItem) {
+    if (!historyItem || !historyItem.snapshot) return;
+
+    const formattedTime = new Date(historyItem.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const authorName = historyItem.author?.name || 'Autor';
+
+    const confirmed = window.confirm(`Deseja restaurar a peça para a versão de ${formattedTime} feita por ${authorName}?`);
+    if (!confirmed) return;
+
+    this.pausePlayback();
+    // Carrega o snapshot histórico
+    state.loadPieceData(historyItem.snapshot);
+    this.seekTo(0);
+    this.closeHistoryModal();
+
+    this.showToast(`Peça restaurada para a versão de ${formattedTime}`, '🕒');
+  }
+
+  formatTimeAgo(timestamp) {
+    if (!timestamp) return 'Recentemente';
+    const now = Date.now();
+    const diffSec = Math.floor((now - timestamp) / 1000);
+
+    if (diffSec < 10) return 'Agora mesmo';
+    if (diffSec < 60) return `Há ${diffSec}s`;
+    const diffMin = Math.floor(diffSec / 60);
+    if (diffMin < 60) return `Há ${diffMin} min`;
+    const diffHour = Math.floor(diffMin / 60);
+    if (diffHour < 24) return `Há ${diffHour}h`;
+    const date = new Date(timestamp);
+    return date.toLocaleDateString([], { day: '2-digit', month: '2-digit' }) + ' ' + 
+           date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+
+  /* ==========================================================================
+     TOAST NOTIFICATION FLUTUANTE
+     ========================================================================== */
+
+  showToast(message, icon = '✓') {
+    const toast = this.dom.toastNotification;
+    if (!toast) return;
+
+    if (this.dom.toastIcon) this.dom.toastIcon.textContent = icon;
+    if (this.dom.toastMessage) this.dom.toastMessage.textContent = message;
+
+    toast.style.display = 'flex';
+    // Força reflow para animação css
+    toast.offsetHeight;
+    toast.classList.add('show');
+
+    clearTimeout(this._toastTimer);
+    this._toastTimer = setTimeout(() => {
+      toast.classList.remove('show');
+      setTimeout(() => {
+        toast.style.display = 'none';
+      }, 300);
+    }, 2800);
   }
 
   exportPieceFile() {

@@ -1879,3 +1879,519 @@ kbd {
     height: 180px;
   }
 }
+
+/* ==========================================================================
+   COLABORAÇÃO EM TEMPO REAL & HISTÓRICO NA NUVEM
+   ========================================================================== */
+
+/* Pílula de Status da Nuvem */
+.cloud-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  padding: 4px 8px;
+  border-radius: 20px;
+  font-size: 0.72rem;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--white-dim);
+  cursor: default;
+  transition: all 0.2s ease;
+}
+
+.cloud-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #64748b;
+  display: inline-block;
+  transition: background 0.2s ease;
+}
+
+.cloud-status-pill.synced .cloud-dot {
+  background: #10b981;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
+}
+
+.cloud-status-pill.syncing .cloud-dot {
+  background: #f59e0b;
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.6);
+  animation: pulseCloud 1s infinite alternate;
+}
+
+.cloud-status-pill.error .cloud-dot {
+  background: #ef4444;
+}
+
+@keyframes pulseCloud {
+  from { opacity: 0.4; }
+  to { opacity: 1; }
+}
+
+/* Linha de Presença (Avatares no Topo) */
+.presence-row {
+  display: flex;
+  align-items: center;
+  gap: -6px;
+}
+
+.presence-avatar-pill {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #ffffff;
+  border: 2px solid var(--bg-header);
+  box-shadow: var(--shadow-sm);
+  margin-left: -6px;
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.presence-avatar-pill:first-child {
+  margin-left: 0;
+}
+
+.presence-avatar-pill:hover {
+  transform: translateY(-2px) scale(1.15);
+  z-index: 5;
+}
+
+/* Botões do Header: Histórico & Compartilhar */
+.btn-history {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  color: var(--white-pure);
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 5px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-history:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--border-medium);
+}
+
+.history-badge {
+  background: var(--red-soft);
+  color: var(--red-primary);
+  border: 1px solid rgba(244, 63, 94, 0.3);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 10px;
+}
+
+.btn-share-highlight {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: linear-gradient(135deg, var(--red-primary), var(--red-dark));
+  color: #ffffff;
+  font-size: 0.82rem;
+  font-weight: 700;
+  padding: 6px 13px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  box-shadow: 0 2px 10px rgba(244, 63, 94, 0.35);
+  transition: all 0.15s ease;
+}
+
+.btn-share-highlight:hover {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(244, 63, 94, 0.5);
+}
+
+.btn-share-highlight:active {
+  transform: translateY(0);
+}
+
+/* Modais de Compartilhar e Histórico */
+.modal-share-window {
+  max-width: 520px;
+}
+
+.modal-history-window {
+  max-width: 620px;
+}
+
+.tag-collab {
+  background: #3b82f6 !important;
+}
+
+.share-url-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.share-input {
+  flex: 1;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  background: var(--bg-stage);
+  user-select: all;
+}
+
+.btn-copy-link {
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  font-weight: 700;
+}
+
+.field-hint {
+  font-size: 0.72rem;
+  color: var(--white-muted);
+  line-height: 1.35;
+  margin-top: 4px;
+}
+
+/* Perfil do Colaborador */
+.collab-profile-box {
+  background: var(--bg-stage);
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.profile-edit-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.user-avatar-circle {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--red-primary);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 0.95rem;
+  box-shadow: var(--shadow-sm);
+  flex-shrink: 0;
+}
+
+.collab-name-input {
+  flex: 1;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.avatar-colors-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.avatar-color-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.avatar-color-btn:hover {
+  transform: scale(1.15);
+}
+
+.avatar-color-btn.selected {
+  border-color: #ffffff;
+  transform: scale(1.15);
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.4);
+}
+
+/* Seção de Colaboradores Ativos */
+.active-collab-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.section-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.online-pill {
+  font-size: 0.68rem;
+  font-family: var(--font-mono);
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-weight: 700;
+}
+
+.collab-users-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.collab-user-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-stage);
+  border: 1px solid var(--border-light);
+  padding: 4px 10px 4px 6px;
+  border-radius: 20px;
+  font-size: 0.78rem;
+  color: var(--white-pure);
+}
+
+.user-chip-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.6rem;
+  font-weight: 800;
+  color: #ffffff;
+}
+
+.user-chip-you {
+  font-size: 0.65rem;
+  color: var(--white-muted);
+  font-weight: 600;
+}
+
+/* Caixa de Informação da Nuvem */
+.cloud-info-box {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: rgba(59, 130, 246, 0.08);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.cloud-info-icon {
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.cloud-info-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.75rem;
+  color: var(--white-dim);
+}
+
+.cloud-info-text strong {
+  color: var(--white-pure);
+  font-size: 0.8rem;
+}
+
+/* Modal de Histórico de Versões */
+.history-count-tag {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--white-muted);
+  margin-right: 8px;
+}
+
+.history-intro-desc {
+  font-size: 0.78rem;
+  color: var(--white-muted);
+  line-height: 1.4;
+  margin-bottom: 4px;
+}
+
+.history-timeline-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 440px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.history-item-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--bg-stage);
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  padding: 10px 12px;
+  transition: all 0.15s ease;
+}
+
+.history-item-card:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--border-medium);
+}
+
+.history-item-card.is-current {
+  border-left: 3px solid var(--red-primary);
+  background: rgba(244, 63, 94, 0.04);
+}
+
+.history-item-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+
+.history-author-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 0.8rem;
+  color: #ffffff;
+  flex-shrink: 0;
+}
+
+.history-item-details {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.history-action-text {
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: var(--white-pure);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.history-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.72rem;
+  color: var(--white-muted);
+}
+
+.history-author-name {
+  font-weight: 600;
+  color: var(--white-dim);
+}
+
+.history-time {
+  font-family: var(--font-mono);
+}
+
+.history-summary {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  background: var(--bg-input);
+  padding: 1px 5px;
+  border-radius: 4px;
+  color: var(--white-muted);
+}
+
+.btn-restore-version {
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  color: var(--white-pure);
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 5px 10px;
+  border-radius: 5px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.btn-restore-version:hover {
+  background: var(--red-primary);
+  border-color: var(--red-primary);
+  color: #ffffff;
+}
+
+.history-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 40px 20px;
+  color: var(--white-muted);
+  text-align: center;
+}
+
+.history-empty-state span {
+  font-size: 2rem;
+  opacity: 0.6;
+}
+
+/* Toast Notificação Flutuante */
+.toast-notification {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: #0f172a;
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+  border-radius: 30px;
+  padding: 10px 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  z-index: 99999;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease, transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.toast-notification.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.toast-notification #toastIcon {
+  color: #10b981;
+  font-weight: 800;
+}

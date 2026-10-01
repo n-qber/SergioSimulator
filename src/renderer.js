@@ -35,6 +35,7 @@ export class DJRunnerRenderer {
 
     // Interação com Compassos na Esteira ("Mexer compassos nela")
     this.selectedMeasureIndex = null;
+    this.selectedMeasureIndices = new Set();
     this.hoveredMeasureIndex = null;
     this.hoveredZone = null; // 'header' | 'body'
     this.isPreparingMeasureDrag = false;
@@ -72,6 +73,16 @@ export class DJRunnerRenderer {
         this.resize();
       });
       this.resizeObserver.observe(this.canvas.parentElement);
+    }
+  }
+
+  setSelectedMeasures(indices) {
+    if (!indices || indices.length === 0) {
+      this.selectedMeasureIndices.clear();
+      this.selectedMeasureIndex = null;
+    } else {
+      this.selectedMeasureIndices = new Set(indices);
+      this.selectedMeasureIndex = indices[0];
     }
   }
 
@@ -270,7 +281,7 @@ export class DJRunnerRenderer {
         if (dist <= 6 && this.draggedMeasureIndex !== null) {
           const idx = this.draggedMeasureIndex;
           this.selectedMeasureIndex = idx;
-          if (this.onSelectMeasure) this.onSelectMeasure(idx);
+          if (this.onSelectMeasure) this.onSelectMeasure(idx, e);
 
           const startTime = this.draggedTiming ? this.draggedTiming.startTime : this.state.getFirstTimingForMeasure(idx)?.startTime;
           if (startTime !== undefined && startTime !== null && this.onSeek) {
@@ -306,7 +317,7 @@ export class DJRunnerRenderer {
       if (hit) {
         e.preventDefault();
         this.selectedMeasureIndex = hit.index;
-        if (this.onSelectMeasure) this.onSelectMeasure(hit.index);
+        if (this.onSelectMeasure) this.onSelectMeasure(hit.index, e);
         if (this.onContextMenu) this.onContextMenu(hit.index, e.clientX, e.clientY);
       }
     });
@@ -477,7 +488,7 @@ export class DJRunnerRenderer {
       const mW = t.duration * this.pixelsPerSecond;
       const mColor = m.color || "#ff334b";
 
-      const isSelected = (this.selectedMeasureIndex === t.measureIndex);
+      const isSelected = this.selectedMeasureIndices.has(t.measureIndex) || (this.selectedMeasureIndex === t.measureIndex);
       const isHovered = (this.hoveredMeasureIndex === t.measureIndex);
       const isBeingDragged = (this.isDraggingMeasure && this.draggedMeasureIndex === t.measureIndex);
 

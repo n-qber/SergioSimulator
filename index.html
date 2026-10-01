@@ -47,6 +47,21 @@
           <span class="save-text">Salvo</span>
         </div>
 
+        <div id="cloudStatusPill" class="cloud-status-pill offline" title="Status da Sincronização na Nuvem">
+          <span class="cloud-dot"></span>
+          <span id="cloudStatusText">Nuvem</span>
+        </div>
+
+        <div id="presenceRow" class="presence-row" title="Colaboradores Online"></div>
+
+        <button type="button" id="btnOpenHistory" class="btn-text-action btn-history" title="Histórico de Versões na Nuvem (até 200 alterações)">
+          <span class="btn-icon">🕒</span> Histórico <span id="historyBadgeCount" class="history-badge">0</span>
+        </button>
+
+        <button type="button" id="btnSharePiece" class="btn-share-highlight" title="Compartilhar Peça e Colaborar em Tempo Real">
+          <span class="btn-icon">🔗</span> Compartilhar
+        </button>
+
         <button type="button" id="btnNewPiece" class="btn-text-action btn-new-piece" title="Iniciar Nova Peça em Branco (Ctrl+N)">
           <span class="btn-icon">📄</span> Novo
         </button>
@@ -144,10 +159,11 @@
           <div class="toolbar-actions">
             <button type="button" id="btnMoveMeasureLeft" class="btn-toolbar-opt" title="Mover Compasso para Trás (Alt + ←)">◀ Mover</button>
             <button type="button" id="btnMoveMeasureRight" class="btn-toolbar-opt" title="Mover Compasso para Frente (Alt + →)">Mover ▶</button>
+            <button type="button" id="btnGroupSelectedMeasures" class="btn-toolbar-opt" style="display:none" title="Criar grupo com os compassos selecionados">📁 Agrupar</button>
             <button type="button" id="btnConfigureSelectedMeasure" class="btn-toolbar-opt primary" title="Configurar Métrica e Andamento">⚙ Configurar</button>
-            <button type="button" id="btnDuplicateSelectedMeasure" class="btn-toolbar-opt" title="Duplicar Compasso">⧉ Duplicar</button>
-            <button type="button" id="btnDeleteSelectedMeasure" class="btn-toolbar-opt danger" title="Excluir Compasso">✕</button>
-            <button type="button" id="btnCloseToolbar" class="btn-toolbar-close" title="Desmarcar">✕</button>
+            <button type="button" id="btnDuplicateSelectedMeasure" class="btn-toolbar-opt" title="Duplicar Compasso(s)">⧉ Duplicar</button>
+            <button type="button" id="btnDeleteSelectedMeasure" class="btn-toolbar-opt danger" title="Excluir Compasso(s) Selecionado(s) (Del)">✕ Excluir</button>
+            <button type="button" id="btnCloseToolbar" class="btn-toolbar-close" title="Desmarcar (Esc)">✕</button>
           </div>
         </div>
 
@@ -390,6 +406,96 @@
           <button type="button" class="btn-red-sm btn-danger-confirm" id="btnExecuteNewPiece">Sim, Limpar e Iniciar Nova</button>
         </div>
       </div>
+    </div>
+
+    <!-- MODAL DE COMPARTILHAMENTO & COLABORAÇÃO EM TEMPO REAL -->
+    <div id="modalSharePiece" class="modal-overlay" style="display:none">
+      <div class="modal-window modal-share-window">
+        <div class="modal-top">
+          <span class="modal-measure-tag tag-collab">Colaboração em Tempo Real</span>
+          <h3 class="modal-heading">Compartilhar Peça / Modelo</h3>
+          <button type="button" class="modal-x" id="btnShareModalClose">&times;</button>
+        </div>
+
+        <div class="modal-body-clean">
+          <!-- Bloco do Link Compartilhável -->
+          <div class="field-group">
+            <label for="inputShareUrl" class="field-label">Link da Peça (Qualquer pessoa com este link pode editar)</label>
+            <div class="share-url-row">
+              <input type="text" id="inputShareUrl" class="clean-input share-input" readonly spellcheck="false">
+              <button type="button" id="btnCopyShareUrl" class="btn-red-sm btn-copy-link">
+                <span id="copyIcon">📋</span> <span id="copyText">Copiar Link</span>
+              </button>
+            </div>
+            <span class="field-hint">Compartilhe este link com outros músicos ou alunos. Todas as alterações sincronizam instantaneamente estilo Google Docs.</span>
+          </div>
+
+          <!-- Perfil do Usuário / Colaborador -->
+          <div class="collab-profile-box">
+            <span class="field-label">Seu Perfil de Colaborador</span>
+            <div class="profile-edit-row">
+              <div id="userAvatarPreview" class="user-avatar-circle" title="Sua cor">P</div>
+              <input type="text" id="inputCollabName" class="clean-input collab-name-input" placeholder="Seu Nome ou Apelido" maxlength="30">
+            </div>
+
+            <div class="avatar-colors-row" id="avatarColorPicker">
+              <!-- Swatches de cores inseridos dinamicamente ou estáticos -->
+            </div>
+          </div>
+
+          <!-- Colaboradores Online Ativos -->
+          <div class="active-collab-section">
+            <div class="section-title-row">
+              <span class="field-label">Colaboradores Online Agora</span>
+              <span id="onlineCountBadge" class="online-pill">1 online</span>
+            </div>
+            <div id="collabUsersList" class="collab-users-list">
+              <!-- Lista de usuários online -->
+            </div>
+          </div>
+
+          <!-- Status do Servidor / Nuvem -->
+          <div class="cloud-info-box">
+            <span class="cloud-info-icon">⚡</span>
+            <div class="cloud-info-text">
+              <strong>Google Cloud Firestore (São Paulo) Ativo</strong>
+              <span>Sincronização com latência ultrabaixa (~10ms) e histórico de até 200 versões salvas permanentemente.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL DE HISTÓRICO DE VERSÕES (ATÉ 200 ALTERAÇÕES NA NUVEM) -->
+    <div id="modalVersionHistory" class="modal-overlay" style="display:none">
+      <div class="modal-window modal-history-window">
+        <div class="modal-top">
+          <span class="modal-measure-tag">Nuvem</span>
+          <h3 class="modal-heading">Histórico de Alterações</h3>
+          <span id="historyTotalCount" class="history-count-tag">0 alterações</span>
+          <button type="button" class="modal-x" id="btnHistoryModalClose">&times;</button>
+        </div>
+
+        <div class="modal-body-clean history-body-clean">
+          <p class="history-intro-desc">
+            Registro cronológico das últimas até 200 alterações salvas na nuvem. Você pode restaurar qualquer ponto anterior da peça com um clique.
+          </p>
+
+          <div id="historyListContainer" class="history-timeline-list">
+            <!-- Itens de histórico gerados dinamicamente -->
+            <div class="history-empty-state">
+              <span>🕒</span>
+              <p>Nenhuma alteração registrada ainda para esta peça.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TOAST NOTIFICATION FLUTUANTE -->
+    <div id="toastNotification" class="toast-notification" style="display:none">
+      <span id="toastIcon">✓</span>
+      <span id="toastMessage">Link copiado para a área de transferência!</span>
     </div>
 
     <!-- MENU DE CONTEXTO PARA COMPASSOS NA VISÃO CORRIDA -->
