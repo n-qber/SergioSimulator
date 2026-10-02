@@ -2575,9 +2575,16 @@ class SergioApp {
   }
 }
 
-// Inicialização da aplicação ao carregar a página
-document.addEventListener('DOMContentLoaded', () => {
+// Inicialização robusta da aplicação ao carregar a página
+function startApp() {
+  if (window.__sergioApp) return;
   const app = new SergioApp();
   app.init();
   window.__sergioApp = app;
-});
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', startApp);
+} else {
+  startApp();
+}
