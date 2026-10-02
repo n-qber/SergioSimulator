@@ -15,7 +15,7 @@ class PieceState {
     this.isCustomPracticeBpm = false;
     this.undoStack = [];
     this.redoStack = [];
-    this.maxUndoSteps = 60;
+    this.maxUndoSteps = 150;
     this.isUndoingOrRedoing = false;
     this.currentSnapshot = null;
     this.loadInitialState();

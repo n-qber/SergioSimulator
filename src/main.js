@@ -2482,10 +2482,12 @@ class SergioApp {
     });
   }
 
-  openHistoryModal() {
+  async openHistoryModal() {
     if (!this.dom.modalVersionHistory) return;
     this.renderHistoryList(collab.historyList);
     this.dom.modalVersionHistory.style.display = 'flex';
+    // Carrega histórico da nuvem sob demanda apenas ao abrir o modal (economiza milhares de leituras)
+    await collab.loadHistory();
   }
 
   closeHistoryModal() {

@@ -33,15 +33,14 @@ export class DJRunnerRenderer {
     this.dragStartX = 0;
     this.dragStartTime = 0;
 
-    // Interação com Compassos na Esteira ("Mexer compassos nela")
+    // Interação com Compassos e Timeline na Esteira (DJ Runner)
     this.selectedMeasureIndex = null;
     this.selectedMeasureIndices = new Set();
     this.hoveredMeasureIndex = null;
-    this.hoveredZone = null; // 'header' | 'body'
-    this.isPreparingMeasureDrag = false;
-    this.isDraggingMeasure = false;
-    this.draggedMeasureIndex = null;
-    this.dropTargetIndex = null;
+    this.isDraggingRunner = false;
+    this.isDraggingMinimap = false;
+    this.dragStartX = 0;
+    this.dragStartTime = 0;
     this.mouseDownX = 0;
     this.mouseDownY = 0;
     this.currentMouseX = 0;
@@ -151,35 +150,10 @@ export class DJRunnerRenderer {
     return null;
   }
 
-  // Calcula o índice de inserção (drop target) ao arrastar um compasso em O(log N)
-  calculateDropTargetIndex(canvasX) {
-    const playheadX = this.width * this.playheadRatio;
-    const currentTime = this.lastCurrentTime || 0;
-    const timeAtX = currentTime + (canvasX - playheadX) / this.pixelsPerSecond;
-
-    const timings = this.state.measureTimings;
-    if (!timings || timings.length === 0) return 0;
-
-    let low = 0;
-    let high = timings.length - 1;
-    while (low <= high) {
-      const mid = (low + high) >> 1;
-      const t = timings[mid];
-      const midTime = t.startTime + (t.duration * 0.5);
-      if (timeAtX < midTime) {
-        high = mid - 1;
-      } else {
-        low = mid + 1;
-      }
-    }
-    const idx = Math.max(0, Math.min(timings.length - 1, low));
-    return timings[idx] ? timings[idx].measureIndex : 0;
-  }
-
   initEvents() {
     window.addEventListener('resize', () => this.resize());
 
-    // 1. Mouse Move: Detecta hover e gerencia arrasto de compasso ou scrubbing
+    // 1. Mouse Move: Gerencia deslizamento suave da esteira (scrubbing) e hover
     this.canvas.addEventListener('mousemove', (e) => {
       const rect = this.canvas.getBoundingClientRect();
       const canvasX = e.clientX - rect.left;
@@ -187,25 +161,12 @@ export class DJRunnerRenderer {
       this.currentMouseX = canvasX;
       this.currentMouseY = canvasY;
 
-      if (this.isPreparingMeasureDrag && !this.isDraggingMeasure) {
-        const dist = Math.hypot(e.clientX - this.mouseDownX, e.clientY - this.mouseDownY);
-        if (dist > 5) {
-          this.isDraggingMeasure = true;
-          this.isDraggingRunner = false;
-        }
-      }
-
-      if (this.isDraggingMeasure) {
-        this.dropTargetIndex = this.calculateDropTargetIndex(canvasX);
-        this.canvas.style.cursor = 'grabbing';
-        return;
-      }
-
       if (this.isDraggingRunner) {
         const dx = e.clientX - this.dragStartX;
         const dt = -dx / this.pixelsPerSecond;
         const newTime = Math.max(0, Math.min(this.state.totalDuration, this.dragStartTime + dt));
         if (this.onSeek) this.onSeek(newTime);
+        this.canvas.style.cursor = 'grabbing';
         return;
       }
 
@@ -213,88 +174,53 @@ export class DJRunnerRenderer {
       const hit = this.getMeasureAtPoint(canvasX, canvasY);
       if (hit) {
         this.hoveredMeasureIndex = hit.index;
-        this.hoveredZone = hit.zone;
-        this.canvas.style.cursor = (hit.zone === 'header') ? 'grab' : 'pointer';
+        this.canvas.style.cursor = 'pointer';
       } else {
         this.hoveredMeasureIndex = null;
-        this.hoveredZone = null;
-        this.canvas.style.cursor = 'default';
+        this.canvas.style.cursor = 'ew-resize';
       }
     });
 
-    // 2. Mouse Down: Inicia arrasto de compasso, seleção ou scrubbing
+    // 2. Mouse Down: Inicia deslizamento suave da esteira (scrubbing/pan)
     this.canvas.addEventListener('mousedown', (e) => {
       if (e.button !== 0) return; // Apenas botão esquerdo
 
       const rect = this.canvas.getBoundingClientRect();
-      const canvasX = e.clientX - rect.left;
-      const canvasY = e.clientY - rect.top;
+      this.currentMouseX = e.clientX - rect.left;
+      this.currentMouseY = e.clientY - rect.top;
 
       this.mouseDownX = e.clientX;
       this.mouseDownY = e.clientY;
-      this.currentMouseX = canvasX;
-      this.currentMouseY = canvasY;
-
-      const hit = this.getMeasureAtPoint(canvasX, canvasY);
-      if (hit) {
-        this.draggedMeasureIndex = hit.index;
-        this.draggedTiming = hit.timing;
-        this.isPreparingMeasureDrag = true;
-
-        if (hit.zone === 'header') {
-          // Clique direto no cabeçalho/alça: prioridade para mover compasso
-          this.isDraggingRunner = false;
-        } else {
-          // Clique no corpo: prepara para scrub ou seleção se soltar sem mover
-          this.isDraggingRunner = true;
-          this.dragStartX = e.clientX;
-          this.dragStartTime = this.lastCurrentTime || 0;
-        }
-      } else {
-        this.draggedTiming = null;
-        this.isDraggingRunner = true;
-        this.dragStartX = e.clientX;
-        this.dragStartTime = this.lastCurrentTime || 0;
-      }
+      this.isDraggingRunner = true;
+      this.dragStartX = e.clientX;
+      this.dragStartTime = this.lastCurrentTime || 0;
+      this.canvas.style.cursor = 'grabbing';
     });
 
     // 3. Mouse Up Global
     window.addEventListener('mouseup', (e) => {
-      if (this.isDraggingMeasure) {
-        if (this.dropTargetIndex !== null && this.dropTargetIndex !== this.draggedMeasureIndex) {
-          if (this.onMoveMeasure) {
-            this.onMoveMeasure(this.draggedMeasureIndex, this.dropTargetIndex);
-          }
-          this.selectedMeasureIndex = this.dropTargetIndex;
-        }
-        this.isDraggingMeasure = false;
-        this.isPreparingMeasureDrag = false;
-        this.draggedMeasureIndex = null;
-        this.draggedTiming = null;
-        this.dropTargetIndex = null;
-        return;
-      }
-
-      // Se preparou o arrasto mas não moveu > 5px, interpreta como clique de seleção
-      if (this.isPreparingMeasureDrag) {
+      if (this.isDraggingRunner) {
         const dist = Math.hypot(e.clientX - this.mouseDownX, e.clientY - this.mouseDownY);
-        if (dist <= 6 && this.draggedMeasureIndex !== null) {
-          const idx = this.draggedMeasureIndex;
-          this.selectedMeasureIndex = idx;
-          if (this.onSelectMeasure) this.onSelectMeasure(idx, e);
-
-          const startTime = this.draggedTiming ? this.draggedTiming.startTime : this.state.getFirstTimingForMeasure(idx)?.startTime;
-          if (startTime !== undefined && startTime !== null && this.onSeek) {
-            this.onSeek(startTime);
+        // Se foi apenas um clique (sem arrasto > 5px), seleciona o compasso e pula para o início dele
+        if (dist <= 5) {
+          const hit = this.getMeasureAtPoint(this.currentMouseX, this.currentMouseY);
+          if (hit) {
+            this.selectedMeasureIndex = hit.index;
+            if (this.onSelectMeasure) this.onSelectMeasure(hit.index, e);
+            const startTime = hit.timing ? hit.timing.startTime : this.state.getFirstTimingForMeasure(hit.index)?.startTime;
+            if (startTime !== undefined && startTime !== null && this.onSeek) {
+              this.onSeek(startTime);
+            }
           }
         }
       }
 
-      this.isPreparingMeasureDrag = false;
-      this.draggedMeasureIndex = null;
-      this.draggedTiming = null;
       this.isDraggingRunner = false;
       this.isDraggingMinimap = false;
+      if (this.canvas) {
+        const hit = this.getMeasureAtPoint(this.currentMouseX, this.currentMouseY);
+        this.canvas.style.cursor = hit ? 'pointer' : 'ew-resize';
+      }
     });
 
     // 4. Duplo Clique: Abre modal de configuração do compasso clicado
@@ -490,11 +416,6 @@ export class DJRunnerRenderer {
 
       const isSelected = this.selectedMeasureIndices.has(t.measureIndex) || (this.selectedMeasureIndex === t.measureIndex);
       const isHovered = (this.hoveredMeasureIndex === t.measureIndex);
-      const isBeingDragged = (this.isDraggingMeasure && this.draggedMeasureIndex === t.measureIndex);
-
-      if (isBeingDragged) {
-        ctx.globalAlpha = 0.35;
-      }
 
       // Bloco do compasso
       ctx.fillStyle = isSelected ? (isLight ? "#eff6ff" : "#181d28") : (isLight ? "#ffffff" : "#12151c");
@@ -636,66 +557,9 @@ export class DJRunnerRenderer {
       ctx.fillStyle = isLight ? "rgba(15, 23, 42, 0.55)" : "rgba(255, 255, 255, 0.4)";
       ctx.font = "500 9.5px 'JetBrains Mono', monospace";
       ctx.fillText(`• ${tempoText}${repFootText}`, nicknameX + 32, badgeY);
-
-      if (isBeingDragged) {
-        ctx.globalAlpha = 1.0;
-      }
     }
 
-    // 5. Linha de Destino ao Arrastar Compasso (Drop Target Indicator)
-    if (this.isDraggingMeasure && this.dropTargetIndex !== null) {
-      const targetIdx = Math.max(0, Math.min(timings.length, this.dropTargetIndex));
-      let dropX = 0;
-      if (targetIdx < timings.length) {
-        const targetTiming = timings[targetIdx];
-        dropX = playheadX + (targetTiming.startTime - currentTime) * this.pixelsPerSecond;
-      } else {
-        const lastTiming = timings[timings.length - 1];
-        dropX = playheadX + (lastTiming.endTime - currentTime) * this.pixelsPerSecond;
-      }
-
-      // Linha vertical de inserção brilhante
-      ctx.strokeStyle = "#ff2a4d";
-      ctx.lineWidth = 4;
-      ctx.shadowColor = "rgba(255, 42, 77, 0.8)";
-      ctx.shadowBlur = 10;
-      ctx.beginPath();
-      ctx.moveTo(dropX, topY - 6);
-      ctx.lineTo(dropX, bottomY + 6);
-      ctx.stroke();
-      ctx.shadowBlur = 0;
-
-      // Marcador indicador com texto
-      ctx.fillStyle = "#ff2a4d";
-      ctx.font = "bold 11px 'Outfit', sans-serif";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "bottom";
-      ctx.fillText("▼ Inserir aqui", dropX, topY - 8);
-
-      // Cartão flutuante (Ghost) acompanhando o mouse
-      const ghostW = 124;
-      const ghostH = 34;
-      const gx = Math.max(ghostW / 2, Math.min(w - ghostW / 2, this.currentMouseX));
-      const gy = Math.max(ghostH + 10, this.currentMouseY);
-
-      ctx.fillStyle = isLight ? "#ffffff" : "#151a24";
-      ctx.strokeStyle = "#3b82f6";
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.roundRect(gx - ghostW / 2, gy - ghostH - 12, ghostW, ghostH, 6);
-      ctx.fill();
-      ctx.stroke();
-
-      ctx.fillStyle = isLight ? "#0f172a" : "#ffffff";
-      ctx.font = "bold 11px 'Outfit', sans-serif";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      const movedM = this.state.measures[this.draggedMeasureIndex];
-      const movedTitle = movedM?.nickname ? `c. ${this.draggedMeasureIndex + 1} (${movedM.nickname})` : `c. ${this.draggedMeasureIndex + 1}`;
-      ctx.fillText(`Mover ${movedTitle}`, gx, gy - ghostH / 2 - 12);
-    }
-
-    // 6. AGULHA CENTRAL (PLAYHEAD)
+    // 5. AGULHA CENTRAL (PLAYHEAD)
     if (this.needleFlashAlpha > 0) {
       ctx.fillStyle = `rgba(255, 42, 77, ${this.needleFlashAlpha * 0.45})`;
       ctx.fillRect(playheadX - 10, 0, 20, h);

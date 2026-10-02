@@ -17,7 +17,7 @@ import {
   getDocs
 } from 'firebase/firestore';
 
-const MAX_HISTORY_ITEMS = 200;
+const MAX_HISTORY_ITEMS = 500;
 const USER_PROFILE_KEY = 'sergio_collab_profile';
 
 export const DEFAULT_AVATAR_COLORS = [
@@ -246,22 +246,8 @@ class CollabService {
         this.setSyncStatus('error', 'Erro de conexão');
       });
 
-      // 2. OUVINTE EM TEMPO REAL: Histórico (até 200 alterações)
-      const historyCol = collection(db, 'pieces', pieceId, 'history');
-      const historyQuery = query(historyCol, orderBy('timestamp', 'desc'), limit(MAX_HISTORY_ITEMS));
-
-      this.unsubHistory = onSnapshot(historyQuery, (snap) => {
-        const list = [];
-        snap.forEach((docSnap) => {
-          list.push({ id: docSnap.id, ...docSnap.data() });
-        });
-        this.historyList = list;
-        if (this.onHistoryChange) {
-          this.onHistoryChange(list);
-        }
-      }, (err) => {
-        console.warn("Erro ao ouvir histórico:", err);
-      });
+      // 2. Histórico agora é carregado sob demanda (evita centenas de leituras no Firestore a cada reload)
+      this.historyList = [];
 
       // 3. OUVINTE EM TEMPO REAL: Presença de colaboradores
       this.setupPresence(pieceId);
@@ -329,7 +315,7 @@ class CollabService {
     }, 350);
   }
 
-  // Registra nova versão no histórico (mantém limite de 200)
+  // Registra nova versão no histórico (grava na nuvem e atualiza localmente sem gastar leituras)
   async addHistoryEntry(pieceId, action, payload) {
     if (!db) return;
     try {
@@ -355,27 +341,39 @@ class CollabService {
 
       await setDoc(entryDoc, entryData);
 
-      // Poda versões antigas se passar de 200 itens
-      this.pruneHistoryIfExceeded(pieceId);
+      // Atualiza lista em memória sem gastar leituras no Firestore
+      this.historyList.unshift(entryData);
+      if (this.historyList.length > MAX_HISTORY_ITEMS) {
+        this.historyList.pop();
+      }
+      if (this.onHistoryChange) {
+        this.onHistoryChange(this.historyList);
+      }
     } catch (e) {
       console.warn("Erro ao gravar histórico:", e);
     }
   }
 
-  // Garante que o histórico não ultrapasse 200 registros na nuvem
-  async pruneHistoryIfExceeded(pieceId) {
+  // Carrega histórico sob demanda quando o usuário abre o modal (evita milhares de leituras)
+  async loadHistory(pieceId = this.currentPieceId, limitCount = 50) {
+    if (!db || !pieceId) return this.historyList;
     try {
       const historyCol = collection(db, 'pieces', pieceId, 'history');
-      const q = query(historyCol, orderBy('timestamp', 'desc'));
-      const snap = await getDocs(q);
-      
-      if (snap.size > MAX_HISTORY_ITEMS) {
-        const docsToDelete = snap.docs.slice(MAX_HISTORY_ITEMS);
-        for (const d of docsToDelete) {
-          await deleteDoc(d.ref).catch(() => {});
-        }
+      const historyQuery = query(historyCol, orderBy('timestamp', 'desc'), limit(limitCount));
+      const snap = await getDocs(historyQuery);
+      const list = [];
+      snap.forEach((docSnap) => {
+        list.push({ id: docSnap.id, ...docSnap.data() });
+      });
+      this.historyList = list;
+      if (this.onHistoryChange) {
+        this.onHistoryChange(list);
       }
-    } catch (_) {}
+      return list;
+    } catch (err) {
+      console.warn("Erro ao buscar histórico:", err);
+      return this.historyList;
+    }
   }
 
   // Restaura uma versão do histórico
@@ -388,13 +386,14 @@ class CollabService {
     return true;
   }
 
-  // Presença e batimento cardíaco (heartbeat)
+  // Presença e batimento cardíaco (heartbeat otimizado a cada 30 segundos)
   setupPresence(pieceId) {
     const presenceCol = collection(db, 'pieces', pieceId, 'presence');
     const myDocRef = doc(presenceCol, this.localUser.id);
 
-    // Heartbeat periódico (a cada 12 segundos)
+    // Heartbeat periódico (a cada 30 segundos, pausado se aba estiver inativa)
     const sendBeat = async () => {
+      if (document.hidden) return;
       try {
         await setDoc(myDocRef, {
           id: this.localUser.id,
@@ -406,7 +405,7 @@ class CollabService {
     };
 
     sendBeat();
-    this.heartbeatTimer = setInterval(sendBeat, 12000);
+    this.heartbeatTimer = setInterval(sendBeat, 30000);
 
     // Remove presença ao fechar aba
     window.addEventListener('beforeunload', () => {
@@ -419,8 +418,8 @@ class CollabService {
       const active = [];
       snap.forEach((d) => {
         const data = d.data();
-        // Usuário online se visto nos últimos 35 segundos
-        if (data && data.lastSeen && (now - data.lastSeen < 35000)) {
+        // Usuário online se visto nos últimos 70 segundos
+        if (data && data.lastSeen && (now - data.lastSeen < 70000)) {
           active.push(data);
         }
       });
