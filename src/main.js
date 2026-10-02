@@ -7,7 +7,7 @@ import { state } from './state.js';
 import { audio } from './audio.js';
 import { PRESETS } from './presets.js';
 import { DJRunnerRenderer } from './renderer.js';
-import { collab } from './collab.js';
+import { collab, DEFAULT_AVATAR_COLORS } from './collab.js';
 
 class SergioApp {
   constructor() {
@@ -57,6 +57,9 @@ class SergioApp {
     this.setupCollab();
     this.setupShareModal();
     this.setupHistoryModal();
+    this.setupJoinModal();
+    this.updateBpmPracticeUI();
+    this.updateUndoRedoUI();
 
     // Pré-gera a peça toda na memória RAM (~5ms)
     this.preparePieceAudio();
@@ -119,18 +122,24 @@ class SergioApp {
 
   cacheDom() {
     this.dom = {
-      // Header
+      // Header & Base BPM
       inputBaseBpm: document.getElementById('inputBaseBpm'),
       btnBpmMinus5: document.getElementById('btnBpmMinus5'),
       btnBpmMinus1: document.getElementById('btnBpmMinus1'),
       btnBpmPlus1: document.getElementById('btnBpmPlus1'),
       btnBpmPlus5: document.getElementById('btnBpmPlus5'),
       btnTapTempo: document.getElementById('btnTapTempo'),
+      bpmPracticeStatus: document.getElementById('bpmPracticeStatus'),
+      bpmPracticeBadge: document.getElementById('bpmPracticeBadge'),
+      btnResetPresentationBpm: document.getElementById('btnResetPresentationBpm'),
+      btnPromotePresentationBpm: document.getElementById('btnPromotePresentationBpm'),
       inputPieceName: document.getElementById('inputPieceName'),
       selectPreset: document.getElementById('selectPreset'),
       btnExport: document.getElementById('btnExport'),
       fileImport: document.getElementById('fileImport'),
       btnNewPiece: document.getElementById('btnNewPiece'),
+      btnUndo: document.getElementById('btnUndo'),
+      btnRedo: document.getElementById('btnRedo'),
       btnThemeToggle: document.getElementById('btnThemeToggle'),
       themeIcon: document.getElementById('themeIcon'),
       saveIndicator: document.getElementById('saveIndicator'),
@@ -158,6 +167,17 @@ class SergioApp {
       avatarColorPicker: document.getElementById('avatarColorPicker'),
       collabUsersList: document.getElementById('collabUsersList'),
       onlineCountBadge: document.getElementById('onlineCountBadge'),
+
+      // Modal de Entrada na Sessão Compartilhada
+      modalJoinCollab: document.getElementById('modalJoinCollab'),
+      btnJoinModalClose: document.getElementById('btnJoinModalClose'),
+      formJoinCollab: document.getElementById('formJoinCollab'),
+      inputJoinName: document.getElementById('inputJoinName'),
+      joinNameError: document.getElementById('joinNameError'),
+      joinAvatarColorPicker: document.getElementById('joinAvatarColorPicker'),
+      joinAvatarPreview: document.getElementById('joinAvatarPreview'),
+      joinPieceTitleHeading: document.getElementById('joinPieceTitleHeading'),
+      btnJoinConfirm: document.getElementById('btnJoinConfirm'),
 
       // Modal de Histórico
       modalVersionHistory: document.getElementById('modalVersionHistory'),
@@ -639,14 +659,16 @@ class SergioApp {
     const input = this.dom.inputBaseBpm;
 
     const syncBpmInput = () => {
-      input.value = state.baseBpm;
+      if (input) input.value = state.baseBpm;
+      this.updateBpmPracticeUI();
     };
     syncBpmInput();
 
     const commitBpm = (val) => {
       const num = parseInt(val, 10);
       if (!isNaN(num) && num >= 20 && num <= 400) {
-        state.setBaseBpm(num);
+        // Altera apenas o andamento base local para treino/estudo (não afeta o banco de dados nem outros usuários)
+        state.setBaseBpm(num, true);
       }
       syncBpmInput();
     };
@@ -670,7 +692,21 @@ class SergioApp {
     this.dom.btnBpmPlus1.addEventListener('click', () => commitBpm(state.baseBpm + 1));
     this.dom.btnBpmPlus5.addEventListener('click', () => commitBpm(state.baseBpm + 5));
 
-    // Tap Tempo
+    // Botão de restaurar BPM original da apresentação
+    this.dom.btnResetPresentationBpm?.addEventListener('click', () => {
+      state.resetToPresentationBpm();
+      syncBpmInput();
+      this.showToast(`BPM restaurado para ${state.presentationBpm} (Apresentação)`, '↺');
+    });
+
+    // Botão de promover BPM atual para oficial da apresentação na nuvem
+    this.dom.btnPromotePresentationBpm?.addEventListener('click', () => {
+      state.setPresentationBpm(state.baseBpm);
+      syncBpmInput();
+      this.showToast(`BPM oficial da apresentação definido como ${state.presentationBpm} na nuvem!`, '☁️');
+    });
+
+    // Tap Tempo (ajusta BPM local de treino)
     this.dom.btnTapTempo.addEventListener('click', () => {
       const now = performance.now();
       this.tapTimes = this.tapTimes.filter(t => (now - t) < 2500);
@@ -683,11 +719,48 @@ class SergioApp {
         }
         const avgIntervalMs = intervals.reduce((a, b) => a + b, 0) / intervals.length;
         const calculatedBpm = Math.round(60000 / avgIntervalMs);
-        if (calculatedBpm >= 20 && calculatedBpm <= 350) {
+        if (calculatedBpm >= 20 && calculatedBpm <= 400) {
           commitBpm(calculatedBpm);
         }
       }
     });
+  }
+
+  updateBpmPracticeUI() {
+    const isPractice = state.baseBpm !== state.presentationBpm;
+    if (this.dom.bpmPracticeStatus) {
+      this.dom.bpmPracticeStatus.style.display = isPractice ? 'inline-flex' : 'none';
+    }
+    if (this.dom.btnResetPresentationBpm) {
+      this.dom.btnResetPresentationBpm.textContent = `↺ ${state.presentationBpm}`;
+      this.dom.btnResetPresentationBpm.title = `Restaurar para ${state.presentationBpm} BPM (Apresentação Oficial)`;
+    }
+    if (this.dom.inputBaseBpm) {
+      if (isPractice) {
+        this.dom.inputBaseBpm.classList.add('practice-active');
+        this.dom.inputBaseBpm.title = `Andamento de Treino Local (${state.baseBpm} BPM). O BPM da apresentação é ${state.presentationBpm}.`;
+      } else {
+        this.dom.inputBaseBpm.classList.remove('practice-active');
+        this.dom.inputBaseBpm.title = `Andamento Base da Apresentação (${state.presentationBpm} BPM)`;
+      }
+    }
+  }
+
+  updateUndoRedoUI() {
+    if (this.dom.btnUndo) {
+      const canU = state.canUndo();
+      this.dom.btnUndo.disabled = !canU;
+      this.dom.btnUndo.style.opacity = canU ? '1' : '0.4';
+      this.dom.btnUndo.style.cursor = canU ? 'pointer' : 'not-allowed';
+      this.dom.btnUndo.setAttribute('aria-disabled', String(!canU));
+    }
+    if (this.dom.btnRedo) {
+      const canR = state.canRedo();
+      this.dom.btnRedo.disabled = !canR;
+      this.dom.btnRedo.style.opacity = canR ? '1' : '0.4';
+      this.dom.btnRedo.style.cursor = canR ? 'pointer' : 'not-allowed';
+      this.dom.btnRedo.setAttribute('aria-disabled', String(!canR));
+    }
   }
 
   // =========================================================================
@@ -817,10 +890,31 @@ class SergioApp {
     this.setupMeasureModal();
     this.setupGroupModal();
 
+    // Botões Desfazer & Refazer
+    this.dom.btnUndo?.addEventListener('click', () => {
+      const action = state.undo();
+      if (action) {
+        this.showToast(`Desfez: ${action}`, '↩');
+      } else {
+        this.showToast('Nada a desfazer', 'ℹ️');
+      }
+    });
+
+    this.dom.btnRedo?.addEventListener('click', () => {
+      const action = state.redo();
+      if (action) {
+        this.showToast(`Refez: ${action}`, '↪');
+      } else {
+        this.showToast('Nada a refazer', 'ℹ️');
+      }
+    });
+
     // Inscrição no estado para re-renderizar quando houver alterações estruturais
-    state.subscribe((st, action, isRemote) => {
+    state.subscribe((st, action, isRemote, isLocalOnly) => {
       this.dom.inputPieceName.value = state.name;
       this.dom.inputBaseBpm.value = state.baseBpm;
+      this.updateBpmPracticeUI();
+      this.updateUndoRedoUI();
       this.renderMeasuresList();
       this.updateHUD(this.playbackTime);
       if (this.renderer) {
@@ -829,8 +923,8 @@ class SergioApp {
       }
       this.preparePieceAudio(true);
 
-      // Sincroniza alteração local com o Firebase na nuvem estilo Google Docs
-      if (!isRemote) {
+      // Sincroniza alteração local com o Firebase na nuvem estilo Google Docs (se não for alteração local exclusiva, como treino de BPM)
+      if (!isRemote && !isLocalOnly) {
         collab.commitLocalChange(action, state);
       }
     });
@@ -839,13 +933,44 @@ class SergioApp {
     window.addEventListener('keydown', (e) => {
       if (['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName)) return;
 
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'n') {
+      const hasModifier = e.ctrlKey || e.metaKey;
+      const key = e.key.toLowerCase();
+
+      // Atalho Ctrl+Z / Cmd+Z: Desfazer
+      if (hasModifier && key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        const action = state.undo();
+        if (action) {
+          this.showToast(`Desfez: ${action}`, '↩');
+        } else {
+          this.showToast('Nada a desfazer', 'ℹ️');
+        }
+        return;
+      }
+
+      // Atalho Ctrl+Y ou Ctrl+Shift+Z / Cmd+Shift+Z: Refazer
+      if (hasModifier && ((key === 'z' && e.shiftKey) || key === 'y')) {
+        e.preventDefault();
+        const action = state.redo();
+        if (action) {
+          this.showToast(`Refez: ${action}`, '↪');
+        } else {
+          this.showToast('Nada a refazer', 'ℹ️');
+        }
+        return;
+      }
+
+      if (hasModifier && key === 'n') {
         e.preventDefault();
         this.openConfirmNewModal();
         return;
       }
 
       if (e.key === 'Escape') {
+        if (this.dom.modalJoinCollab && this.dom.modalJoinCollab.style.display === 'flex') {
+          this.closeJoinModal();
+          return;
+        }
         if (this.dom.modalConfirmNewPiece && this.dom.modalConfirmNewPiece.style.display === 'flex') {
           this.closeConfirmNewModal();
           return;
@@ -1423,6 +1548,7 @@ class SergioApp {
       const inputRepeat = card.querySelector('.input-card-repeat');
 
       if (btnMinus) {
+        btnMinus.addEventListener('dblclick', (e) => e.stopPropagation());
         btnMinus.addEventListener('click', (e) => {
           e.stopPropagation();
           const cur = Math.max(1, (m.repeat || 1) - 1);
@@ -1431,6 +1557,7 @@ class SergioApp {
       }
 
       if (btnPlus) {
+        btnPlus.addEventListener('dblclick', (e) => e.stopPropagation());
         btnPlus.addEventListener('click', (e) => {
           e.stopPropagation();
           const cur = Math.min(999, (m.repeat || 1) + 1);
@@ -1439,6 +1566,7 @@ class SergioApp {
       }
 
       if (inputRepeat) {
+        inputRepeat.addEventListener('dblclick', (e) => e.stopPropagation());
         inputRepeat.addEventListener('click', (e) => e.stopPropagation());
         inputRepeat.addEventListener('keydown', (e) => {
           e.stopPropagation();
@@ -1454,6 +1582,11 @@ class SergioApp {
           }
         });
       }
+
+      // Previne propagação de dblclick em todos os botões internos do cartão
+      card.querySelectorAll('button').forEach(btn => {
+        btn.addEventListener('dblclick', (e) => e.stopPropagation());
+      });
 
       // Eventos de clique nas ações e no cartão
       card.addEventListener('click', (e) => {
@@ -1499,7 +1632,11 @@ class SergioApp {
         if (t && !e.shiftKey) this.seekTo(t.startTime);
       });
 
-      card.addEventListener('dblclick', () => {
+      card.addEventListener('dblclick', (e) => {
+        // Ignora duplo clique em botões internos, inputs ou controles (ex: cliques rápidos no + ou - de repetições)
+        if (e.target.closest('button, input, select, textarea, .card-actions, .card-repeat-box, .btn-repeat-step, .btn-card-icon, .btn-card-edit')) {
+          return;
+        }
         this.openMeasureModal(idx);
       });
 
@@ -1891,6 +2028,9 @@ class SergioApp {
   setupCollab() {
     collab.onRemoteStateChange = (remoteData) => {
       state.loadPieceData(remoteData, true);
+      if (this.dom.joinPieceTitleHeading && remoteData.name) {
+        this.dom.joinPieceTitleHeading.textContent = `Peça: "${remoteData.name}"`;
+      }
       this.showToast(`${remoteData.updatedBy?.name || 'Alguém'} atualizou a peça`, '🔄');
     };
 
@@ -1917,6 +2057,7 @@ class SergioApp {
     const urlPieceId = collab.getPieceIdFromUrl();
     if (urlPieceId) {
       collab.connectToPiece(urlPieceId, state);
+      this.checkJoinModalOnSharedLink(urlPieceId);
     } else {
       collab.connectToPiece(state.id, state);
     }
@@ -1946,7 +2087,12 @@ class SergioApp {
       pill.style.backgroundColor = u.color || '#3b82f6';
       const initial = (u.name || 'U').charAt(0).toUpperCase();
       pill.textContent = initial;
-      pill.title = u.id === collab.localUser.id ? `${u.name} (Você)` : u.name;
+      const isMe = u.id === collab.localUser.id;
+      pill.title = isMe ? `${u.name} (Você - clique para editar seu perfil)` : u.name;
+      if (isMe) {
+        pill.style.cursor = 'pointer';
+        pill.addEventListener('click', () => this.openShareModal());
+      }
       row.appendChild(pill);
     });
 
@@ -2063,6 +2209,169 @@ class SergioApp {
     if (this.dom.modalSharePiece) {
       this.dom.modalSharePiece.style.display = 'none';
     }
+  }
+
+  /* ==========================================================================
+     MODAL DE ENTRADA NA SESSÃO COMPARTILHADA (IDENTIFICAÇÃO NOME & COR)
+     ========================================================================== */
+
+  checkJoinModalOnSharedLink(urlPieceId) {
+    if (!urlPieceId) return;
+    const sessionKey = `sergio_session_joined_${urlPieceId}`;
+    try {
+      const alreadyJoinedInThisTab = sessionStorage.getItem(sessionKey);
+      if (!alreadyJoinedInThisTab) {
+        // Abre o modal de identificação perguntando nome e cor
+        this.openJoinModal(urlPieceId);
+      }
+    } catch (_) {
+      this.openJoinModal(urlPieceId);
+    }
+  }
+
+  setupJoinModal() {
+    if (!this.dom.modalJoinCollab) return;
+
+    this.selectedJoinColor = collab.localUser.color || DEFAULT_AVATAR_COLORS[0];
+
+    // Gerador de botões de cor para o modal de entrada
+    if (this.dom.joinAvatarColorPicker) {
+      this.dom.joinAvatarColorPicker.innerHTML = '';
+      DEFAULT_AVATAR_COLORS.forEach(c => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `avatar-color-btn ${c === this.selectedJoinColor ? 'selected' : ''}`;
+        btn.style.backgroundColor = c;
+        btn.title = `Cor ${c}`;
+        btn.innerHTML = c === this.selectedJoinColor ? '✓' : '';
+        btn.addEventListener('click', () => {
+          this.selectedJoinColor = c;
+          this.dom.joinAvatarColorPicker.querySelectorAll('.avatar-color-btn').forEach(b => {
+            b.classList.remove('selected');
+            b.innerHTML = '';
+          });
+          btn.classList.add('selected');
+          btn.innerHTML = '✓';
+          this.updateJoinAvatarPreview();
+        });
+        this.dom.joinAvatarColorPicker.appendChild(btn);
+      });
+    }
+
+    // Input do nome do colaborador
+    if (this.dom.inputJoinName) {
+      this.dom.inputJoinName.addEventListener('input', () => {
+        if (this.dom.joinNameError) this.dom.joinNameError.style.display = 'none';
+        this.dom.inputJoinName.classList.remove('input-error');
+        this.updateJoinAvatarPreview();
+      });
+    }
+
+    // Fechar ao clicar no backdrop ou botão X
+    this.dom.btnJoinModalClose?.addEventListener('click', () => this.closeJoinModal());
+    this.dom.modalJoinCollab?.addEventListener('click', (e) => {
+      if (e.target === this.dom.modalJoinCollab) this.closeJoinModal();
+    });
+
+    // Submissão do formulário
+    this.dom.formJoinCollab?.addEventListener('submit', (e) => {
+      e.preventDefault();
+      this.submitJoinCollab();
+    });
+  }
+
+  updateJoinAvatarPreview() {
+    const preview = this.dom.joinAvatarPreview;
+    if (!preview) return;
+    const name = this.dom.inputJoinName ? this.dom.inputJoinName.value.trim() : '';
+    const color = this.selectedJoinColor || collab.localUser.color || DEFAULT_AVATAR_COLORS[0];
+    preview.style.backgroundColor = color;
+    preview.textContent = name ? name.charAt(0).toUpperCase() : (collab.localUser.name ? collab.localUser.name.charAt(0).toUpperCase() : '?');
+    preview.style.boxShadow = `0 0 16px ${color}88`;
+  }
+
+  openJoinModal(pieceId) {
+    if (!this.dom.modalJoinCollab) return;
+
+    this.currentJoiningPieceId = pieceId;
+
+    if (this.dom.joinPieceTitleHeading) {
+      this.dom.joinPieceTitleHeading.textContent = state.name ? `Peça: "${state.name}"` : 'Sessão Colaborativa';
+    }
+
+    // Pré-preenche se o usuário já possui um perfil configurado no LocalStorage
+    if (this.dom.inputJoinName) {
+      const savedProfile = collab.localUser;
+      if (collab.hasCustomProfile()) {
+        this.dom.inputJoinName.value = savedProfile.name || '';
+      } else {
+        this.dom.inputJoinName.value = '';
+      }
+      this.selectedJoinColor = savedProfile.color || DEFAULT_AVATAR_COLORS[0];
+    }
+
+    // Atualiza swatches de cor selecionados
+    if (this.dom.joinAvatarColorPicker) {
+      this.dom.joinAvatarColorPicker.querySelectorAll('.avatar-color-btn').forEach(b => {
+        const isMatch = b.style.backgroundColor === this.selectedJoinColor || b.getAttribute('title')?.includes(this.selectedJoinColor);
+        if (isMatch) {
+          b.classList.add('selected');
+          b.innerHTML = '✓';
+        } else {
+          b.classList.remove('selected');
+          b.innerHTML = '';
+        }
+      });
+    }
+
+    this.updateJoinAvatarPreview();
+    this.dom.modalJoinCollab.style.display = 'flex';
+
+    setTimeout(() => {
+      this.dom.inputJoinName?.focus();
+      this.dom.inputJoinName?.select();
+    }, 100);
+  }
+
+  closeJoinModal() {
+    if (this.dom.modalJoinCollab) {
+      this.dom.modalJoinCollab.style.display = 'none';
+    }
+  }
+
+  submitJoinCollab() {
+    const name = this.dom.inputJoinName ? this.dom.inputJoinName.value.trim() : '';
+    if (!name) {
+      if (this.dom.joinNameError) this.dom.joinNameError.style.display = 'block';
+      this.dom.inputJoinName?.classList.add('input-error');
+      this.dom.inputJoinName?.focus();
+      return;
+    }
+
+    const color = this.selectedJoinColor || collab.localUser.color || DEFAULT_AVATAR_COLORS[0];
+
+    // Atualiza perfil e salva no LocalStorage
+    collab.updateProfile(name, color);
+
+    // Marca esta sessão como ingressada nesta aba para não reabrir em recargas de tela (F5)
+    if (this.currentJoiningPieceId) {
+      try {
+        sessionStorage.setItem(`sergio_session_joined_${this.currentJoiningPieceId}`, 'true');
+      } catch (_) {}
+    }
+
+    this.closeJoinModal();
+    this.updateCollabAvatarPreview();
+    if (this.dom.inputCollabName) {
+      this.dom.inputCollabName.value = name;
+    }
+
+    // Ativa o áudio com o gesto do clique de entrada
+    try {
+      audio.init();
+    } catch (_) {}
+
+    this.showToast(`Bem-vindo(a), ${name}! Você está conectado à peça.`, '👋');
   }
 
   async copyShareUrl() {

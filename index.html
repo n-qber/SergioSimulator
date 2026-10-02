@@ -32,6 +32,11 @@
           <button type="button" class="btn-bpm-step" id="btnBpmPlus1">+1</button>
           <button type="button" class="btn-bpm-step" id="btnBpmPlus5">+5</button>
           <button type="button" class="btn-tap" id="btnTapTempo" title="Toque no ritmo">TAP</button>
+          <div id="bpmPracticeStatus" class="bpm-practice-status" style="display:none">
+            <span id="bpmPracticeBadge" class="bpm-mode-tag" title="Andamento de treino local (não afeta o banco de dados nem os outros músicos)">Treino</span>
+            <button type="button" id="btnResetPresentationBpm" class="btn-reset-bpm" title="Restaurar BPM oficial da apresentação">↺ 120</button>
+            <button type="button" id="btnPromotePresentationBpm" class="btn-promote-bpm" title="Definir este BPM como o oficial da apresentação na nuvem">☁️</button>
+          </div>
         </div>
       </div>
 
@@ -60,6 +65,14 @@
 
         <button type="button" id="btnSharePiece" class="btn-share-highlight" title="Compartilhar Peça e Colaborar em Tempo Real">
           <span class="btn-icon">🔗</span> Compartilhar
+        </button>
+
+        <button type="button" id="btnUndo" class="btn-text-action btn-undo" title="Desfazer última alteração (Ctrl+Z)" disabled>
+          <span class="btn-icon">↩</span> Desfazer
+        </button>
+
+        <button type="button" id="btnRedo" class="btn-text-action btn-redo" title="Refazer alteração (Ctrl+Y)" disabled>
+          <span class="btn-icon">↪</span> Refazer
         </button>
 
         <button type="button" id="btnNewPiece" class="btn-text-action btn-new-piece" title="Iniciar Nova Peça em Branco (Ctrl+N)">
@@ -405,6 +418,52 @@
           <button type="button" class="btn-ghost-sm" id="btnCancelNewPiece">Cancelar</button>
           <button type="button" class="btn-red-sm btn-danger-confirm" id="btnExecuteNewPiece">Sim, Limpar e Iniciar Nova</button>
         </div>
+      </div>
+    </div>
+
+    <!-- MODAL DE ENTRADA NA SESSÃO COMPARTILHADA (IDENTIFICAÇÃO DE NOME E COR) -->
+    <div id="modalJoinCollab" class="modal-overlay" style="display:none">
+      <div class="modal-window modal-join-window">
+        <div class="modal-top">
+          <span class="modal-measure-tag tag-collab">Sessão Compartilhada</span>
+          <h3 class="modal-heading">Entrar na Peça</h3>
+          <button type="button" class="modal-x" id="btnJoinModalClose" title="Fechar e continuar">&times;</button>
+        </div>
+
+        <form id="formJoinCollab" class="modal-body-clean join-modal-body">
+          <div class="join-welcome-box">
+            <div class="join-avatar-wrapper">
+              <div id="joinAvatarPreview" class="join-avatar-preview" title="Sua cor e inicial">?</div>
+            </div>
+            <div class="join-welcome-info">
+              <h4 id="joinPieceTitleHeading" class="join-piece-title">Sessão Colaborativa</h4>
+              <p class="join-subtitle">Você abriu um link compartilhado! Escolha como deseja ser identificado pelos outros músicos na sessão ao vivo.</p>
+            </div>
+          </div>
+
+          <div class="field-group">
+            <label for="inputJoinName" class="field-label">Seu Nome ou Apelido <span class="required-star">*</span></label>
+            <input type="text" id="inputJoinName" class="clean-input join-name-input" placeholder="Ex: Sérgio, Baterista, Luísa..." maxlength="30" autocomplete="name" required spellcheck="false">
+            <span id="joinNameError" class="field-error-hint" style="display:none">Por favor, informe seu nome ou apelido para entrar na peça.</span>
+          </div>
+
+          <div class="field-group">
+            <label class="field-label">Selecione sua Cor de Colaborador</label>
+            <div class="avatar-colors-row join-colors-row" id="joinAvatarColorPicker">
+              <!-- Swatches de cores inseridos dinamicamente -->
+            </div>
+          </div>
+
+          <div class="join-actions-row">
+            <button type="submit" id="btnJoinConfirm" class="btn-red-action btn-join-submit">
+              <span>Entrar na Peça</span> <span class="btn-arrow">→</span>
+            </button>
+          </div>
+
+          <p class="join-footer-hint">
+            💾 Seu nome e cor serão salvos no LocalStorage deste navegador para as próximas sessões.
+          </p>
+        </form>
       </div>
     </div>
 

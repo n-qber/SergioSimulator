@@ -20,7 +20,7 @@ import {
 const MAX_HISTORY_ITEMS = 200;
 const USER_PROFILE_KEY = 'sergio_collab_profile';
 
-const DEFAULT_AVATAR_COLORS = [
+export const DEFAULT_AVATAR_COLORS = [
   '#FF334B', '#3B82F6', '#10B981', '#8B5CF6', 
   '#F59E0B', '#EC4899', '#06B6D4', '#14B8A6'
 ];
@@ -62,7 +62,16 @@ class CollabService {
       const saved = localStorage.getItem(USER_PROFILE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (parsed.id && parsed.name && parsed.color) return parsed;
+        if (parsed.id && parsed.name && parsed.color) {
+          const isExplicitlySaved = localStorage.getItem('sergio_collab_profile_saved') === 'true';
+          const isCustom = Boolean(parsed.isCustomized || isExplicitlySaved || !DEFAULT_NAMES.includes(parsed.name));
+          return {
+            id: parsed.id,
+            name: parsed.name,
+            color: parsed.color,
+            isCustomized: isCustom
+          };
+        }
       }
     } catch (_) {}
 
@@ -71,7 +80,8 @@ class CollabService {
     const profile = {
       id: `user-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
       name: randomName,
-      color: randomColor
+      color: randomColor,
+      isCustomized: false
     };
 
     try {
@@ -81,12 +91,29 @@ class CollabService {
     return profile;
   }
 
-  // Atualiza nome e cor do usuário
+  // Verifica se o usuário já personalizou e salvou seu nome e cor
+  hasCustomProfile() {
+    try {
+      if (localStorage.getItem('sergio_collab_profile_saved') === 'true') return true;
+      if (this.localUser && this.localUser.isCustomized) return true;
+      const saved = localStorage.getItem(USER_PROFILE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.isCustomized) return true;
+        if (parsed.name && !DEFAULT_NAMES.includes(parsed.name)) return true;
+      }
+    } catch (_) {}
+    return false;
+  }
+
+  // Atualiza nome e cor do usuário e persiste no localStorage
   updateProfile(name, color) {
     this.localUser.name = (name || '').trim() || this.localUser.name;
     this.localUser.color = color || this.localUser.color;
+    this.localUser.isCustomized = true;
     try {
       localStorage.setItem(USER_PROFILE_KEY, JSON.stringify(this.localUser));
+      localStorage.setItem('sergio_collab_profile_saved', 'true');
     } catch (_) {}
 
     // Notifica presença atualizada se conectado
@@ -152,7 +179,8 @@ class CollabService {
           id: pieceId,
           name: currentStateSnapshot.name || "Nova Peça Colaborativa",
           description: currentStateSnapshot.description || "",
-          baseBpm: currentStateSnapshot.baseBpm || 120,
+          baseBpm: currentStateSnapshot.presentationBpm || currentStateSnapshot.baseBpm || 120,
+          presentationBpm: currentStateSnapshot.presentationBpm || currentStateSnapshot.baseBpm || 120,
           measures: currentStateSnapshot.measures || [],
           groups: currentStateSnapshot.groups || [],
           updatedAt: Date.now(),
@@ -261,7 +289,8 @@ class CollabService {
           id: this.currentPieceId,
           name: stateData.name,
           description: stateData.description || "",
-          baseBpm: stateData.baseBpm,
+          baseBpm: stateData.presentationBpm || stateData.baseBpm,
+          presentationBpm: stateData.presentationBpm || stateData.baseBpm,
           measures: stateData.measures.map(m => ({
             id: m.id,
             nickname: m.nickname || "",

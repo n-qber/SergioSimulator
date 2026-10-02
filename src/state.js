@@ -10,6 +10,13 @@ const STORAGE_KEY = 'sergio_piece_data';
 class PieceState {
   constructor() {
     this.listeners = new Set();
+    this.presentationBpm = 120;
+    this.isCustomPracticeBpm = false;
+    this.undoStack = [];
+    this.redoStack = [];
+    this.maxUndoSteps = 60;
+    this.isUndoingOrRedoing = false;
+    this.currentSnapshot = null;
     this.loadInitialState();
   }
 
@@ -44,7 +51,29 @@ class PieceState {
     this.id = data.id || `piece-${Date.now()}`;
     this.name = data.name !== undefined ? data.name : "Peça nº 1";
     this.description = data.description || "";
-    this.baseBpm = Math.max(20, Math.min(400, Number(data.baseBpm) || 120));
+    
+    // BPM oficial de apresentação da peça (da partitura/nuvem)
+    this.presentationBpm = Math.max(20, Math.min(400, Number(data.presentationBpm || data.baseBpm) || 120));
+
+    // Andamento ativo de reprodução / treino
+    if (!isRemote) {
+      try {
+        const savedPractice = localStorage.getItem(`sergio_practice_bpm_${this.id}`);
+        if (savedPractice && !isNaN(parseInt(savedPractice, 10))) {
+          this.baseBpm = Math.max(20, Math.min(400, parseInt(savedPractice, 10)));
+          this.isCustomPracticeBpm = (this.baseBpm !== this.presentationBpm);
+        } else {
+          this.baseBpm = this.presentationBpm;
+          this.isCustomPracticeBpm = false;
+        }
+      } catch (_) {
+        this.baseBpm = this.presentationBpm;
+        this.isCustomPracticeBpm = false;
+      }
+    } else if (!this.isCustomPracticeBpm) {
+      // Se for atualização remota e o usuário NÃO estiver treinando em andamento específico:
+      this.baseBpm = this.presentationBpm;
+    }
     
     this.measures = (data.measures || []).map((m, idx) => ({
       id: m.id || `m-${Date.now()}-${idx}-${Math.random().toString(36).substr(2, 4)}`,
@@ -72,19 +101,65 @@ class PieceState {
       .filter(g => g.startMeasure <= g.endMeasure);
 
     this.recalculateTimings();
-    this.notify("Dados da peça atualizados", isRemote);
+    this.currentSnapshot = this.getSnapshot();
+    if (!isRemote) {
+      this.undoStack = [];
+      this.redoStack = [];
+    }
+    this.isUndoingOrRedoing = true;
+    try {
+      this.notify("Dados da peça atualizados", isRemote);
+    } finally {
+      this.isUndoingOrRedoing = false;
+    }
   }
 
-  // Define andamento base com validação rigorosa (evita NaN e bugs de digitação)
-  setBaseBpm(newBpm) {
+  // Define andamento base local (treino/prática sem afetar o banco de dados)
+  setBaseBpm(newBpm, isLocalOnly = true) {
     const parsed = parseFloat(newBpm);
     if (!isNaN(parsed) && parsed >= 20 && parsed <= 400) {
       this.baseBpm = Math.round(parsed);
+      this.isCustomPracticeBpm = (this.baseBpm !== this.presentationBpm);
+
+      try {
+        if (this.isCustomPracticeBpm) {
+          localStorage.setItem(`sergio_practice_bpm_${this.id}`, this.baseBpm.toString());
+        } else {
+          localStorage.removeItem(`sergio_practice_bpm_${this.id}`);
+        }
+      } catch (_) {}
+
       this.recalculateTimings();
-      this.notify(`Alterou BPM base para ${this.baseBpm}`);
+      this.notify(
+        this.isCustomPracticeBpm ? `Alterou BPM base de treino para ${this.baseBpm}` : `Restaurou BPM para ${this.baseBpm}`,
+        false,
+        isLocalOnly
+      );
       return true;
     }
     return false;
+  }
+
+  // Define o BPM oficial de apresentação da peça (salva no banco de dados)
+  setPresentationBpm(newBpm) {
+    const parsed = parseFloat(newBpm);
+    if (!isNaN(parsed) && parsed >= 20 && parsed <= 400) {
+      this.presentationBpm = Math.round(parsed);
+      this.baseBpm = this.presentationBpm;
+      this.isCustomPracticeBpm = false;
+      try {
+        localStorage.removeItem(`sergio_practice_bpm_${this.id}`);
+      } catch (_) {}
+      this.recalculateTimings();
+      this.notify(`Definiu BPM oficial da apresentação para ${this.presentationBpm}`, false, false);
+      return true;
+    }
+    return false;
+  }
+
+  // Restaura o BPM local para o BPM oficial da apresentação
+  resetToPresentationBpm() {
+    return this.setBaseBpm(this.presentationBpm, true);
   }
 
   setPieceName(name) {
@@ -295,7 +370,12 @@ class PieceState {
     this.id = `piece-${Date.now()}`;
     this.name = name;
     this.description = "";
-    this.baseBpm = Math.max(20, Math.min(400, parseInt(baseBpm, 10) || 120));
+    this.presentationBpm = Math.max(20, Math.min(400, parseInt(baseBpm, 10) || 120));
+    this.baseBpm = this.presentationBpm;
+    this.isCustomPracticeBpm = false;
+    try {
+      localStorage.removeItem(`sergio_practice_bpm_${this.id}`);
+    } catch (_) {}
     this.measures = [];
     this.groups = [];
     this.recalculateTimings();
@@ -568,7 +648,9 @@ class PieceState {
           id: this.id,
           name: this.name,
           description: this.description,
-          baseBpm: this.baseBpm,
+          presentationBpm: this.presentationBpm,
+          baseBpm: this.presentationBpm,
+          practiceBpm: this.baseBpm,
           groups: this.groups,
           measures: this.measures
         }
@@ -582,11 +664,102 @@ class PieceState {
     }
   }
 
-  notify(action = "Alteração na peça", isRemote = false) {
+  // Captura um instantâneo do estado estrutural da peça
+  getSnapshot() {
+    return {
+      id: this.id,
+      name: this.name,
+      description: this.description,
+      presentationBpm: this.presentationBpm,
+      baseBpm: this.baseBpm,
+      isCustomPracticeBpm: this.isCustomPracticeBpm,
+      measures: this.measures.map(m => ({ ...m })),
+      groups: this.groups.map(g => ({ ...g }))
+    };
+  }
+
+  // Restaura um instantâneo
+  applySnapshot(snapshot) {
+    if (!snapshot) return;
+    this.id = snapshot.id;
+    this.name = snapshot.name;
+    this.description = snapshot.description || "";
+    this.presentationBpm = snapshot.presentationBpm || 120;
+    this.baseBpm = snapshot.baseBpm || this.presentationBpm;
+    this.isCustomPracticeBpm = Boolean(snapshot.isCustomPracticeBpm);
+    this.measures = (snapshot.measures || []).map(m => ({ ...m }));
+    this.groups = (snapshot.groups || []).map(g => ({ ...g }));
+    this.recalculateTimings();
+  }
+
+  canUndo() {
+    return this.undoStack.length > 0;
+  }
+
+  canRedo() {
+    return this.redoStack.length > 0;
+  }
+
+  // Desfaz a última ação (Ctrl+Z)
+  undo() {
+    if (!this.canUndo()) return null;
+    const entry = this.undoStack.pop();
+    const current = this.getSnapshot();
+    this.redoStack.push({
+      action: entry.action,
+      snapshot: current
+    });
+    this.isUndoingOrRedoing = true;
+    try {
+      this.applySnapshot(entry.snapshot);
+      this.currentSnapshot = this.getSnapshot();
+      this.notify(`Desfez: ${entry.action}`, false, false);
+      return entry.action;
+    } finally {
+      this.isUndoingOrRedoing = false;
+    }
+  }
+
+  // Refaz a última ação desfeita (Ctrl+Y / Ctrl+Shift+Z)
+  redo() {
+    if (!this.canRedo()) return null;
+    const entry = this.redoStack.pop();
+    const current = this.getSnapshot();
+    this.undoStack.push({
+      action: entry.action,
+      snapshot: current
+    });
+    this.isUndoingOrRedoing = true;
+    try {
+      this.applySnapshot(entry.snapshot);
+      this.currentSnapshot = this.getSnapshot();
+      this.notify(`Refez: ${entry.action}`, false, false);
+      return entry.action;
+    } finally {
+      this.isUndoingOrRedoing = false;
+    }
+  }
+
+  notify(action = "Alteração na peça", isRemote = false, isLocalOnly = false) {
+    // Grava histórico de Desfazer se for alteração local e não for chamada durante undo/redo
+    if (!isRemote && !this.isUndoingOrRedoing) {
+      if (this.currentSnapshot) {
+        this.undoStack.push({
+          action: action,
+          snapshot: this.currentSnapshot
+        });
+        if (this.undoStack.length > this.maxUndoSteps) {
+          this.undoStack.shift();
+        }
+        this.redoStack = [];
+      }
+      this.currentSnapshot = this.getSnapshot();
+    }
+
     this.saveToLocalStorage();
     for (const cb of this.listeners) {
       try {
-        cb(this, action, isRemote);
+        cb(this, action, isRemote, isLocalOnly);
       } catch (err) {
         console.error("Erro no ouvinte de estado:", err);
       }
@@ -603,7 +776,9 @@ class PieceState {
         id: this.id,
         name: this.name,
         description: this.description,
-        baseBpm: this.baseBpm,
+        presentationBpm: this.presentationBpm,
+        baseBpm: this.presentationBpm,
+        practiceBpm: this.baseBpm,
         groups: this.groups,
         measures: this.measures
       }
