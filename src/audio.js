@@ -21,13 +21,17 @@ class PercussionAudioEngine {
   async init() {
     if (!this.ctx) {
       const AudioCtx = window.AudioContext || window.webkitAudioContext;
-      this.ctx = new AudioCtx({ latencyHint: 'interactive' });
-      this.masterGain = this.ctx.createGain();
-      this.masterGain.gain.setValueAtTime(this.isMuted ? 0 : this.volume, this.ctx.currentTime);
-      this.masterGain.connect(this.ctx.destination);
+      if (AudioCtx) {
+        this.ctx = new AudioCtx({ latencyHint: 'interactive' });
+        this.masterGain = this.ctx.createGain();
+        this.masterGain.gain.setValueAtTime(this.isMuted ? 0 : this.volume, this.ctx.currentTime);
+        this.masterGain.connect(this.ctx.destination);
+      }
     }
-    if (this.ctx.state === "suspended") {
-      await this.ctx.resume();
+    if (this.ctx && this.ctx.state === "suspended") {
+      try {
+        await this.ctx.resume();
+      } catch (_) {}
     }
     return this.ctx;
   }
@@ -90,6 +94,9 @@ class PercussionAudioEngine {
    * - Sample-accurate: cada batida é indexada matematicamente no exato ponto amostral sem desvio.
    */
   async renderPieceBuffer(timings, totalDuration, soundType = this.soundType) {
+    if (!this.ctx) {
+      await this.init();
+    }
     const sampleRate = (this.ctx && this.ctx.sampleRate) ? this.ctx.sampleRate : 48000;
     // Margem de segurança de 0.4s no final para cauda do último ataque
     const safeDuration = Math.max(0.5, totalDuration + 0.4);

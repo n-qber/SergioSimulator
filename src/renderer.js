@@ -354,7 +354,7 @@ export class DJRunnerRenderer {
   }
 
   triggerBeatHit(isAccent = false) {
-    this.needleFlashAlpha = isAccent ? 0.7 : 0.35;
+    this.needleFlashAlpha = isAccent ? 1.0 : 0.65;
   }
 
   render(currentTime, dt = 0.016) {
@@ -697,8 +697,8 @@ export class DJRunnerRenderer {
 
     // 6. AGULHA CENTRAL (PLAYHEAD)
     if (this.needleFlashAlpha > 0) {
-      ctx.fillStyle = `rgba(255, 42, 77, ${this.needleFlashAlpha * 0.3})`;
-      ctx.fillRect(playheadX - 6, 0, 12, h);
+      ctx.fillStyle = `rgba(255, 42, 77, ${this.needleFlashAlpha * 0.45})`;
+      ctx.fillRect(playheadX - 10, 0, 20, h);
     }
 
     // Linha vermelha com centro branco

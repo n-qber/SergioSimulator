@@ -17,6 +17,9 @@ class SergioApp {
     this.playbackSpeed = 1.0;
     
     // Motor de Áudio Pré-Renderizado (OfflineAudioContext)
+    this.audio = audio;
+    this.state = state;
+    this.collab = collab;
     this.pieceAudioBuffer = null;
     this.isRenderingBuffer = false;
     this.pendingBufferRegen = false;
@@ -377,7 +380,7 @@ class SergioApp {
       this.playbackTime = 0;
     }
 
-    if (!this.pieceAudioBuffer) {
+    if (!this.pieceAudioBuffer || (audio.ctx && this.pieceAudioBuffer.sampleRate !== audio.ctx.sampleRate)) {
       await this.preparePieceAudio();
     }
 
