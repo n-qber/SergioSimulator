@@ -920,6 +920,7 @@ class SergioApp {
       this.updateUndoRedoUI();
       this.renderMeasuresList();
       this.updateHUD(this.playbackTime);
+      this.initPresetsDropdown();
       if (this.renderer) {
         this.renderer.markMinimapDirty?.();
         this.renderer.resize();
@@ -1698,11 +1699,27 @@ class SergioApp {
   executeCreateNewPiece() {
     this.stopPlayback();
     this.closeMeasureToolbar();
+
+    // Se estiver em uma sala com link compartilhado antigo (?p=...), limpa da URL para não sobrescrever a sala alheia
+    if (typeof window !== 'undefined' && window.history && window.location.search) {
+      const url = new URL(window.location.href);
+      if (url.searchParams.has('p') || url.searchParams.has('piece')) {
+        url.searchParams.delete('p');
+        url.searchParams.delete('piece');
+        window.history.pushState({}, '', url.pathname + (url.search ? url.search : ''));
+      }
+    }
+
     state.createNewPiece("Nova Peça", 120);
+
+    // Reconecta à nova peça no Firebase Collab com seu ID exclusivo
+    collab.connectToPiece(state.id, state);
+
     if (this.dom.inputPieceName) this.dom.inputPieceName.value = state.name;
     if (this.dom.inputBaseBpm) this.dom.inputBaseBpm.value = state.baseBpm;
-    if (this.dom.selectPreset) this.dom.selectPreset.value = "";
+    this.initPresetsDropdown();
     this.closeConfirmNewModal();
+    this.showToast("Nova peça criada! A peça anterior foi salva em 'Minhas Peças'.", "✨");
   }
 
   // =========================================================================
@@ -1962,6 +1979,7 @@ class SergioApp {
 
   initPresetsDropdown() {
     const select = this.dom.selectPreset;
+    if (!select) return;
     select.innerHTML = '';
 
     const defaultOpt = document.createElement('option');
@@ -1974,10 +1992,10 @@ class SergioApp {
     const actionGroup = document.createElement('optgroup');
     actionGroup.label = 'Ações da Peça';
 
-    const emptyOpt = document.createElement('option');
-    emptyOpt.value = '__empty__';
-    emptyOpt.textContent = '📄 Nova Peça Vazia (0 compassos)';
-    actionGroup.appendChild(emptyOpt);
+    const newOpt = document.createElement('option');
+    newOpt.value = '__new_piece__';
+    newOpt.textContent = '✨ Nova Peça (Salva a atual)';
+    actionGroup.appendChild(newOpt);
 
     const resetOpt = document.createElement('option');
     resetOpt.value = '__reset_default__';
@@ -1986,6 +2004,26 @@ class SergioApp {
 
     select.appendChild(actionGroup);
 
+    // 📁 Grupo de Minhas Peças Salvas Localmente
+    const libraryPieces = state.getLibraryPieces ? state.getLibraryPieces() : [];
+    if (libraryPieces.length > 0) {
+      const libraryGroup = document.createElement('optgroup');
+      libraryGroup.label = '📁 Minhas Peças Salvas';
+
+      libraryPieces.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = `lib_${p.id}`;
+        const isCurrent = p.id === state.id;
+        const count = p.measures?.length || 0;
+        opt.textContent = `${isCurrent ? '▶ ' : ''}${p.name || 'Sem Nome'} (${count} comp.)`;
+        if (isCurrent) opt.selected = true;
+        libraryGroup.appendChild(opt);
+      });
+
+      select.appendChild(libraryGroup);
+    }
+
+    // 🎼 Grupo de Estudos Didáticos
     const presetsGroup = document.createElement('optgroup');
     presetsGroup.label = 'Estudos Didáticos';
 
@@ -1998,30 +2036,56 @@ class SergioApp {
 
     select.appendChild(presetsGroup);
 
-    select.addEventListener('change', (e) => {
-      const val = e.target.value;
-      if (val === '__empty__') {
-        select.value = '';
-        this.openConfirmNewModal();
-        return;
-      }
-      if (val === '__reset_default__') {
-        this.pausePlayback();
-        state.resetToDefault();
-        this.seekTo(0);
-        this.closeMeasureToolbar();
-        select.value = '';
-        return;
-      }
-      const found = PRESETS.find(p => p.id === val);
-      if (found) {
-        this.pausePlayback();
-        state.loadPieceData(JSON.parse(JSON.stringify(found)));
-        this.seekTo(0);
-        this.closeMeasureToolbar();
-        select.value = '';
-      }
-    });
+    if (!select._hasChangeListener) {
+      select._hasChangeListener = true;
+      select.addEventListener('change', (e) => {
+        const val = e.target.value;
+        if (val === '__new_piece__' || val === '__empty__') {
+          select.value = '';
+          this.openConfirmNewModal();
+          return;
+        }
+        if (val.startsWith('lib_')) {
+          const pieceId = val.replace('lib_', '');
+          if (pieceId !== state.id) {
+            this.pausePlayback();
+            const loaded = state.loadPieceFromLibrary(pieceId);
+            if (loaded) {
+              collab.connectToPiece(state.id, state);
+              this.seekTo(0);
+              this.closeMeasureToolbar();
+              this.showToast(`Peça '${state.name}' carregada!`, '📁');
+            }
+          }
+          this.initPresetsDropdown();
+          return;
+        }
+        if (val === '__reset_default__') {
+          this.pausePlayback();
+          if (state.measures && state.measures.length > 0) {
+            state.saveCurrentPieceToLibrary();
+          }
+          state.resetToDefault();
+          collab.connectToPiece(state.id, state);
+          this.seekTo(0);
+          this.closeMeasureToolbar();
+          this.initPresetsDropdown();
+          return;
+        }
+        const found = PRESETS.find(p => p.id === val);
+        if (found) {
+          this.pausePlayback();
+          if (state.measures && state.measures.length > 0) {
+            state.saveCurrentPieceToLibrary();
+          }
+          state.loadPieceData(JSON.parse(JSON.stringify(found)));
+          collab.connectToPiece(state.id, state);
+          this.seekTo(0);
+          this.closeMeasureToolbar();
+          this.initPresetsDropdown();
+        }
+      });
+    }
   }
 
   /* ==========================================================================

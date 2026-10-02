@@ -6,6 +6,7 @@
 import { PRESETS } from './presets.js';
 
 const STORAGE_KEY = 'sergio_piece_data';
+const LIBRARY_KEY = 'sergio_pieces_library';
 
 class PieceState {
   constructor() {
@@ -365,8 +366,90 @@ class PieceState {
     this.notify("Limpou todos os compassos");
   }
 
-  // Reinicia para um arquivo/peça completamente nova
+  // Salva a peça atual na biblioteca local do usuário (para nunca perder composições anteriores)
+  saveCurrentPieceToLibrary() {
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined') return;
+    try {
+      const raw = localStorage.getItem(LIBRARY_KEY);
+      let library = raw ? JSON.parse(raw) : [];
+      if (!Array.isArray(library)) library = [];
+
+      const pieceData = {
+        id: this.id,
+        name: this.name || "Peça Sem Nome",
+        description: this.description || "",
+        presentationBpm: this.presentationBpm,
+        baseBpm: this.baseBpm,
+        measures: this.measures.map(m => ({ ...m })),
+        groups: this.groups.map(g => ({ ...g })),
+        updatedAt: new Date().toISOString()
+      };
+
+      const existingIdx = library.findIndex(p => p.id === this.id);
+      if (existingIdx >= 0) {
+        library[existingIdx] = pieceData;
+      } else {
+        library.unshift(pieceData);
+      }
+
+      // Mantém até 50 peças locais
+      if (library.length > 50) {
+        library = library.slice(0, 50);
+      }
+
+      localStorage.setItem(LIBRARY_KEY, JSON.stringify(library));
+    } catch (e) {
+      console.warn("Erro ao salvar peça na biblioteca:", e);
+    }
+  }
+
+  // Retorna todas as peças salvas na biblioteca local
+  getLibraryPieces() {
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined') return [];
+    try {
+      const raw = localStorage.getItem(LIBRARY_KEY);
+      const library = raw ? JSON.parse(raw) : [];
+      return Array.isArray(library) ? library : [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  // Carrega uma peça da biblioteca pelo ID
+  loadPieceFromLibrary(pieceId) {
+    const library = this.getLibraryPieces();
+    const found = library.find(p => p.id === pieceId);
+    if (found) {
+      // Salva a peça atual antes de trocar para garantir que nenhuma alteração se perca
+      if (this.measures && this.measures.length > 0) {
+        this.saveCurrentPieceToLibrary();
+      }
+      this.loadPieceData(JSON.parse(JSON.stringify(found)));
+      return true;
+    }
+    return false;
+  }
+
+  // Remove uma peça da biblioteca
+  deletePieceFromLibrary(pieceId) {
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined') return;
+    try {
+      const raw = localStorage.getItem(LIBRARY_KEY);
+      let library = raw ? JSON.parse(raw) : [];
+      if (!Array.isArray(library)) return;
+      library = library.filter(p => p.id !== pieceId);
+      localStorage.setItem(LIBRARY_KEY, JSON.stringify(library));
+    } catch (_) {}
+  }
+
+  // Cria uma nova peça efetivamente, preservando a peça atual na biblioteca
   createNewPiece(name = "Nova Peça", baseBpm = 120) {
+    // 1. Salva a peça atual antes de criar a nova
+    if (this.measures && this.measures.length > 0) {
+      this.saveCurrentPieceToLibrary();
+    }
+
+    // 2. Gera novo ID exclusivo e limpa dados
     this.id = `piece-${Date.now()}`;
     this.name = name;
     this.description = "";
@@ -376,9 +459,32 @@ class PieceState {
     try {
       localStorage.removeItem(`sergio_practice_bpm_${this.id}`);
     } catch (_) {}
-    this.measures = [];
+
+    // 3. Inicializa com 1 compasso padrão 4/4 pronto para tocar
+    this.measures = [
+      {
+        id: `m-${Date.now()}-0-${Math.random().toString(36).substr(2, 4)}`,
+        nickname: "Compasso 1",
+        beats: 4,
+        beatUnit: 4,
+        tempoMode: "ratio",
+        ratioNum: 1,
+        ratioDen: 1,
+        customBpm: this.baseBpm,
+        color: "#ff334b",
+        repeat: 1
+      }
+    ];
     this.groups = [];
     this.recalculateTimings();
+    this.currentSnapshot = this.getSnapshot();
+    this.undoStack = [];
+    this.redoStack = [];
+
+    // Salva a nova peça no storage ativo e registra na biblioteca
+    this.saveToLocalStorage();
+    this.saveCurrentPieceToLibrary();
+
     this.notify(`Criou nova peça '${this.name}'`);
   }
 
@@ -656,6 +762,9 @@ class PieceState {
         }
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      if (this.id && this.measures && this.measures.length > 0) {
+        this.saveCurrentPieceToLibrary();
+      }
       window.dispatchEvent(new CustomEvent('sergio:saved', { 
         detail: { count: this.measures.length, name: this.name } 
       }));
