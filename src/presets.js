@@ -5,6 +5,27 @@
 
 export const PRESETS = [
   {
+    id: "metronomo-padrao-4-4",
+    name: "Metrônomo Padrão 4/4 (Sem Modulações)",
+    description: "Compassos regulares em 4/4 constantes para treino contínuo, calibração com metrônomo físico ou cronômetro.",
+    baseBpm: 120,
+    groups: [
+      {
+        id: "grp-padrao-1",
+        name: "Pulso 4/4 Regular",
+        color: "#ff334b",
+        startMeasure: 0,
+        endMeasure: 3
+      }
+    ],
+    measures: [
+      { id: "p-1", nickname: "Compasso 1", beats: 4, beatUnit: 4, tempoMode: "ratio", ratioNum: 1, ratioDen: 1, customBpm: 120, color: "#ff334b", repeat: 8 },
+      { id: "p-2", nickname: "Compasso 2", beats: 4, beatUnit: 4, tempoMode: "ratio", ratioNum: 1, ratioDen: 1, customBpm: 120, color: "#ff334b", repeat: 8 },
+      { id: "p-3", nickname: "Compasso 3", beats: 4, beatUnit: 4, tempoMode: "ratio", ratioNum: 1, ratioDen: 1, customBpm: 120, color: "#ff334b", repeat: 8 },
+      { id: "p-4", nickname: "Compasso 4", beats: 4, beatUnit: 4, tempoMode: "ratio", ratioNum: 1, ratioDen: 1, customBpm: 120, color: "#ff334b", repeat: 8 }
+    ]
+  },
+  {
     id: "sergio-master-study",
     name: "Estudo de Modulações Rítmicas (3/2 & 4/3)",
     description: "Peça didática de percussão explorando transições métricas clássicas e compassos mistos.",

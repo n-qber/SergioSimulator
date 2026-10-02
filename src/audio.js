@@ -16,6 +16,18 @@ class PercussionAudioEngine {
     this.volume = 0.8;
     this.soundType = "woodblock"; // 'woodblock', 'clave', 'click', 'beep'
     this.clickCache = {};
+
+    if (typeof window !== 'undefined') {
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (AudioCtx) {
+          this.ctx = new AudioCtx({ latencyHint: 'interactive' });
+          this.masterGain = this.ctx.createGain();
+          this.masterGain.gain.setValueAtTime(this.isMuted ? 0 : this.volume, this.ctx.currentTime);
+          this.masterGain.connect(this.ctx.destination);
+        }
+      } catch (_) {}
+    }
   }
 
   async init() {
