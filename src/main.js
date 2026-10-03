@@ -63,6 +63,8 @@ class SergioApp {
     this.setupJoinModal();
     this.updateBpmPracticeUI();
     this.updateUndoRedoUI();
+    this.setupMobileNav();
+    this.renderQuickMeasureStrip();
 
     // Pré-gera a peça toda na memória RAM (~5ms)
     this.preparePieceAudio();
@@ -288,7 +290,22 @@ class SergioApp {
       ctxMoveLeft: document.getElementById('ctxMoveLeft'),
       ctxMoveRight: document.getElementById('ctxMoveRight'),
       ctxDuplicate: document.getElementById('ctxDuplicate'),
-      ctxDelete: document.getElementById('ctxDelete')
+      ctxDelete: document.getElementById('ctxDelete'),
+
+      // Navegação Mobile & Floating Play
+      mobileBottomNav: document.getElementById('mobileBottomNav'),
+      tabNavStage: document.getElementById('tabNavStage'),
+      tabNavMeasures: document.getElementById('tabNavMeasures'),
+      tabNavPiece: document.getElementById('tabNavPiece'),
+      tabMeasuresBadge: document.getElementById('tabMeasuresBadge'),
+      btnFloatingPlay: document.getElementById('btnFloatingPlay'),
+      floatingPlayIcon: document.getElementById('floatingPlayIcon'),
+      floatingPauseIcon: document.getElementById('floatingPauseIcon'),
+      measureQuickCarouselWrap: document.getElementById('measureQuickCarouselWrap'),
+      measureQuickStrip: document.getElementById('measureQuickStrip'),
+      measuresSection: document.getElementById('measuresSection'),
+      stageContainer: document.querySelector('.stage-container'),
+      headerRightArea: document.getElementById('headerRightArea')
     };
   }
 
@@ -448,11 +465,17 @@ class SergioApp {
 
   updatePlayPauseIcon() {
     if (this.isPlaying) {
-      this.dom.playIcon.style.display = 'none';
-      this.dom.pauseIcon.style.display = 'block';
+      if (this.dom.playIcon) this.dom.playIcon.style.display = 'none';
+      if (this.dom.pauseIcon) this.dom.pauseIcon.style.display = 'block';
+      if (this.dom.floatingPlayIcon) this.dom.floatingPlayIcon.style.display = 'none';
+      if (this.dom.floatingPauseIcon) this.dom.floatingPauseIcon.style.display = 'block';
+      this.dom.btnFloatingPlay?.classList.add('is-playing');
     } else {
-      this.dom.playIcon.style.display = 'block';
-      this.dom.pauseIcon.style.display = 'none';
+      if (this.dom.playIcon) this.dom.playIcon.style.display = 'block';
+      if (this.dom.pauseIcon) this.dom.pauseIcon.style.display = 'none';
+      if (this.dom.floatingPlayIcon) this.dom.floatingPlayIcon.style.display = 'block';
+      if (this.dom.floatingPauseIcon) this.dom.floatingPauseIcon.style.display = 'none';
+      this.dom.btnFloatingPlay?.classList.remove('is-playing');
     }
   }
 
@@ -517,6 +540,7 @@ class SergioApp {
       this._lastTotalTimeStr = '00:00.0';
       this.lastBeatText = '- / -';
       this.highlightActiveMeasureCard(-1);
+      this.highlightActiveQuickMeasure(-1);
       return;
     }
 
@@ -579,8 +603,9 @@ class SergioApp {
         this.dom.hudTempoRatio.textContent = "Fixo";
       }
 
-      // Realce no cartão
+      // Realce no cartão e na esteira de pulo rápido
       this.highlightActiveMeasureCard(pos.measureIndex);
+      this.highlightActiveQuickMeasure(pos.measureIndex);
     }
 
     // Batimento e pontos de beat (muda a cada beat, não a cada frame)
@@ -642,6 +667,88 @@ class SergioApp {
       }
     }
     this.lastHighlightedIdx = activeIndex;
+  }
+
+  highlightActiveQuickMeasure(activeIndex) {
+    const strip = this.dom.measureQuickStrip;
+    if (!strip) return;
+
+    const allBtns = strip.querySelectorAll('.quick-measure-btn');
+    allBtns.forEach((btn, i) => {
+      const isActive = (i === activeIndex);
+      btn.classList.toggle('active', isActive);
+      if (isActive && this.isPlaying) {
+        btn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+      }
+    });
+  }
+
+  renderQuickMeasureStrip() {
+    const strip = this.dom.measureQuickStrip;
+    if (!strip) return;
+    strip.innerHTML = '';
+    const measures = state.measures;
+    if (!measures || measures.length === 0) return;
+
+    measures.forEach((m, idx) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'quick-measure-btn';
+      btn.dataset.index = idx;
+      if (idx === this._lastMeasureIdx) {
+        btn.classList.add('active');
+      }
+
+      const mColor = m.color || '#ff334b';
+      btn.style.setProperty('--m-color', mColor);
+
+      const hasNick = m.nickname && m.nickname.trim();
+      const label = hasNick ? m.nickname : `${m.beats}/${m.beatUnit}`;
+      const repeatInfo = ((m.repeat || 1) > 1) ? `<span class="qm-rep">×${m.repeat}</span>` : '';
+
+      btn.innerHTML = `
+        <span class="qm-idx" style="color:${mColor}">c.${idx + 1}</span>
+        <span class="qm-label">${label}</span>
+        ${repeatInfo}
+      `;
+
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const t = state.getFirstTimingForMeasure(idx);
+        if (t) {
+          this.seekTo(t.startTime);
+          this.handleMeasureSelected(idx);
+        }
+      });
+
+      strip.appendChild(btn);
+    });
+  }
+
+  setupMobileNav() {
+    this.activeMobileTab = 'stage';
+    this.setMobileTab('stage');
+
+    this.dom.tabNavStage?.addEventListener('click', () => this.setMobileTab('stage'));
+    this.dom.tabNavMeasures?.addEventListener('click', () => this.setMobileTab('measures'));
+    this.dom.tabNavPiece?.addEventListener('click', () => this.setMobileTab('piece'));
+
+    this.dom.btnFloatingPlay?.addEventListener('click', () => this.togglePlayPause());
+  }
+
+  setMobileTab(tab) {
+    this.activeMobileTab = tab;
+    document.body.setAttribute('data-mobile-tab', tab);
+
+    this.dom.tabNavStage?.classList.toggle('active', tab === 'stage');
+    this.dom.tabNavMeasures?.classList.toggle('active', tab === 'measures');
+    this.dom.tabNavPiece?.classList.toggle('active', tab === 'piece');
+
+    if (tab === 'stage') {
+      setTimeout(() => {
+        this.renderer?.resize();
+      }, 50);
+    }
   }
 
   formatTime(sec) {
@@ -1442,6 +1549,11 @@ class SergioApp {
     this.dom.measureCountBadge.textContent = (totalCount !== uniqueCount)
       ? `${totalCount} compassos no total (${uniqueCount} ${uniqueCount === 1 ? 'cartão' : 'cartões'})`
       : `${uniqueCount} ${uniqueCount === 1 ? 'compasso' : 'compassos'}`;
+
+    if (this.dom.tabMeasuresBadge) {
+      this.dom.tabMeasuresBadge.textContent = uniqueCount;
+    }
+    this.renderQuickMeasureStrip();
 
     grid.innerHTML = '';
     this.cachedCards = [];

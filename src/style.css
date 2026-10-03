@@ -325,6 +325,16 @@ button {
   gap: 8px;
 }
 
+.header-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mobile-group-title {
+  display: none;
+}
+
 .save-status-pill {
   display: inline-flex;
   align-items: center;
@@ -1030,6 +1040,237 @@ button {
 .btn-action-ghost:hover {
   background: var(--bg-card-hover);
   color: var(--white-pure);
+}
+
+/* ==========================================================================
+   CARROSSEL DE PULOS RÁPIDOS DE COMPASSO (CUE STRIP ESTILO DJ)
+   ========================================================================== */
+
+.measure-quick-carousel-wrap {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding: 3px 0;
+  margin: 2px 0 4px 0;
+}
+
+.measure-quick-carousel-wrap::-webkit-scrollbar {
+  display: none;
+}
+
+.measure-quick-strip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: max-content;
+  padding: 2px 2px;
+}
+
+.quick-measure-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: 14px;
+  padding: 4px 10px;
+  color: var(--white-pure);
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.quick-measure-btn:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--border-medium);
+}
+
+.quick-measure-btn.active {
+  background: var(--red-soft);
+  border-color: var(--red-primary);
+  box-shadow: 0 0 10px rgba(244, 63, 94, 0.45);
+  transform: scale(1.03);
+}
+
+.quick-measure-btn .qm-idx {
+  font-weight: 800;
+  font-size: 0.72rem;
+}
+
+.quick-measure-btn .qm-label {
+  color: var(--white-dim);
+  font-family: var(--font-ui);
+  font-size: 0.74rem;
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quick-measure-btn .qm-rep {
+  font-size: 0.65rem;
+  color: #f59e0b;
+  font-weight: 700;
+}
+
+/* ==========================================================================
+   BOTÃO FLUTUANTE DE PLAY/PAUSE (USADO NO MOBILE FORA DA ABA TOCAR)
+   ========================================================================== */
+
+.floating-mini-play {
+  position: fixed;
+  right: 20px;
+  bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--red-primary), var(--red-dark));
+  color: #ffffff;
+  border: none;
+  box-shadow: 0 4px 20px rgba(244, 63, 94, 0.55);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.floating-mini-play:active {
+  transform: scale(0.92);
+}
+
+.floating-mini-play.is-playing {
+  animation: floatingPulse 1.4s infinite alternate ease-in-out;
+}
+
+@keyframes floatingPulse {
+  0% {
+    box-shadow: 0 4px 16px rgba(244, 63, 94, 0.5);
+  }
+  100% {
+    box-shadow: 0 4px 28px rgba(244, 63, 94, 0.9);
+  }
+}
+
+/* ==========================================================================
+   BARRA DE NAVEGAÇÃO MOBILE (RODAPÉ FIXO)
+   ========================================================================== */
+
+.mobile-bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: calc(58px + env(safe-area-inset-bottom, 0px));
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  background: rgba(11, 15, 25, 0.94);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-top: 1px solid var(--border-light);
+  display: none;
+  align-items: center;
+  justify-content: space-around;
+  z-index: 999;
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.45);
+}
+
+.mobile-nav-btn {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  background: transparent;
+  border: none;
+  color: var(--white-muted);
+  cursor: pointer;
+  position: relative;
+  transition: color 0.15s ease, transform 0.1s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mobile-nav-btn:active {
+  transform: scale(0.95);
+}
+
+.mobile-nav-btn .nav-btn-icon {
+  font-size: 1.25rem;
+  line-height: 1;
+  transition: transform 0.15s ease;
+}
+
+.mobile-nav-btn .nav-btn-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+
+.mobile-nav-btn.active {
+  color: var(--red-primary);
+}
+
+.mobile-nav-btn.active .nav-btn-icon {
+  transform: scale(1.15);
+}
+
+.mobile-nav-btn.active::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 28px;
+  height: 3px;
+  border-radius: 0 0 3px 3px;
+  background: var(--red-primary);
+  box-shadow: 0 0 8px rgba(244, 63, 94, 0.8);
+}
+
+.nav-btn-badge {
+  position: absolute;
+  top: 6px;
+  right: calc(50% - 24px);
+  background: var(--red-primary);
+  color: #ffffff;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 800;
+  padding: 1px 5px;
+  border-radius: 10px;
+  min-width: 16px;
+  text-align: center;
+}
+
+/* Ajustes no Tema Claro */
+[data-theme="light"] .mobile-bottom-nav {
+  background: rgba(255, 255, 255, 0.94);
+  border-top-color: rgba(0, 0, 0, 0.08);
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="light"] .floating-mini-play {
+  box-shadow: 0 4px 20px rgba(225, 29, 72, 0.45);
+}
+
+[data-theme="light"] .quick-measure-btn {
+  background: #ffffff;
+  border-color: rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="light"] .quick-measure-btn.active {
+  background: rgba(225, 29, 72, 0.08);
+  border-color: var(--red-primary);
 }
 
 /* ==========================================================================
@@ -1930,24 +2171,644 @@ kbd {
 }
 
 /* ==========================================================================
-   RESPONSIVIDADE
+   RESPONSIVIDADE COMPLETA PARA CELULAR (FOCADO NA PARTE PRINCIPAL)
    ========================================================================== */
 
-@media (max-width: 900px) {
-  .top-header {
-    height: auto;
-    padding: 10px 16px;
-    flex-wrap: wrap;
-    gap: 10px;
+@media (max-width: 768px) {
+  html, body {
+    overflow-x: hidden;
+    width: 100%;
+    max-width: 100vw;
   }
 
-  .integrated-hud-bar {
-    grid-template-columns: 1fr;
+  .app-container {
+    width: 100%;
+    min-height: 100dvh;
+    padding-bottom: calc(62px + env(safe-area-inset-bottom, 0px));
+    overflow-x: hidden;
+  }
+
+  /* BARRA SUPERIOR (HEADER) MOBILE COMPACTA & LIMPA */
+  .top-header {
+    height: auto;
+    padding: 8px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    background: var(--bg-header);
+    border-bottom: 1px solid var(--border-light);
+  }
+
+  .header-left {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
     gap: 8px;
   }
 
+  .brand {
+    gap: 6px;
+  }
+
+  .brand-icon {
+    font-size: 1.15rem;
+  }
+
+  .brand-title {
+    font-size: 0.85rem;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+  }
+
+  .base-bpm-bar {
+    padding: 2px 4px;
+    gap: 2px;
+    flex-shrink: 0;
+  }
+
+  .bpm-title {
+    display: none;
+  }
+
+  .btn-bpm-step {
+    font-size: 0.68rem;
+    padding: 3px 5px;
+    min-width: 22px;
+    height: 26px;
+  }
+
+  #inputBaseBpm {
+    width: 36px;
+    font-size: 0.88rem;
+    padding: 2px 0;
+  }
+
+  .btn-tap {
+    font-size: 0.65rem;
+    padding: 4px 6px;
+    height: 26px;
+  }
+
+  .header-center {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .piece-title-input {
+    font-size: 0.88rem;
+    padding: 4px 6px;
+    width: 100%;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 4px;
+  }
+
+  /* VISIBILIDADE DAS ABAS MOBILE */
+  .mobile-bottom-nav {
+    display: flex;
+  }
+
+  /* 1. ABA 'TOCAR' (PADRÃO / PALCO PRINCIPAL) */
+  body:not([data-mobile-tab]) .stage-container,
+  body[data-mobile-tab="stage"] .stage-container {
+    display: flex !important;
+  }
+
+  body:not([data-mobile-tab]) .measures-section,
+  body[data-mobile-tab="stage"] .measures-section {
+    display: none !important;
+  }
+
+  body:not([data-mobile-tab]) .header-right,
+  body[data-mobile-tab="stage"] .header-right {
+    display: none !important;
+  }
+
+  body:not([data-mobile-tab]) .floating-mini-play,
+  body[data-mobile-tab="stage"] .floating-mini-play {
+    display: none !important;
+  }
+
+  /* 2. ABA 'COMPASSOS' */
+  body[data-mobile-tab="measures"] .stage-container {
+    display: none !important;
+  }
+
+  body[data-mobile-tab="measures"] .measures-section {
+    display: flex !important;
+  }
+
+  body[data-mobile-tab="measures"] .header-right {
+    display: none !important;
+  }
+
+  body[data-mobile-tab="measures"] .floating-mini-play {
+    display: flex !important;
+  }
+
+  /* 3. ABA 'PEÇA & NUVEM' */
+  body[data-mobile-tab="piece"] .stage-container {
+    display: none !important;
+  }
+
+  body[data-mobile-tab="piece"] .measures-section {
+    display: none !important;
+  }
+
+  body[data-mobile-tab="piece"] .header-right {
+    display: flex !important;
+  }
+
+  body[data-mobile-tab="piece"] .floating-mini-play {
+    display: flex !important;
+  }
+
+  /* PALCO PRINCIPAL (STAGE) EM DESTAQUE NO MOBILE */
+  .main-stage {
+    padding: 8px 10px calc(80px + env(safe-area-inset-bottom, 0px)) 10px;
+    width: 100%;
+    gap: 10px;
+  }
+
+  .stage-container {
+    padding: 8px;
+    border-radius: 12px;
+    gap: 8px;
+  }
+
+  /* HUD UNIFICADO RESPONSIVO (2 LINHAS LIMPAS) */
+  .integrated-hud-bar {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-rows: auto auto;
+    gap: 6px 10px;
+    padding: 8px 10px;
+    border-radius: 8px;
+  }
+
+  .hud-col-measure {
+    grid-column: 1;
+    grid-row: 1;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+  }
+
+  .hud-badge {
+    font-size: 0.68rem;
+    padding: 2px 5px;
+    flex-shrink: 0;
+  }
+
+  .hud-nickname {
+    font-size: 0.95rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .hud-group-tag {
+    display: none;
+  }
+
+  .hud-col-time {
+    grid-column: 2;
+    grid-row: 1;
+    font-size: 1rem;
+    justify-self: end;
+  }
+
+  .hud-col-tempo {
+    grid-column: 1 / span 2;
+    grid-row: 2;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding-top: 4px;
+    border-top: 1px solid var(--border-light);
+  }
+
+  .hud-beat-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .beat-str {
+    font-size: 0.88rem;
+  }
+
+  .hud-bpm-wrap {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .bpm-num {
+    font-size: 0.95rem;
+  }
+
+  .bpm-unit {
+    font-size: 0.65rem;
+  }
+
+  .ratio-pill {
+    font-size: 0.65rem;
+    padding: 1px 4px;
+  }
+
+  /* MINIMAPA E VISÃO CORRIDA */
+  .minimap-strip {
+    height: 24px;
+    border-radius: 6px;
+  }
+
   .runner-box {
-    height: 180px;
+    height: clamp(190px, 32vh, 260px) !important;
+    border-radius: 8px;
+  }
+
+  .runner-resizer {
+    display: none;
+  }
+
+  /* BARRA DE TRANSPORTE OTIMIZADA PARA POLEGAR */
+  .clean-transport-bar {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 6px 0 0 0;
+    width: 100%;
+  }
+
+  .clean-transport-bar .transport-controls {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    width: 100%;
+  }
+
+  .clean-transport-bar .btn-ctrl {
+    width: 46px;
+    height: 46px;
+    border-radius: 12px;
+    font-size: 1.15rem;
+    background: var(--bg-card);
+  }
+
+  .clean-transport-bar .btn-play {
+    width: 68px;
+    height: 52px;
+    border-radius: 26px;
+    background: linear-gradient(135deg, var(--red-primary), var(--red-dark));
+    box-shadow: 0 4px 18px rgba(244, 63, 94, 0.45);
+  }
+
+  .clean-transport-bar .btn-play svg {
+    width: 26px;
+    height: 26px;
+  }
+
+  .clean-transport-bar .speed-and-loop {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    gap: 8px;
+  }
+
+  .clean-transport-bar .speed-toggle-group {
+    flex: 1;
+    display: flex;
+    justify-content: space-around;
+    padding: 3px;
+  }
+
+  .clean-transport-bar .speed-opt {
+    flex: 1;
+    padding: 6px 0;
+    font-size: 0.76rem;
+    text-align: center;
+  }
+
+  .clean-transport-bar .btn-loop-clean {
+    padding: 7px 14px;
+    font-size: 0.8rem;
+  }
+
+  .clean-transport-bar .quick-add-actions {
+    display: flex;
+    width: 100%;
+    gap: 8px;
+  }
+
+  .clean-transport-bar .quick-add-actions button {
+    flex: 1;
+    padding: 9px 8px;
+    font-size: 0.82rem;
+    text-align: center;
+    justify-content: center;
+  }
+
+  #btnToggleWideMode {
+    display: none;
+  }
+
+  /* GERENCIADOR DE COMPASSOS MOBILE */
+  .measures-section {
+    padding: 12px 10px;
+    border-radius: 12px;
+    gap: 12px;
+  }
+
+  .section-top-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .section-title-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .clean-section-title {
+    font-size: 1.1rem;
+  }
+
+  .section-top-buttons {
+    display: flex;
+    gap: 6px;
+    width: 100%;
+  }
+
+  .section-top-buttons button {
+    flex: 1;
+    padding: 8px 4px;
+    font-size: 0.78rem;
+    text-align: center;
+    justify-content: center;
+  }
+
+  .measures-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .measure-card {
+    padding: 12px;
+  }
+
+  /* ABA DE PEÇA & NUVEM NO MOBILE */
+  body[data-mobile-tab="piece"] .top-header {
+    max-height: calc(100dvh - 66px);
+    overflow-y: auto;
+    padding-bottom: 24px;
+  }
+
+  body[data-mobile-tab="piece"] .header-right {
+    display: flex !important;
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+    padding: 6px 0 16px 0;
+  }
+
+  .header-group {
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+    border-radius: 12px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+  }
+
+  .mobile-group-title {
+    display: block;
+    font-size: 0.84rem;
+    font-weight: 700;
+    color: var(--white-pure);
+    border-bottom: 1px solid var(--border-light);
+    padding-bottom: 6px;
+    margin-bottom: 2px;
+  }
+
+  .header-group button,
+  .header-group select,
+  .header-group .file-btn {
+    width: 100%;
+    height: 40px;
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .undo-redo-row,
+  .file-actions-row {
+    display: flex;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .undo-redo-row button,
+  .file-actions-row button,
+  .file-actions-row label {
+    flex: 1;
+    height: 38px;
+  }
+
+  /* MODAIS MOBILE */
+  .modal-window {
+    width: 94vw;
+    max-width: 440px;
+    max-height: 88vh;
+    overflow-y: auto;
+    padding: 14px;
+    border-radius: 14px;
+  }
+
+  .modal-body-clean {
+    gap: 12px;
+  }
+
+  .field-row {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .preset-ratios {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4px;
+  }
+
+  .btn-ratio-preset {
+    padding: 6px 2px;
+    font-size: 0.72rem;
+  }
+
+  .fraction-inputs {
+    gap: 6px;
+  }
+
+  .frac-num {
+    width: 50px;
+    font-size: 1rem;
+  }
+
+  .swatches-row {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+}
+
+/* ==========================================================================
+   SUPORTE PARA CELULAR EM PAISAGEM / MODO HORIZONTAL (ESTANTE DE MÚSICA)
+   ========================================================================== */
+
+@media (max-width: 900px) and (orientation: landscape) {
+  .top-header {
+    padding: 4px 10px;
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .header-center {
+    max-width: 260px;
+  }
+
+  .main-stage {
+    padding: 4px 8px calc(52px + env(safe-area-inset-bottom, 0px)) 8px;
+    gap: 6px;
+  }
+
+  .stage-container {
+    padding: 6px;
+    gap: 6px;
+  }
+
+  .integrated-hud-bar {
+    padding: 4px 8px;
+    grid-template-columns: 1fr auto auto;
+    grid-template-rows: auto;
+    gap: 8px;
+  }
+
+  .hud-col-measure {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .hud-col-tempo {
+    grid-column: 2;
+    grid-row: 1;
+    border-top: none;
+    padding-top: 0;
+    width: auto;
+    gap: 10px;
+  }
+
+  .hud-col-time {
+    grid-column: 3;
+    grid-row: 1;
+  }
+
+  .runner-box {
+    height: clamp(140px, 46vh, 220px) !important;
+  }
+
+  .clean-transport-bar {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 2px 0;
+  }
+
+  .clean-transport-bar .transport-controls {
+    width: auto;
+    gap: 6px;
+  }
+
+  .clean-transport-bar .btn-ctrl {
+    width: 38px;
+    height: 38px;
+    font-size: 0.95rem;
+  }
+
+  .clean-transport-bar .btn-play {
+    width: 54px;
+    height: 40px;
+    border-radius: 20px;
+  }
+
+  .clean-transport-bar .speed-and-loop {
+    width: auto;
+    gap: 6px;
+  }
+
+  .clean-transport-bar .quick-add-actions {
+    width: auto;
+    gap: 6px;
+  }
+
+  .clean-transport-bar .quick-add-actions button {
+    padding: 6px 10px;
+    flex: unset;
+  }
+
+  .mobile-bottom-nav {
+    height: calc(44px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .mobile-nav-btn .nav-btn-icon {
+    font-size: 1rem;
+  }
+
+  .mobile-nav-btn .nav-btn-label {
+    font-size: 0.6rem;
+  }
+
+  .floating-mini-play {
+    bottom: calc(54px + env(safe-area-inset-bottom, 0px));
+    width: 48px;
+    height: 48px;
+  }
+}
+
+/* ==========================================================================
+   DESKTOP: GARANTE LAYOUT INTEGRAL VISÍVEL
+   ========================================================================== */
+
+@media (min-width: 769px) {
+  .mobile-bottom-nav {
+    display: none !important;
+  }
+
+  .floating-mini-play {
+    display: none !important;
+  }
+
+  .stage-container {
+    display: flex !important;
+  }
+
+  .measures-section {
+    display: flex !important;
+  }
+
+  .header-right {
+    display: flex !important;
+  }
+
+  .mobile-group-title {
+    display: none !important;
   }
 }
 

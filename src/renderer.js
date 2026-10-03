@@ -151,10 +151,63 @@ export class DJRunnerRenderer {
   }
 
   initEvents() {
-    window.addEventListener('resize', () => this.resize());
+    this.canvas.style.touchAction = 'none';
+    this.minimapCanvas.style.touchAction = 'none';
 
-    // 1. Mouse Move: Gerencia deslizamento suave da esteira (scrubbing) e hover
-    this.canvas.addEventListener('mousemove', (e) => {
+    window.addEventListener('resize', () => this.resize());
+    window.addEventListener('orientationchange', () => {
+      setTimeout(() => this.resize(), 100);
+    });
+
+    // Multi-touch pinch-to-zoom para celulares
+    this.activePointers = new Map();
+    this.initialPinchDistance = 0;
+    this.initialPps = this.pixelsPerSecond;
+
+    // 1. Pointer Down (Mouse, Touch, Pen): Inicia deslizamento suave da esteira (scrubbing/pan) ou pinch zoom
+    this.canvas.addEventListener('pointerdown', (e) => {
+      if (e.button !== undefined && e.button !== 0) return; // Apenas botão principal / touch
+
+      this.activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+      if (this.activePointers.size === 2) {
+        this.isDraggingRunner = false;
+        const pts = Array.from(this.activePointers.values());
+        this.initialPinchDistance = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+        this.initialPps = this.pixelsPerSecond;
+        return;
+      }
+
+      const rect = this.canvas.getBoundingClientRect();
+      this.currentMouseX = e.clientX - rect.left;
+      this.currentMouseY = e.clientY - rect.top;
+
+      this.mouseDownX = e.clientX;
+      this.mouseDownY = e.clientY;
+      this.isDraggingRunner = true;
+      this.dragStartX = e.clientX;
+      this.dragStartTime = this.lastCurrentTime || 0;
+      this.canvas.style.cursor = 'grabbing';
+
+      try {
+        this.canvas.setPointerCapture(e.pointerId);
+      } catch (err) {}
+    });
+
+    // 2. Pointer Move: Gerencia deslizamento suave da esteira (scrubbing), pinch-to-zoom e hover
+    this.canvas.addEventListener('pointermove', (e) => {
+      if (this.activePointers.has(e.pointerId)) {
+        this.activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      }
+
+      if (this.activePointers.size === 2 && this.initialPinchDistance > 10) {
+        const pts = Array.from(this.activePointers.values());
+        const currentDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+        const scale = currentDist / this.initialPinchDistance;
+        this.pixelsPerSecond = Math.max(80, Math.min(500, this.initialPps * scale));
+        return;
+      }
+
       const rect = this.canvas.getBoundingClientRect();
       const canvasX = e.clientX - rect.left;
       const canvasY = e.clientY - rect.top;
@@ -181,27 +234,16 @@ export class DJRunnerRenderer {
       }
     });
 
-    // 2. Mouse Down: Inicia deslizamento suave da esteira (scrubbing/pan)
-    this.canvas.addEventListener('mousedown', (e) => {
-      if (e.button !== 0) return; // Apenas botão esquerdo
+    // 3. Pointer Up & Cancel
+    const endRunnerDrag = (e) => {
+      this.activePointers.delete(e.pointerId);
+      if (this.activePointers.size < 2) {
+        this.initialPinchDistance = 0;
+      }
 
-      const rect = this.canvas.getBoundingClientRect();
-      this.currentMouseX = e.clientX - rect.left;
-      this.currentMouseY = e.clientY - rect.top;
-
-      this.mouseDownX = e.clientX;
-      this.mouseDownY = e.clientY;
-      this.isDraggingRunner = true;
-      this.dragStartX = e.clientX;
-      this.dragStartTime = this.lastCurrentTime || 0;
-      this.canvas.style.cursor = 'grabbing';
-    });
-
-    // 3. Mouse Up Global
-    window.addEventListener('mouseup', (e) => {
       if (this.isDraggingRunner) {
         const dist = Math.hypot(e.clientX - this.mouseDownX, e.clientY - this.mouseDownY);
-        // Se foi apenas um clique (sem arrasto > 5px), seleciona o compasso e pula para o início dele
+        // Se foi apenas um toque/clique (sem arrasto > 5px), seleciona o compasso e pula para o início dele
         if (dist <= 5) {
           const hit = this.getMeasureAtPoint(this.currentMouseX, this.currentMouseY);
           if (hit) {
@@ -213,6 +255,11 @@ export class DJRunnerRenderer {
             }
           }
         }
+        try {
+          if (this.canvas.hasPointerCapture && this.canvas.hasPointerCapture(e.pointerId)) {
+            this.canvas.releasePointerCapture(e.pointerId);
+          }
+        } catch (err) {}
       }
 
       this.isDraggingRunner = false;
@@ -221,7 +268,11 @@ export class DJRunnerRenderer {
         const hit = this.getMeasureAtPoint(this.currentMouseX, this.currentMouseY);
         this.canvas.style.cursor = hit ? 'pointer' : 'ew-resize';
       }
-    });
+    };
+
+    this.canvas.addEventListener('pointerup', endRunnerDrag);
+    this.canvas.addEventListener('pointercancel', endRunnerDrag);
+    window.addEventListener('pointerup', endRunnerDrag);
 
     // 4. Duplo Clique: Abre modal de configuração do compasso clicado
     this.canvas.addEventListener('dblclick', (e) => {
@@ -234,7 +285,7 @@ export class DJRunnerRenderer {
       }
     });
 
-    // 5. Menu de Contexto (Botão Direito)
+    // 5. Menu de Contexto (Botão Direito ou Toque Longo)
     this.canvas.addEventListener('contextmenu', (e) => {
       const rect = this.canvas.getBoundingClientRect();
       const canvasX = e.clientX - rect.left;
@@ -248,17 +299,36 @@ export class DJRunnerRenderer {
       }
     });
 
-    // 6. Scrubbing e navegação no Minimapa
-    this.minimapCanvas.addEventListener('mousedown', (e) => {
+    // 6. Scrubbing e navegação no Minimapa (com Pointer Events)
+    this.minimapCanvas.addEventListener('pointerdown', (e) => {
+      if (e.button !== undefined && e.button !== 0) return;
       this.isDraggingMinimap = true;
+      try {
+        this.minimapCanvas.setPointerCapture(e.pointerId);
+      } catch (err) {}
       this.handleMinimapClick(e);
     });
 
-    window.addEventListener('mousemove', (e) => {
+    this.minimapCanvas.addEventListener('pointermove', (e) => {
       if (this.isDraggingMinimap) {
         this.handleMinimapClick(e);
       }
     });
+
+    const endMinimapDrag = (e) => {
+      if (this.isDraggingMinimap) {
+        try {
+          if (this.minimapCanvas.hasPointerCapture && this.minimapCanvas.hasPointerCapture(e.pointerId)) {
+            this.minimapCanvas.releasePointerCapture(e.pointerId);
+          }
+        } catch (err) {}
+        this.isDraggingMinimap = false;
+      }
+    };
+
+    this.minimapCanvas.addEventListener('pointerup', endMinimapDrag);
+    this.minimapCanvas.addEventListener('pointercancel', endMinimapDrag);
+    window.addEventListener('pointerup', endMinimapDrag);
 
     // 7. Zoom horizontal com roda do mouse
     this.canvas.addEventListener('wheel', (e) => {

@@ -2,7 +2,10 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#0b0f19">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Sérgio Simulator | Simulador Rítmico & Modulação Métrica para Percussão</title>
   <meta name="description" content="Simulador de visão corrida estilo DJ para estudo de peças de percussão com compassos variados, métricas mistas e modulações métricas matemáticas.">
   
@@ -15,8 +18,8 @@
 <body>
   <div id="app" class="app-container">
     
-    <!-- BARRA SUPERIOR (HEADER MINIMALISTA) -->
-    <header class="top-header">
+    <!-- BARRA SUPERIOR (HEADER) -->
+    <header class="top-header" id="topHeader">
       <div class="header-left">
         <div class="brand">
           <div class="brand-icon">🥁</div>
@@ -24,7 +27,7 @@
         </div>
 
         <!-- Seletor de Base BPM Limpo -->
-        <div class="base-bpm-bar" title="Andamento Base da Peça">
+        <div class="base-bpm-bar" id="baseBpmBar" title="Andamento Base da Peça">
           <span class="bpm-title">BASE BPM</span>
           <button type="button" class="btn-bpm-step" id="btnBpmMinus5">-5</button>
           <button type="button" class="btn-bpm-step" id="btnBpmMinus1">-1</button>
@@ -45,63 +48,79 @@
         <input type="text" id="inputPieceName" class="piece-title-input" value="Estudo de Modulações Rítmicas (3/2 & 4/3)" placeholder="Nome da Peça" title="Clique para editar">
       </div>
 
-      <!-- Lado Direito: Ações Rápidas -->
-      <div class="header-right">
-        <div id="saveIndicator" class="save-status-pill" title="Peça salva automaticamente no navegador">
-          <span class="save-dot"></span>
-          <span class="save-text">Salvo</span>
+      <!-- Lado Direito: Ações Rápidas & Menu de Peça -->
+      <div class="header-right" id="headerRightArea">
+        <!-- Grupo 1: Nuvem & Compartilhamento -->
+        <div class="header-group group-cloud">
+          <div class="mobile-group-title">☁️ Sincronização & Colaboração</div>
+          <div id="saveIndicator" class="save-status-pill" title="Peça salva automaticamente no navegador">
+            <span class="save-dot"></span>
+            <span class="save-text">Salvo</span>
+          </div>
+
+          <div id="cloudStatusPill" class="cloud-status-pill offline" title="Status da Sincronização na Nuvem">
+            <span class="cloud-dot"></span>
+            <span id="cloudStatusText">Nuvem</span>
+          </div>
+
+          <div id="presenceRow" class="presence-row" title="Colaboradores Online"></div>
+
+          <button type="button" id="btnOpenHistory" class="btn-text-action btn-history" title="Histórico de Versões na Nuvem (até 500 alterações)">
+            <span class="btn-icon">🕒</span> Histórico <span id="historyBadgeCount" class="history-badge">0</span>
+          </button>
+
+          <button type="button" id="btnSharePiece" class="btn-share-highlight" title="Compartilhar Peça e Colaborar em Tempo Real">
+            <span class="btn-icon">🔗</span> Compartilhar
+          </button>
         </div>
 
-        <div id="cloudStatusPill" class="cloud-status-pill offline" title="Status da Sincronização na Nuvem">
-          <span class="cloud-dot"></span>
-          <span id="cloudStatusText">Nuvem</span>
+        <!-- Grupo 2: Peças & Histórico Local -->
+        <div class="header-group group-actions">
+          <div class="mobile-group-title">📁 Peças & Edição</div>
+          <div class="undo-redo-row">
+            <button type="button" id="btnUndo" class="btn-text-action btn-undo" title="Desfazer última alteração (Ctrl+Z)" disabled>
+              <span class="btn-icon">↩</span> Desfazer
+            </button>
+
+            <button type="button" id="btnRedo" class="btn-text-action btn-redo" title="Refazer alteração (Ctrl+Y)" disabled>
+              <span class="btn-icon">↪</span> Refazer
+            </button>
+          </div>
+
+          <button type="button" id="btnNewPiece" class="btn-text-action btn-new-piece" title="Iniciar Nova Peça em Branco (Ctrl+N)">
+            <span class="btn-icon">📄</span> Nova Peça
+          </button>
+
+          <select id="selectPreset" class="clean-select" title="Carregar Exemplo ou Nova Peça">
+            <option value="" disabled selected>Peças de Exemplo...</option>
+          </select>
+          
+          <div class="file-actions-row">
+            <button type="button" id="btnExport" class="btn-text-action" title="Exportar Peça">Exportar</button>
+            <label class="btn-text-action file-btn" title="Importar Peça">
+              Importar
+              <input type="file" id="fileImport" accept=".json" style="display:none">
+            </label>
+          </div>
         </div>
 
-        <div id="presenceRow" class="presence-row" title="Colaboradores Online"></div>
+        <!-- Grupo 3: Preferências de Áudio e Visual -->
+        <div class="header-group group-prefs">
+          <div class="mobile-group-title">🔊 Som & Tema</div>
+          <button type="button" id="btnThemeToggle" class="btn-icon-action" title="Alternar Tema Claro / Escuro (T)">
+            <span id="themeIcon">☀️</span>
+          </button>
 
-        <button type="button" id="btnOpenHistory" class="btn-text-action btn-history" title="Histórico de Versões na Nuvem (até 500 alterações)">
-          <span class="btn-icon">🕒</span> Histórico <span id="historyBadgeCount" class="history-badge">0</span>
-        </button>
-
-        <button type="button" id="btnSharePiece" class="btn-share-highlight" title="Compartilhar Peça e Colaborar em Tempo Real">
-          <span class="btn-icon">🔗</span> Compartilhar
-        </button>
-
-        <button type="button" id="btnUndo" class="btn-text-action btn-undo" title="Desfazer última alteração (Ctrl+Z)" disabled>
-          <span class="btn-icon">↩</span> Desfazer
-        </button>
-
-        <button type="button" id="btnRedo" class="btn-text-action btn-redo" title="Refazer alteração (Ctrl+Y)" disabled>
-          <span class="btn-icon">↪</span> Refazer
-        </button>
-
-        <button type="button" id="btnNewPiece" class="btn-text-action btn-new-piece" title="Iniciar Nova Peça em Branco (Ctrl+N)">
-          <span class="btn-icon">📄</span> Novo
-        </button>
-
-        <select id="selectPreset" class="clean-select" title="Carregar Exemplo ou Nova Peça">
-          <option value="" disabled selected>Peças de Exemplo...</option>
-        </select>
-        
-        <button type="button" id="btnExport" class="btn-text-action" title="Exportar Peça">Exportar</button>
-        <label class="btn-text-action file-btn" title="Importar Peça">
-          Importar
-          <input type="file" id="fileImport" accept=".json" style="display:none">
-        </label>
-
-        <button type="button" id="btnThemeToggle" class="btn-icon-action" title="Alternar Tema Claro / Escuro (T)">
-          <span id="themeIcon">☀️</span>
-        </button>
-
-        <button type="button" id="btnMute" class="btn-icon-mute active" title="Mudo (M)">
-          <span id="muteIcon">🔊</span>
-        </button>
-        <select id="selectSoundType" class="clean-select" title="Timbre de Percussão">
-          <option value="woodblock">Bloco de Madeira</option>
-          <option value="clave">Clave / Rimshot</option>
-          <option value="click">Click Digital</option>
-          <option value="beep">Bip</option>
-        </select>
+          <button type="button" id="btnMute" class="btn-icon-mute active" title="Mudo (M)">
+            <span id="muteIcon">🔊</span>
+          </button>
+          <select id="selectSoundType" class="clean-select" title="Timbre de Percussão">
+            <option value="woodblock">Bloco de Madeira</option>
+            <option value="clave">Clave / Rimshot</option>
+            <option value="click">Click Digital</option>
+            <option value="beep">Bip</option>
+          </select>
+        </div>
       </div>
     </header>
 
@@ -180,6 +199,11 @@
           </div>
         </div>
 
+        <!-- Carrossel de Pulos Rápidos de Compasso (Cue Strip estilo DJ) -->
+        <div class="measure-quick-carousel-wrap" id="measureQuickCarouselWrap" title="Toque em qualquer compasso para saltar a reprodução imediatamente">
+          <div class="measure-quick-strip" id="measureQuickStrip"></div>
+        </div>
+
         <!-- Barra de Controles de Transporte (Limpa & Direta) -->
         <div class="clean-transport-bar">
           <div class="transport-controls">
@@ -212,7 +236,7 @@
       </section>
 
       <!-- GERENCIADOR INFERIOR DE COMPASSOS (LEVE & ORGANIZADO) -->
-      <section class="measures-section">
+      <section class="measures-section" id="measuresSection">
         <div class="section-top-row">
           <div class="section-title-wrap">
             <h2 class="clean-section-title">Compassos da Peça</h2>
@@ -229,7 +253,30 @@
         <div id="measuresGrid" class="measures-grid"></div>
       </section>
 
+      <!-- Botão Flutuante de Play/Pause (Usado na visão de Compassos no mobile) -->
+      <button type="button" id="btnFloatingPlay" class="floating-mini-play" title="Tocar / Pausar (Espaço)">
+        <svg id="floatingPlayIcon" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+        <svg id="floatingPauseIcon" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" style="display:none"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+      </button>
+
     </main>
+
+    <!-- BARRA DE NAVEGAÇÃO MOBILE FIXA (RODAPÉ) -->
+    <nav class="mobile-bottom-nav" id="mobileBottomNav" aria-label="Navegação Mobile">
+      <button type="button" class="mobile-nav-btn active" data-tab="stage" id="tabNavStage">
+        <span class="nav-btn-icon">🥁</span>
+        <span class="nav-btn-label">Tocar</span>
+      </button>
+      <button type="button" class="mobile-nav-btn" data-tab="measures" id="tabNavMeasures">
+        <span class="nav-btn-icon">🎼</span>
+        <span class="nav-btn-label">Compassos</span>
+        <span class="nav-btn-badge" id="tabMeasuresBadge">0</span>
+      </button>
+      <button type="button" class="mobile-nav-btn" data-tab="piece" id="tabNavPiece">
+        <span class="nav-btn-icon">⚙️</span>
+        <span class="nav-btn-label">Peça & Nuvem</span>
+      </button>
+    </nav>
 
     <!-- MODAL DE EDIÇÃO DE COMPASSO -->
     <div id="modalMeasureEdit" class="modal-overlay" style="display:none">
