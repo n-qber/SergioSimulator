@@ -2953,6 +2953,44 @@ kbd {
   transform: translateY(0);
 }
 
+/* Botão de Instalar App (PWA) */
+.btn-install-app {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  color: var(--white-pure);
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 5px 11px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-install-app:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--red-primary);
+  color: var(--red-primary);
+}
+
+.btn-install-app.can-install {
+  border-color: rgba(244, 63, 94, 0.5);
+  background: var(--red-soft);
+  color: var(--red-primary);
+  animation: pulseInstall 2s infinite alternate ease-in-out;
+}
+
+@keyframes pulseInstall {
+  0% {
+    box-shadow: 0 0 0 rgba(244, 63, 94, 0);
+  }
+  100% {
+    box-shadow: 0 0 12px rgba(244, 63, 94, 0.45);
+  }
+}
+
 /* Modais de Entrada, Compartilhar e Histórico */
 .modal-join-window {
   max-width: 480px;

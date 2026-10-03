@@ -65,6 +65,7 @@ class SergioApp {
     this.updateUndoRedoUI();
     this.setupMobileNav();
     this.renderQuickMeasureStrip();
+    this.setupPwa();
 
     // Pré-gera a peça toda na memória RAM (~5ms)
     this.preparePieceAudio();
@@ -305,7 +306,8 @@ class SergioApp {
       measureQuickStrip: document.getElementById('measureQuickStrip'),
       measuresSection: document.getElementById('measuresSection'),
       stageContainer: document.querySelector('.stage-container'),
-      headerRightArea: document.getElementById('headerRightArea')
+      headerRightArea: document.getElementById('headerRightArea'),
+      btnInstallPwa: document.getElementById('btnInstallPwa')
     };
   }
 
@@ -749,6 +751,88 @@ class SergioApp {
         this.renderer?.resize();
       }, 50);
     }
+  }
+
+  // =========================================================================
+  // SUPORTE A PWA (OFFLINE & INSTALAÇÃO)
+  // =========================================================================
+
+  setupPwa() {
+    // 1. Registro do Service Worker para suporte offline
+    if ('serviceWorker' in navigator && (window.location.protocol === 'https:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+          .then((reg) => {
+            console.log('[PWA] Service Worker ativo com escopo:', reg.scope);
+          })
+          .catch((err) => {
+            console.warn('[PWA] Falha ao registrar Service Worker:', err);
+          });
+      });
+    }
+
+    // 2. Intercepta 'beforeinstallprompt' para botão de instalação personalizado
+    let deferredPrompt = null;
+    const btnInstall = this.dom.btnInstallPwa;
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      if (btnInstall) {
+        btnInstall.style.display = 'inline-flex';
+        btnInstall.classList.add('can-install');
+      }
+    });
+
+    if (btnInstall) {
+      btnInstall.addEventListener('click', async () => {
+        if (deferredPrompt) {
+          deferredPrompt.prompt();
+          const { outcome } = await deferredPrompt.userChoice;
+          if (outcome === 'accepted') {
+            this.showToast('Sérgio Simulator instalado com sucesso!', '🎉');
+            btnInstall.style.display = 'none';
+          }
+          deferredPrompt = null;
+        } else {
+          // Detecta se já está instalado ou se é iOS
+          const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+          const isStandalone = window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches;
+
+          if (isStandalone) {
+            this.showToast('Aplicativo já instalado e operando offline!', '✅');
+          } else if (isIos) {
+            alert('Para instalar no iPhone/iPad:\n1. Toque no botão Compartilhar (⎋) do Safari\n2. Role para baixo e selecione "Adicionar à Tela de Início"');
+          } else {
+            this.showToast('App pronto para uso offline! Verifique o menu do navegador para instalar.', '📲');
+          }
+        }
+      });
+    }
+
+    window.addEventListener('appinstalled', () => {
+      this.showToast('Sérgio Simulator instalado!', '✅');
+      if (btnInstall) btnInstall.style.display = 'none';
+    });
+
+    // 3. Monitoramento de Conexão Online / Offline
+    const updateOnlineStatus = () => {
+      if (!navigator.onLine) {
+        this.showToast('Modo Offline ativado • Peças salvas no aparelho', '📡');
+        if (this.dom.cloudStatusPill) {
+          this.dom.cloudStatusPill.className = 'cloud-status-pill offline';
+          if (this.dom.cloudStatusText) this.dom.cloudStatusText.textContent = 'Offline';
+        }
+      } else {
+        if (this.dom.cloudStatusPill) {
+          this.dom.cloudStatusPill.className = 'cloud-status-pill synced';
+          if (this.dom.cloudStatusText) this.dom.cloudStatusText.textContent = 'Online';
+        }
+      }
+    };
+
+    window.addEventListener('online', updateOnlineStatus);
+    window.addEventListener('offline', updateOnlineStatus);
   }
 
   formatTime(sec) {

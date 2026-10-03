@@ -14,6 +14,11 @@
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   
   <link rel="stylesheet" href="/src/style.css">
+  
+  <!-- PWA & Offline Manifest -->
+  <link rel="manifest" href="/manifest.json">
+  <link rel="icon" type="image/svg+xml" href="/icons/icon.svg">
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
 </head>
 <body>
   <div id="app" class="app-container">
@@ -71,6 +76,10 @@
 
           <button type="button" id="btnSharePiece" class="btn-share-highlight" title="Compartilhar Peça e Colaborar em Tempo Real">
             <span class="btn-icon">🔗</span> Compartilhar
+          </button>
+
+          <button type="button" id="btnInstallPwa" class="btn-text-action btn-install-app" title="Instalar aplicativo no aparelho para uso offline sem internet">
+            <span class="btn-icon">📲</span> Instalar App
           </button>
         </div>
 
