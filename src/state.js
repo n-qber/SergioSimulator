@@ -52,6 +52,9 @@ class PieceState {
     this.id = data.id || `piece-${Date.now()}`;
     this.name = data.name !== undefined ? data.name : "Peça nº 1";
     this.description = data.description || "";
+    this.ownerId = data.ownerId || null;
+    this.ownerName = data.ownerName || null;
+    this.access = data.access || 'edit_link';
     
     // BPM oficial de apresentação da peça (da partitura/nuvem)
     this.presentationBpm = Math.max(20, Math.min(400, Number(data.presentationBpm || data.baseBpm) || 120));
@@ -204,7 +207,7 @@ class PieceState {
     }
 
     this.recalculateTimings();
-    this.notify(`Adicionou compasso (${newMeasure.beats}/${newMeasure.beatUnit})`);
+    this.notify(`Adicionou compasso (${newMeasure.beats}T)`);
     return newMeasure;
   }
 
@@ -380,6 +383,9 @@ class PieceState {
         description: this.description || "",
         presentationBpm: this.presentationBpm,
         baseBpm: this.baseBpm,
+        ownerId: this.ownerId || null,
+        ownerName: this.ownerName || null,
+        access: this.access || 'edit_link',
         measures: this.measures.map(m => ({ ...m })),
         groups: this.groups.map(g => ({ ...g })),
         updatedAt: new Date().toISOString()
@@ -486,6 +492,41 @@ class PieceState {
     this.saveCurrentPieceToLibrary();
 
     this.notify(`Criou nova peça '${this.name}'`);
+  }
+
+  // Clona a peça atual criando uma cópia independente (Fork / Fazer Cópia)
+  duplicateCurrentPiece(customName = null) {
+    if (this.measures && this.measures.length > 0) {
+      this.saveCurrentPieceToLibrary();
+    }
+
+    const newId = `piece-${Date.now()}`;
+    this.id = newId;
+    this.name = customName || `${this.name} (Cópia)`;
+    this.ownerId = null;
+    this.access = 'edit_link';
+
+    // Gera novos IDs para os compassos
+    this.measures = this.measures.map((m, idx) => ({
+      ...m,
+      id: `m-${Date.now()}-${idx}-${Math.random().toString(36).substr(2, 4)}`
+    }));
+
+    // Gera novos IDs para os grupos
+    this.groups = this.groups.map((g, idx) => ({
+      ...g,
+      id: `g-${Date.now()}-${idx}-${Math.random().toString(36).substr(2, 4)}`
+    }));
+
+    this.recalculateTimings();
+    this.currentSnapshot = this.getSnapshot();
+    this.undoStack = [];
+    this.redoStack = [];
+
+    this.saveToLocalStorage();
+    this.saveCurrentPieceToLibrary();
+    this.notify(`Criou uma cópia pessoal '${this.name}'`);
+    return newId;
   }
 
   // Atualizar compasso existente
@@ -595,10 +636,9 @@ class PieceState {
         effectiveBpm = m.customBpm;
       }
 
-      // Duração de um tempo em segundos:
-      // O andamento é referente à semínima (beatUnit = 4).
-      // Se beatUnit for 8 (colcheia), a duração é proporcional.
-      const beatDuration = (60 / effectiveBpm) * (4 / m.beatUnit);
+      // Duração de um tempo (pulso) em segundos:
+      // O andamento (BPM) define diretamente a frequência dos tempos/pulsos.
+      const beatDuration = 60 / effectiveBpm;
       const measureDuration = m.beats * beatDuration;
 
       for (let r = 0; r < m.repeat; r++) {

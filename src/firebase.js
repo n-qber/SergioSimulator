@@ -5,6 +5,7 @@
 
 import { initializeApp, getApps } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
 
 const env = (typeof import.meta !== 'undefined' && import.meta.env) ? import.meta.env : {};
 
@@ -19,12 +20,14 @@ const firebaseConfig = {
 
 let app = null;
 let db = null;
+let auth = null;
 
 try {
   app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
   db = getFirestore(app);
+  auth = getAuth(app);
 } catch (err) {
-  console.error("Falha ao inicializar o Firebase Firestore:", err);
+  console.error("Falha ao inicializar o Firebase:", err);
 }
 
-export { app, db, firebaseConfig };
+export { app, db, auth, firebaseConfig };

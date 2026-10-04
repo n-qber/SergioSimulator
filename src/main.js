@@ -8,6 +8,7 @@ import { audio } from './audio.js';
 import { PRESETS } from './presets.js';
 import { DJRunnerRenderer } from './renderer.js';
 import { collab, DEFAULT_AVATAR_COLORS } from './collab.js';
+import { authService } from './auth.js';
 
 class SergioApp {
   constructor() {
@@ -20,6 +21,8 @@ class SergioApp {
     this.audio = audio;
     this.state = state;
     this.collab = collab;
+    this.authService = authService;
+    this.authModalMode = 'login';
     this.pieceAudioBuffer = null;
     this.isRenderingBuffer = false;
     this.pendingBufferRegen = false;
@@ -58,7 +61,9 @@ class SergioApp {
     this.renderMeasuresList();
     this.updateHUD(0);
     this.setupCollab();
+    this.setupAuth();
     this.setupShareModal();
+    this.setupAccessControlUi();
     this.setupHistoryModal();
     this.setupJoinModal();
     this.updateBpmPracticeUI();
@@ -161,6 +166,21 @@ class SergioApp {
       historyBadgeCount: document.getElementById('historyBadgeCount'),
       btnSharePiece: document.getElementById('btnSharePiece'),
 
+      // Perfil e Autenticação
+      btnAuth: document.getElementById('btnAuth'),
+      userAuthAvatar: document.getElementById('userAuthAvatar'),
+      userAuthLabel: document.getElementById('userAuthLabel'),
+      userMenuDropdown: document.getElementById('userMenuDropdown'),
+      userMenuAvatarLarge: document.getElementById('userMenuAvatarLarge'),
+      userMenuName: document.getElementById('userMenuName'),
+      userMenuEmail: document.getElementById('userMenuEmail'),
+      btnUserCloudPieces: document.getElementById('btnUserCloudPieces'),
+      btnUserLogout: document.getElementById('btnUserLogout'),
+
+      // Modo Leitura / Ouvinte
+      readOnlyBanner: document.getElementById('readOnlyBanner'),
+      btnForkPiece: document.getElementById('btnForkPiece'),
+
       // Modal de Compartilhar
       modalSharePiece: document.getElementById('modalSharePiece'),
       btnShareModalClose: document.getElementById('btnShareModalClose'),
@@ -173,6 +193,38 @@ class SergioApp {
       avatarColorPicker: document.getElementById('avatarColorPicker'),
       collabUsersList: document.getElementById('collabUsersList'),
       onlineCountBadge: document.getElementById('onlineCountBadge'),
+
+      // Controle de Acesso no Modal de Compartilhar
+      radioAccessPrivate: document.getElementById('radioAccessPrivate'),
+      radioAccessView: document.getElementById('radioAccessView'),
+      radioAccessEdit: document.getElementById('radioAccessEdit'),
+      accessLoginRequiredNotice: document.getElementById('accessLoginRequiredNotice'),
+      btnNoticeLogin: document.getElementById('btnNoticeLogin'),
+      labelShareUrl: document.getElementById('labelShareUrl'),
+      hintShareUrl: document.getElementById('hintShareUrl'),
+
+      // Modal de Autenticação
+      modalAuth: document.getElementById('modalAuth'),
+      btnAuthModalClose: document.getElementById('btnAuthModalClose'),
+      btnGoogleSignIn: document.getElementById('btnGoogleSignIn'),
+      formAuthEmail: document.getElementById('formAuthEmail'),
+      inputAuthName: document.getElementById('inputAuthName'),
+      inputAuthEmail: document.getElementById('inputAuthEmail'),
+      inputAuthPassword: document.getElementById('inputAuthPassword'),
+      btnForgotPass: document.getElementById('btnForgotPass'),
+      btnAuthSubmit: document.getElementById('btnAuthSubmit'),
+      btnAuthToggleMode: document.getElementById('btnAuthToggleMode'),
+      authAlertBox: document.getElementById('authAlertBox'),
+      groupAuthName: document.getElementById('groupAuthName'),
+      groupAuthPassword: document.getElementById('groupAuthPassword'),
+      authModalTitle: document.getElementById('authModalTitle'),
+      authModalSubtitle: document.getElementById('authModalSubtitle'),
+      authTogglePrompt: document.getElementById('authTogglePrompt'),
+
+      // Modal de Acesso Negado
+      modalAccessDenied: document.getElementById('modalAccessDenied'),
+      btnAccessDeniedGoHome: document.getElementById('btnAccessDeniedGoHome'),
+      btnAccessDeniedLogin: document.getElementById('btnAccessDeniedLogin'),
 
       // Modal de Entrada na Sessão Compartilhada
       modalJoinCollab: document.getElementById('modalJoinCollab'),
@@ -596,10 +648,9 @@ class SergioApp {
 
       if (pos.measure.tempoMode === "ratio") {
         if (pos.measure.ratioNum === 1 && pos.measure.ratioDen === 1) {
-          this.dom.hudTempoRatio.textContent = "1:1";
+          this.dom.hudTempoRatio.textContent = "1/1";
         } else {
-          const mult = (pos.measure.ratioNum / pos.measure.ratioDen).toFixed(2);
-          this.dom.hudTempoRatio.textContent = `${pos.measure.ratioNum}/${pos.measure.ratioDen} (${mult}x)`;
+          this.dom.hudTempoRatio.textContent = `${pos.measure.ratioNum}/${pos.measure.ratioDen}`;
         }
       } else {
         this.dom.hudTempoRatio.textContent = "Fixo";
@@ -705,7 +756,7 @@ class SergioApp {
       btn.style.setProperty('--m-color', mColor);
 
       const hasNick = m.nickname && m.nickname.trim();
-      const label = hasNick ? m.nickname : `${m.beats}/${m.beatUnit}`;
+      const label = hasNick ? m.nickname : `${m.beats}T`;
       const repeatInfo = ((m.repeat || 1) > 1) ? `<span class="qm-rep">×${m.repeat}</span>` : '';
 
       btn.innerHTML = `
@@ -895,6 +946,10 @@ class SergioApp {
 
     // Botão de promover BPM atual para oficial da apresentação na nuvem
     this.dom.btnPromotePresentationBpm?.addEventListener('click', () => {
+      if (state.isReadOnly) {
+        this.showToast('Esta peça está em modo apenas leitura. Crie uma cópia pessoal para salvar alterações.', '🔒');
+        return;
+      }
       state.setPresentationBpm(state.baseBpm);
       syncBpmInput();
       this.showToast(`BPM oficial da apresentação definido como ${state.presentationBpm} na nuvem!`, '☁️');
@@ -1690,7 +1745,7 @@ class SergioApp {
       let tempoDesc = '';
       if (m.tempoMode === "ratio") {
         tempoDesc = (m.ratioNum === 1 && m.ratioDen === 1) 
-          ? `${Math.round(timing.effectiveBpm)} BPM (Base)`
+          ? `${Math.round(timing.effectiveBpm)} BPM (1/1)`
           : `${Math.round(timing.effectiveBpm)} BPM (${m.ratioNum}/${m.ratioDen})`;
       } else {
         tempoDesc = `${Math.round(timing.effectiveBpm)} BPM (Fixo)`;
@@ -1719,7 +1774,7 @@ class SergioApp {
         ${titleHtml}
 
         <div class="measure-card-details">
-          <span class="measure-card-meter">${m.beats}/${m.beatUnit}</span>
+          <span class="measure-card-meter">${m.beats}T</span>
           <span class="measure-card-tempo">${tempoDesc}</span>
         </div>
 
@@ -1948,8 +2003,22 @@ class SergioApp {
       });
     });
 
-    this.dom.editRatioNum.addEventListener('input', () => this.updateModalCalculatedBpm());
-    this.dom.editRatioDen.addEventListener('input', () => this.updateModalCalculatedBpm());
+    const syncRatioPresetButtons = () => {
+      const num = parseInt(this.dom.editRatioNum.value, 10);
+      const den = parseInt(this.dom.editRatioDen.value, 10);
+      ratioBtns.forEach(b => {
+        b.classList.toggle('active', parseInt(b.dataset.num, 10) === num && parseInt(b.dataset.den, 10) === den);
+      });
+    };
+
+    this.dom.editRatioNum.addEventListener('input', () => {
+      this.updateModalCalculatedBpm();
+      syncRatioPresetButtons();
+    });
+    this.dom.editRatioDen.addEventListener('input', () => {
+      this.updateModalCalculatedBpm();
+      syncRatioPresetButtons();
+    });
 
     const swatches = modal.querySelectorAll('.color-swatch-btn');
     swatches.forEach(btn => {
@@ -1961,7 +2030,8 @@ class SergioApp {
     });
 
     this.dom.editColorPicker.addEventListener('input', () => {
-      swatches.forEach(b => b.classList.remove('selected'));
+      const val = this.dom.editColorPicker.value.toLowerCase();
+      swatches.forEach(b => b.classList.toggle('selected', b.dataset.color?.toLowerCase() === val));
     });
 
     this.dom.btnDeleteMeasureModal.addEventListener('click', () => {
@@ -1997,7 +2067,7 @@ class SergioApp {
       state.updateMeasure(idx, {
         nickname: this.dom.editNickname.value,
         beats: parseInt(this.dom.editBeats.value, 10) || 4,
-        beatUnit: parseInt(this.dom.editBeatUnit.value, 10) || 4,
+        beatUnit: 4,
         repeat: Math.max(1, Math.min(999, parseInt(this.dom.editRepeat.value, 10) || 1)),
         tempoMode: tempoMode,
         ratioNum: num,
@@ -2031,7 +2101,7 @@ class SergioApp {
     this.dom.modalMeasureIdx.textContent = `Compasso ${index + 1}`;
     this.dom.editNickname.value = m.nickname || '';
     this.dom.editBeats.value = m.beats;
-    this.dom.editBeatUnit.value = m.beatUnit;
+    if (this.dom.editBeatUnit) this.dom.editBeatUnit.value = m.beatUnit || 4;
     this.dom.editRepeat.value = m.repeat || 1;
 
     if (m.tempoMode === 'fixed') {
@@ -2045,6 +2115,13 @@ class SergioApp {
     this.dom.editRatioDen.value = m.ratioDen || 1;
     this.dom.editCustomBpm.value = m.customBpm || state.baseBpm;
     this.dom.editColorPicker.value = m.color || '#ff334b';
+
+    const curNum = m.ratioNum || 1;
+    const curDen = m.ratioDen || 1;
+    const ratioBtns = this.dom.modalMeasureEdit.querySelectorAll('.btn-ratio-preset, .preset-ratio-btn');
+    ratioBtns.forEach(btn => {
+      btn.classList.toggle('active', parseInt(btn.dataset.num, 10) === curNum && parseInt(btn.dataset.den, 10) === curDen);
+    });
 
     const swatches = this.dom.modalMeasureEdit.querySelectorAll('.color-swatch-btn');
     swatches.forEach(s => {
@@ -2088,6 +2165,11 @@ class SergioApp {
         btn.classList.add('selected');
         this.dom.newGroupColorPicker.value = btn.dataset.color;
       });
+    });
+
+    this.dom.newGroupColorPicker.addEventListener('input', () => {
+      const val = this.dom.newGroupColorPicker.value.toLowerCase();
+      colorBtns.forEach(b => b.classList.toggle('selected', b.dataset.color?.toLowerCase() === val));
     });
 
     this.dom.formCreateGroup.addEventListener('submit', (e) => {
@@ -2219,6 +2301,34 @@ class SergioApp {
       select.appendChild(libraryGroup);
     }
 
+    // ☁️ Grupo de Peças na Nuvem (se logado)
+    if (this.authService && this.authService.isLoggedIn()) {
+      collab.getUserCloudPieces().then(cloudPieces => {
+        if (!cloudPieces || cloudPieces.length === 0) return;
+        
+        let cloudGroup = select.querySelector('optgroup[data-type="cloud"]');
+        if (!cloudGroup) {
+          cloudGroup = document.createElement('optgroup');
+          cloudGroup.label = '☁️ Minhas Peças na Nuvem';
+          cloudGroup.dataset.type = 'cloud';
+          select.insertBefore(cloudGroup, presetsGroup);
+        } else {
+          cloudGroup.innerHTML = '';
+        }
+
+        cloudPieces.forEach(p => {
+          const opt = document.createElement('option');
+          opt.value = `cloud_${p.id}`;
+          const isCurrent = p.id === state.id;
+          const count = p.measures?.length || 0;
+          const lockIcon = p.access === 'private' ? '🔒 ' : (p.access === 'view_link' ? '🎧 ' : '✏️ ');
+          opt.textContent = `${isCurrent ? '▶ ' : ''}${lockIcon}${p.name || 'Sem Nome'} (${count} comp.)`;
+          if (isCurrent) opt.selected = true;
+          cloudGroup.appendChild(opt);
+        });
+      }).catch(() => {});
+    }
+
     // 🎼 Grupo de Estudos Didáticos
     const presetsGroup = document.createElement('optgroup');
     presetsGroup.label = 'Estudos Didáticos';
@@ -2239,6 +2349,21 @@ class SergioApp {
         if (val === '__new_piece__' || val === '__empty__') {
           select.value = '';
           this.openConfirmNewModal();
+          return;
+        }
+        if (val.startsWith('cloud_')) {
+          const pieceId = val.replace('cloud_', '');
+          if (pieceId !== state.id) {
+            this.pausePlayback();
+            collab.connectToPiece(pieceId, null).then((ok) => {
+              if (ok) {
+                this.seekTo(0);
+                this.closeMeasureToolbar();
+                this.showToast(`Peça da nuvem carregada!`, '☁️');
+              }
+            });
+          }
+          this.initPresetsDropdown();
           return;
         }
         if (val.startsWith('lib_')) {
@@ -2316,6 +2441,14 @@ class SergioApp {
       this.updateSyncStatus(status, text);
     };
 
+    collab.onPermissionChange = (info) => {
+      this.handleCollabPermissionChanged(info);
+    };
+
+    collab.onAccessDenied = (info) => {
+      this.handleCollabAccessDenied(info);
+    };
+
     // Conexão inicial: Se houver ?piece= na URL, conecta àquela peça; se não, sincroniza com o ID da peça atual
     const urlPieceId = collab.getPieceIdFromUrl();
     if (urlPieceId) {
@@ -2333,7 +2466,7 @@ class SergioApp {
 
     pill.className = `cloud-status-pill ${status}`;
     label.textContent = text || (status === 'synced' ? 'Nuvem OK' : 'Sincronizando...');
-    pill.title = `Firebase Firestore (São Paulo): ${text}`;
+    pill.title = text || (status === 'synced' ? 'Nuvem sincronizada' : 'Sincronizando...');
   }
 
   renderPresenceAvatars(activeUsers) {
@@ -2464,6 +2597,7 @@ class SergioApp {
     }
     this.updateCollabAvatarPreview();
     this.renderCollabModalUsers(collab.activeCollaborators);
+    this.updateShareModalLinkDisplay();
 
     this.dom.modalSharePiece.style.display = 'flex';
   }
@@ -2471,6 +2605,340 @@ class SergioApp {
   closeShareModal() {
     if (this.dom.modalSharePiece) {
       this.dom.modalSharePiece.style.display = 'none';
+    }
+  }
+
+  /* ==========================================================================
+     SISTEMA DE AUTENTICAÇÃO & CONTROLE DE ACESSO (GOOGLE, E-MAIL & CONVIDADO)
+     ========================================================================== */
+
+  setupAuth() {
+    this.authService.onUserChange((user, isLoggedIn) => {
+      this.updateAuthUi(user, isLoggedIn);
+      this.initPresetsDropdown();
+    });
+
+    // Abrir menu de usuário ou modal de login ao clicar no botão do cabeçalho
+    this.dom.btnAuth?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (this.authService.isLoggedIn()) {
+        const isHidden = !this.dom.userMenuDropdown || this.dom.userMenuDropdown.style.display === 'none';
+        if (this.dom.userMenuDropdown) {
+          this.dom.userMenuDropdown.style.display = isHidden ? 'flex' : 'none';
+        }
+      } else {
+        this.openAuthModal('login');
+      }
+    });
+
+    // Fechar dropdown de usuário ao clicar fora
+    document.addEventListener('click', (e) => {
+      if (this.dom.userMenuDropdown && !this.dom.userMenuDropdown.contains(e.target) && e.target !== this.dom.btnAuth) {
+        this.dom.userMenuDropdown.style.display = 'none';
+      }
+    });
+
+    // Botão de Logout
+    this.dom.btnUserLogout?.addEventListener('click', async () => {
+      try {
+        await this.authService.logout();
+        if (this.dom.userMenuDropdown) this.dom.userMenuDropdown.style.display = 'none';
+        this.showToast('Você saiu da sua conta', '👋');
+      } catch (err) {
+        this.showToast(err.message, '⚠️');
+      }
+    });
+
+    // Botão "Minhas Peças na Nuvem" no menu de usuário
+    this.dom.btnUserCloudPieces?.addEventListener('click', () => {
+      if (this.dom.userMenuDropdown) this.dom.userMenuDropdown.style.display = 'none';
+      if (this.dom.selectPreset) {
+        this.dom.selectPreset.focus();
+        this.showToast('Selecione uma peça na lista de Peças Salvas na Nuvem', '☁️');
+      }
+    });
+
+    // Modal de Autenticação
+    this.dom.btnAuthModalClose?.addEventListener('click', () => this.closeAuthModal());
+    this.dom.modalAuth?.addEventListener('click', (e) => {
+      if (e.target === this.dom.modalAuth) this.closeAuthModal();
+    });
+
+    this.dom.btnGoogleSignIn?.addEventListener('click', () => this.handleGoogleLogin());
+    this.dom.formAuthEmail?.addEventListener('submit', (e) => this.handleEmailAuthSubmit(e));
+    this.dom.btnAuthToggleMode?.addEventListener('click', () => this.toggleAuthModalMode());
+    this.dom.btnForgotPass?.addEventListener('click', () => this.handleForgotPassword());
+
+    // Botão de duplicar peça pessoal no banner de modo ouvinte
+    this.dom.btnForkPiece?.addEventListener('click', () => this.handleForkCurrentPiece());
+
+    // Modal de Acesso Negado
+    this.dom.btnAccessDeniedGoHome?.addEventListener('click', () => {
+      if (this.dom.modalAccessDenied) this.dom.modalAccessDenied.style.display = 'none';
+      state.resetToDefault();
+      collab.connectToPiece(state.id, state);
+      this.seekTo(0);
+      this.showToast('Carregou estudo padrão', '🔄');
+    });
+
+    this.dom.btnAccessDeniedLogin?.addEventListener('click', () => {
+      if (this.dom.modalAccessDenied) this.dom.modalAccessDenied.style.display = 'none';
+      this.openAuthModal('login');
+    });
+
+    // Aviso de login no seletor de acesso
+    this.dom.btnNoticeLogin?.addEventListener('click', () => {
+      this.closeShareModal();
+      this.openAuthModal('login');
+    });
+  }
+
+  updateAuthUi(user, isLoggedIn) {
+    if (isLoggedIn && user) {
+      this.dom.btnAuth?.classList.add('logged-in');
+      const name = this.authService.getDisplayName();
+      if (this.dom.userAuthLabel) this.dom.userAuthLabel.textContent = name;
+      
+      const photo = this.authService.getPhotoURL();
+      if (this.dom.userAuthAvatar) {
+        if (photo) {
+          this.dom.userAuthAvatar.innerHTML = `<img src="${photo}" alt="${name}">`;
+        } else {
+          this.dom.userAuthAvatar.textContent = (name || 'U').charAt(0).toUpperCase();
+        }
+      }
+
+      if (this.dom.userMenuName) this.dom.userMenuName.textContent = name;
+      if (this.dom.userMenuEmail) this.dom.userMenuEmail.textContent = user.email || 'Conta Conectada';
+      if (this.dom.userMenuAvatarLarge) {
+        if (photo) {
+          this.dom.userMenuAvatarLarge.innerHTML = `<img src="${photo}" alt="${name}">`;
+        } else {
+          this.dom.userMenuAvatarLarge.textContent = (name || 'U').charAt(0).toUpperCase();
+        }
+      }
+    } else {
+      this.dom.btnAuth?.classList.remove('logged-in');
+      if (this.dom.userAuthLabel) this.dom.userAuthLabel.textContent = 'Entrar';
+      if (this.dom.userAuthAvatar) this.dom.userAuthAvatar.innerHTML = '👤';
+      if (this.dom.userMenuDropdown) this.dom.userMenuDropdown.style.display = 'none';
+    }
+  }
+
+  openAuthModal(mode = 'login') {
+    this.authModalMode = mode;
+    this.clearAuthAlert();
+    if (this.dom.formAuthEmail) this.dom.formAuthEmail.reset();
+
+    if (mode === 'register') {
+      if (this.dom.authModalTitle) this.dom.authModalTitle.textContent = 'Criar Nova Conta';
+      if (this.dom.authModalSubtitle) this.dom.authModalSubtitle.textContent = 'Cadastre-se gratuitamente para criar peças privadas e salvar na nuvem.';
+      if (this.dom.groupAuthName) this.dom.groupAuthName.style.display = 'block';
+      if (this.dom.groupAuthPassword) this.dom.groupAuthPassword.style.display = 'block';
+      if (this.dom.btnForgotPass) this.dom.btnForgotPass.style.display = 'none';
+      if (this.dom.inputAuthPassword) {
+        this.dom.inputAuthPassword.placeholder = 'Crie uma senha (mínimo 8 caracteres)';
+        this.dom.inputAuthPassword.minLength = 8;
+        this.dom.inputAuthPassword.autocomplete = 'new-password';
+      }
+      if (this.dom.btnAuthSubmit) this.dom.btnAuthSubmit.textContent = 'Criar Conta';
+      if (this.dom.authTogglePrompt) this.dom.authTogglePrompt.textContent = 'Já tem uma conta?';
+      if (this.dom.btnAuthToggleMode) this.dom.btnAuthToggleMode.textContent = 'Fazer Login';
+    } else if (mode === 'forgot') {
+      if (this.dom.authModalTitle) this.dom.authModalTitle.textContent = 'Recuperar Senha';
+      if (this.dom.authModalSubtitle) this.dom.authModalSubtitle.textContent = 'Digite seu e-mail para receber um link de redefinição de senha.';
+      if (this.dom.groupAuthName) this.dom.groupAuthName.style.display = 'none';
+      if (this.dom.groupAuthPassword) this.dom.groupAuthPassword.style.display = 'none';
+      if (this.dom.btnAuthSubmit) this.dom.btnAuthSubmit.textContent = 'Enviar Link de Redefinição';
+      if (this.dom.authTogglePrompt) this.dom.authTogglePrompt.textContent = 'Lembrou sua senha?';
+      if (this.dom.btnAuthToggleMode) this.dom.btnAuthToggleMode.textContent = 'Voltar ao Login';
+    } else {
+      if (this.dom.authModalTitle) this.dom.authModalTitle.textContent = 'Entrar na Conta';
+      if (this.dom.authModalSubtitle) this.dom.authModalSubtitle.textContent = 'Acesse suas peças privadas em qualquer aparelho e salve suas composições na nuvem.';
+      if (this.dom.groupAuthName) this.dom.groupAuthName.style.display = 'none';
+      if (this.dom.groupAuthPassword) this.dom.groupAuthPassword.style.display = 'block';
+      if (this.dom.btnForgotPass) this.dom.btnForgotPass.style.display = 'inline-block';
+      if (this.dom.inputAuthPassword) {
+        this.dom.inputAuthPassword.placeholder = 'Sua senha';
+        this.dom.inputAuthPassword.removeAttribute('minlength');
+        this.dom.inputAuthPassword.autocomplete = 'current-password';
+      }
+      if (this.dom.btnAuthSubmit) this.dom.btnAuthSubmit.textContent = 'Entrar';
+      if (this.dom.authTogglePrompt) this.dom.authTogglePrompt.textContent = 'Não tem uma conta?';
+      if (this.dom.btnAuthToggleMode) this.dom.btnAuthToggleMode.textContent = 'Criar Conta';
+    }
+
+    if (this.dom.modalAuth) {
+      this.dom.modalAuth.style.display = 'flex';
+      setTimeout(() => this.dom.inputAuthEmail?.focus(), 100);
+    }
+  }
+
+  closeAuthModal() {
+    if (this.dom.modalAuth) {
+      this.dom.modalAuth.style.display = 'none';
+    }
+  }
+
+  toggleAuthModalMode() {
+    if (this.authModalMode === 'login') {
+      this.openAuthModal('register');
+    } else {
+      this.openAuthModal('login');
+    }
+  }
+
+  showAuthAlert(message, type = 'error') {
+    if (!this.dom.authAlertBox) return;
+    this.dom.authAlertBox.textContent = message;
+    this.dom.authAlertBox.className = `auth-alert ${type}`;
+    this.dom.authAlertBox.style.display = 'block';
+  }
+
+  clearAuthAlert() {
+    if (!this.dom.authAlertBox) return;
+    this.dom.authAlertBox.style.display = 'none';
+    this.dom.authAlertBox.textContent = '';
+  }
+
+  async handleGoogleLogin() {
+    this.clearAuthAlert();
+    try {
+      const user = await this.authService.loginWithGoogle();
+      this.closeAuthModal();
+      this.showToast(`Bem-vindo, ${user.displayName || 'Músico'}!`, '👋');
+      await collab.claimOwnership();
+      this.initPresetsDropdown();
+    } catch (err) {
+      this.showAuthAlert(err.message, 'error');
+    }
+  }
+
+  async handleEmailAuthSubmit(e) {
+    if (e) e.preventDefault();
+    this.clearAuthAlert();
+
+    const email = this.dom.inputAuthEmail?.value || '';
+    const password = this.dom.inputAuthPassword?.value || '';
+    const name = this.dom.inputAuthName?.value || '';
+
+    if (!email) {
+      this.showAuthAlert('Por favor, informe seu e-mail.', 'error');
+      return;
+    }
+
+    if (this.authModalMode === 'forgot') {
+      try {
+        await this.authService.resetPassword(email);
+        this.showAuthAlert('E-mail de redefinição enviado! Verifique sua caixa de entrada.', 'success');
+      } catch (err) {
+        this.showAuthAlert(err.message, 'error');
+      }
+      return;
+    }
+
+    if (!password) {
+      this.showAuthAlert('Por favor, digite sua senha.', 'error');
+      return;
+    }
+
+    try {
+      if (this.authModalMode === 'register') {
+        if (password.length < 8) {
+          this.showAuthAlert('A senha deve ter no mínimo 8 caracteres.', 'error');
+          return;
+        }
+        const user = await this.authService.registerWithEmail(email, password, name);
+        this.closeAuthModal();
+        this.showToast(`Conta criada! Bem-vindo, ${user.displayName || 'Músico'}!`, '🎉');
+        await collab.claimOwnership();
+        this.initPresetsDropdown();
+      } else {
+        const user = await this.authService.loginWithEmail(email, password);
+        this.closeAuthModal();
+        this.showToast(`Login realizado! Bem-vindo, ${user.displayName || 'Músico'}!`, '👋');
+        await collab.claimOwnership();
+        this.initPresetsDropdown();
+      }
+    } catch (err) {
+      this.showAuthAlert(err.message, 'error');
+    }
+  }
+
+  handleForgotPassword() {
+    this.openAuthModal('forgot');
+  }
+
+  handleForkCurrentPiece() {
+    const newId = state.duplicateCurrentPiece();
+    collab.connectToPiece(newId, state);
+    this.seekTo(0);
+    this.showToast(`Cópia criada: '${state.name}'! Agora você pode editar.`, '🍴');
+  }
+
+  setupAccessControlUi() {
+    const radios = [
+      this.dom.radioAccessPrivate,
+      this.dom.radioAccessView,
+      this.dom.radioAccessEdit
+    ];
+
+    radios.forEach(radio => {
+      radio?.addEventListener('change', async (e) => {
+        if (!e.target.checked) return;
+        const val = e.target.value;
+
+        if (val === 'private' && !this.authService.isLoggedIn()) {
+          e.target.checked = false;
+          if (this.dom.radioAccessEdit) this.dom.radioAccessEdit.checked = true;
+          if (this.dom.accessLoginRequiredNotice) {
+            this.dom.accessLoginRequiredNotice.style.display = 'flex';
+          }
+          return;
+        }
+
+        try {
+          await collab.updatePieceAccess(val);
+          this.updateShareModalLinkDisplay();
+          this.showToast('Visibilidade da peça atualizada!', '🔒');
+        } catch (err) {
+          this.showToast('Erro ao atualizar visibilidade na nuvem.', '⚠️');
+        }
+      });
+    });
+  }
+
+  updateShareModalLinkDisplay() {
+    const access = collab.currentPieceAccess;
+    if (this.dom.radioAccessPrivate) this.dom.radioAccessPrivate.checked = (access === 'private');
+    if (this.dom.radioAccessView) this.dom.radioAccessView.checked = (access === 'view_link');
+    if (this.dom.radioAccessEdit) this.dom.radioAccessEdit.checked = (access === 'edit_link' || !access);
+
+    if (this.dom.accessLoginRequiredNotice) {
+      this.dom.accessLoginRequiredNotice.style.display = this.authService.isLoggedIn() ? 'none' : 'flex';
+    }
+
+    if (access === 'private') {
+      if (this.dom.labelShareUrl) this.dom.labelShareUrl.textContent = 'Link Privado (Apenas você pode abrir)';
+      if (this.dom.hintShareUrl) this.dom.hintShareUrl.textContent = 'Esta peça é privada. Outras pessoas que abrirem este link verão aviso de acesso restrito.';
+    } else if (access === 'view_link') {
+      if (this.dom.labelShareUrl) this.dom.labelShareUrl.textContent = 'Link de Ouvinte (Apenas Leitura)';
+      if (this.dom.hintShareUrl) this.dom.hintShareUrl.textContent = 'Músicos com este link poderão ouvir e treinar, sem poder alterar sua partitura.';
+    } else {
+      if (this.dom.labelShareUrl) this.dom.labelShareUrl.textContent = 'Link de Colaboração (Qualquer pessoa pode editar)';
+      if (this.dom.hintShareUrl) this.dom.hintShareUrl.textContent = 'Músicos com este link poderão compor e editar junto com você em tempo real.';
+    }
+  }
+
+  handleCollabPermissionChanged(info) {
+    if (this.dom.readOnlyBanner) {
+      this.dom.readOnlyBanner.style.display = info.isReadOnly ? 'flex' : 'none';
+    }
+  }
+
+  handleCollabAccessDenied(info) {
+    if (this.dom.modalAccessDenied) {
+      this.dom.modalAccessDenied.style.display = 'flex';
     }
   }
 

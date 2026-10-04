@@ -607,9 +607,11 @@ export class DJRunnerRenderer {
       // 4. Métrica e Andamento Secundários (Rodapé do compasso)
       const badgeY = bottomY - 10;
       ctx.textAlign = "left";
-      ctx.fillStyle = isLight ? "rgba(15, 23, 42, 0.8)" : "rgba(255, 255, 255, 0.75)";
-      ctx.font = "600 10.5px 'JetBrains Mono', monospace";
-      ctx.fillText(`${m.beats}/${m.beatUnit}`, nicknameX, badgeY);
+      ctx.fillStyle = isLight ? "rgba(15, 23, 42, 0.85)" : "rgba(255, 255, 255, 0.85)";
+      ctx.font = "700 11px 'JetBrains Mono', monospace";
+      const meterText = `${m.beats}T`;
+      ctx.fillText(meterText, nicknameX, badgeY);
+      const meterWidth = ctx.measureText(meterText).width;
 
       let tempoText = "";
       if (m.tempoMode === "ratio") {
@@ -626,7 +628,7 @@ export class DJRunnerRenderer {
 
       ctx.fillStyle = isLight ? "rgba(15, 23, 42, 0.55)" : "rgba(255, 255, 255, 0.4)";
       ctx.font = "500 9.5px 'JetBrains Mono', monospace";
-      ctx.fillText(`• ${tempoText}${repFootText}`, nicknameX + 32, badgeY);
+      ctx.fillText(`• ${tempoText}${repFootText}`, nicknameX + meterWidth + 6, badgeY);
     }
 
     // 5. AGULHA CENTRAL (PLAYHEAD)

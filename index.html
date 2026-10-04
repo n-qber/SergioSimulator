@@ -43,13 +43,14 @@
           <div id="bpmPracticeStatus" class="bpm-practice-status" style="display:none">
             <span id="bpmPracticeBadge" class="bpm-mode-tag" title="Andamento de treino local (não afeta o banco de dados nem os outros músicos)">Treino</span>
             <button type="button" id="btnResetPresentationBpm" class="btn-reset-bpm" title="Restaurar BPM oficial da apresentação">↺ 120</button>
-            <button type="button" id="btnPromotePresentationBpm" class="btn-promote-bpm" title="Definir este BPM como o oficial da apresentação na nuvem">☁️</button>
+            <button type="button" id="btnPromotePresentationBpm" class="btn-promote-bpm" title="Definir este BPM como o oficial da apresentação na nuvem"><span class="btn-promote-icon">☁️</span><span class="btn-promote-text"> Salvar</span></button>
           </div>
         </div>
       </div>
 
       <!-- Centro: Nome da Peça -->
       <div class="header-center">
+        <div class="mobile-group-title mobile-piece-header-title" style="display:none">🎼 Peça Atual</div>
         <input type="text" id="inputPieceName" class="piece-title-input" value="Estudo de Modulações Rítmicas (3/2 & 4/3)" placeholder="Nome da Peça" title="Clique para editar">
       </div>
 
@@ -77,6 +78,30 @@
           <button type="button" id="btnSharePiece" class="btn-share-highlight" title="Compartilhar Peça e Colaborar em Tempo Real">
             <span class="btn-icon">🔗</span> Compartilhar
           </button>
+
+          <!-- Perfil e Autenticação do Usuário -->
+          <div class="user-auth-wrapper">
+            <button type="button" id="btnAuth" class="btn-user-auth" title="Fazer Login ou Criar Conta">
+              <span id="userAuthAvatar" class="user-avatar-tiny">👤</span>
+              <span id="userAuthLabel" class="user-auth-name">Entrar</span>
+            </button>
+            <div id="userMenuDropdown" class="user-menu-dropdown" style="display:none">
+              <div class="user-menu-header">
+                <div id="userMenuAvatarLarge" class="user-avatar-circle-sm">👤</div>
+                <div class="user-menu-info">
+                  <div id="userMenuName" class="user-menu-name">Convidado</div>
+                  <div id="userMenuEmail" class="user-menu-email">Não conectado</div>
+                </div>
+              </div>
+              <div class="user-menu-divider"></div>
+              <button type="button" id="btnUserCloudPieces" class="user-menu-item">
+                <span class="menu-item-icon">☁️</span> Minhas Peças na Nuvem
+              </button>
+              <button type="button" id="btnUserLogout" class="user-menu-item user-menu-logout">
+                <span class="menu-item-icon">🚪</span> Sair da Conta
+              </button>
+            </div>
+          </div>
 
           <button type="button" id="btnInstallPwa" class="btn-text-action btn-install-app" title="Instalar aplicativo no aparelho para uso offline sem internet">
             <span class="btn-icon">📲</span> Instalar App
@@ -133,6 +158,20 @@
       </div>
     </header>
 
+    <!-- BANNER DE MODO LEITURA / OUVINTE -->
+    <div id="readOnlyBanner" class="readonly-banner" style="display:none">
+      <div class="readonly-content">
+        <span class="readonly-icon">🎧</span>
+        <div class="readonly-text">
+          <strong>Modo Ouvinte (Apenas Leitura)</strong>
+          <span>Você pode ouvir e praticar livremente com andamento individual. Para editar a partitura, faça uma cópia pessoal.</span>
+        </div>
+      </div>
+      <button type="button" id="btnForkPiece" class="btn-fork-piece" title="Criar uma cópia independente desta peça na sua biblioteca pessoal">
+        <span class="btn-icon">🍴</span> Fazer uma Cópia Pessoal
+      </button>
+    </div>
+
     <!-- PALCO PRINCIPAL CENTRALIZADO -->
     <main class="main-stage">
       
@@ -167,7 +206,7 @@
             <div class="hud-bpm-wrap">
               <span id="hudBpmValue" class="bpm-num">120</span>
               <span class="bpm-unit">BPM</span>
-              <span id="hudTempoRatio" class="ratio-pill">1:1</span>
+              <span id="hudTempoRatio" class="ratio-pill">1/1</span>
             </div>
           </div>
         </div>
@@ -308,17 +347,8 @@
           <!-- Métrica e Repetições -->
           <div class="field-row">
             <div class="field-group">
-              <label for="editBeats" class="field-label">Tempos (Notas)</label>
+              <label for="editBeats" class="field-label">Quantidade de Tempos (Pulsos)</label>
               <input type="number" id="editBeats" class="clean-input" min="1" max="32" value="4" required>
-            </div>
-            <div class="field-group">
-              <label for="editBeatUnit" class="field-label">Unidade de Tempo</label>
-              <select id="editBeatUnit" class="clean-select-field">
-                <option value="4">Semínima (/4)</option>
-                <option value="8">Colcheia (/8)</option>
-                <option value="16">Semicolcheia (/16)</option>
-                <option value="2">Mínima (/2)</option>
-              </select>
             </div>
             <div class="field-group">
               <label for="editRepeat" class="field-label" title="Quantas vezes este compasso se repete continuamente">Repetições (x)</label>
@@ -343,12 +373,14 @@
             <!-- Fração Matemática -->
             <div id="panelTempoRatio" class="ratio-box">
               <div class="preset-ratios">
-                <button type="button" class="btn-ratio-preset active" data-num="1" data-den="1">1:1</button>
-                <button type="button" class="btn-ratio-preset" data-num="3" data-den="2">3/2 (1.5x)</button>
-                <button type="button" class="btn-ratio-preset" data-num="4" data-den="3">4/3 (1.33x)</button>
-                <button type="button" class="btn-ratio-preset" data-num="2" data-den="3">2/3 (0.67x)</button>
-                <button type="button" class="btn-ratio-preset" data-num="5" data-den="4">5/4 (1.25x)</button>
-                <button type="button" class="btn-ratio-preset" data-num="3" data-den="4">3/4 (0.75x)</button>
+                <button type="button" class="btn-ratio-preset active" data-num="1" data-den="1">1/1</button>
+                <button type="button" class="btn-ratio-preset" data-num="3" data-den="2">3/2</button>
+                <button type="button" class="btn-ratio-preset" data-num="4" data-den="3">4/3</button>
+                <button type="button" class="btn-ratio-preset" data-num="2" data-den="3">2/3</button>
+                <button type="button" class="btn-ratio-preset" data-num="5" data-den="4">5/4</button>
+                <button type="button" class="btn-ratio-preset" data-num="3" data-den="4">3/4</button>
+                <button type="button" class="btn-ratio-preset" data-num="5" data-den="3">5/3</button>
+                <button type="button" class="btn-ratio-preset" data-num="7" data-den="4">7/4</button>
               </div>
 
               <div class="fraction-inputs">
@@ -373,13 +405,27 @@
           <div class="field-group">
             <label class="field-label">Cor de Identificação</label>
             <div class="swatches-row">
-              <button type="button" class="color-swatch-btn" style="background:#ff334b" data-color="#ff334b"></button>
-              <button type="button" class="color-swatch-btn" style="background:#dc2626" data-color="#dc2626"></button>
-              <button type="button" class="color-swatch-btn" style="background:#3b82f6" data-color="#3b82f6"></button>
-              <button type="button" class="color-swatch-btn" style="background:#10b981" data-color="#10b981"></button>
-              <button type="button" class="color-swatch-btn" style="background:#8b5cf6" data-color="#8b5cf6"></button>
-              <button type="button" class="color-swatch-btn" style="background:#ec4899" data-color="#ec4899"></button>
-              <input type="color" id="editColorPicker" value="#ff334b" class="custom-color-picker">
+              <button type="button" class="color-swatch-btn selected" style="background:#ff334b" data-color="#ff334b" title="Coral"></button>
+              <button type="button" class="color-swatch-btn" style="background:#dc2626" data-color="#dc2626" title="Vermelho"></button>
+              <button type="button" class="color-swatch-btn" style="background:#991b1b" data-color="#991b1b" title="Vinho"></button>
+              <button type="button" class="color-swatch-btn" style="background:#ea580c" data-color="#ea580c" title="Laranja"></button>
+              <button type="button" class="color-swatch-btn" style="background:#d97706" data-color="#d97706" title="Âmbar"></button>
+              <button type="button" class="color-swatch-btn" style="background:#eab308" data-color="#eab308" title="Amarelo"></button>
+              <button type="button" class="color-swatch-btn" style="background:#84cc16" data-color="#84cc16" title="Lima"></button>
+              <button type="button" class="color-swatch-btn" style="background:#10b981" data-color="#10b981" title="Verde Esmeralda"></button>
+              <button type="button" class="color-swatch-btn" style="background:#059669" data-color="#059669" title="Menta"></button>
+              <button type="button" class="color-swatch-btn" style="background:#14b8a6" data-color="#14b8a6" title="Turquesa"></button>
+              <button type="button" class="color-swatch-btn" style="background:#06b6d4" data-color="#06b6d4" title="Ciano"></button>
+              <button type="button" class="color-swatch-btn" style="background:#0284c7" data-color="#0284c7" title="Azul Céu"></button>
+              <button type="button" class="color-swatch-btn" style="background:#3b82f6" data-color="#3b82f6" title="Azul Royal"></button>
+              <button type="button" class="color-swatch-btn" style="background:#6366f1" data-color="#6366f1" title="Índigo"></button>
+              <button type="button" class="color-swatch-btn" style="background:#8b5cf6" data-color="#8b5cf6" title="Violeta"></button>
+              <button type="button" class="color-swatch-btn" style="background:#a855f7" data-color="#a855f7" title="Púrpura"></button>
+              <button type="button" class="color-swatch-btn" style="background:#d946ef" data-color="#d946ef" title="Fúcsia"></button>
+              <button type="button" class="color-swatch-btn" style="background:#ec4899" data-color="#ec4899" title="Rosa"></button>
+              <button type="button" class="color-swatch-btn" style="background:#be185d" data-color="#be185d" title="Magenta"></button>
+              <button type="button" class="color-swatch-btn" style="background:#64748b" data-color="#64748b" title="Ardósia / Cinza"></button>
+              <input type="color" id="editColorPicker" value="#ff334b" class="custom-color-picker" title="Cor personalizada">
             </div>
           </div>
 
@@ -425,12 +471,27 @@
             <div class="field-group">
               <label class="field-label">Cor do Grupo</label>
               <div class="swatches-row">
-                <button type="button" class="group-color-btn selected" style="background:#ff334b" data-color="#ff334b"></button>
-                <button type="button" class="group-color-btn" style="background:#3b82f6" data-color="#3b82f6"></button>
-                <button type="button" class="group-color-btn" style="background:#10b981" data-color="#10b981"></button>
-                <button type="button" class="group-color-btn" style="background:#8b5cf6" data-color="#8b5cf6"></button>
-                <button type="button" class="group-color-btn" style="background:#ec4899" data-color="#ec4899"></button>
-                <input type="color" id="newGroupColorPicker" value="#3b82f6" class="custom-color-picker">
+                <button type="button" class="group-color-btn selected" style="background:#ff334b" data-color="#ff334b" title="Coral"></button>
+                <button type="button" class="group-color-btn" style="background:#dc2626" data-color="#dc2626" title="Vermelho"></button>
+                <button type="button" class="group-color-btn" style="background:#991b1b" data-color="#991b1b" title="Vinho"></button>
+                <button type="button" class="group-color-btn" style="background:#ea580c" data-color="#ea580c" title="Laranja"></button>
+                <button type="button" class="group-color-btn" style="background:#d97706" data-color="#d97706" title="Âmbar"></button>
+                <button type="button" class="group-color-btn" style="background:#eab308" data-color="#eab308" title="Amarelo"></button>
+                <button type="button" class="group-color-btn" style="background:#84cc16" data-color="#84cc16" title="Lima"></button>
+                <button type="button" class="group-color-btn" style="background:#10b981" data-color="#10b981" title="Verde Esmeralda"></button>
+                <button type="button" class="group-color-btn" style="background:#059669" data-color="#059669" title="Menta"></button>
+                <button type="button" class="group-color-btn" style="background:#14b8a6" data-color="#14b8a6" title="Turquesa"></button>
+                <button type="button" class="group-color-btn" style="background:#06b6d4" data-color="#06b6d4" title="Ciano"></button>
+                <button type="button" class="group-color-btn" style="background:#0284c7" data-color="#0284c7" title="Azul Céu"></button>
+                <button type="button" class="group-color-btn" style="background:#3b82f6" data-color="#3b82f6" title="Azul Royal"></button>
+                <button type="button" class="group-color-btn" style="background:#6366f1" data-color="#6366f1" title="Índigo"></button>
+                <button type="button" class="group-color-btn" style="background:#8b5cf6" data-color="#8b5cf6" title="Violeta"></button>
+                <button type="button" class="group-color-btn" style="background:#a855f7" data-color="#a855f7" title="Púrpura"></button>
+                <button type="button" class="group-color-btn" style="background:#d946ef" data-color="#d946ef" title="Fúcsia"></button>
+                <button type="button" class="group-color-btn" style="background:#ec4899" data-color="#ec4899" title="Rosa"></button>
+                <button type="button" class="group-color-btn" style="background:#be185d" data-color="#be185d" title="Magenta"></button>
+                <button type="button" class="group-color-btn" style="background:#64748b" data-color="#64748b" title="Ardósia / Cinza"></button>
+                <input type="color" id="newGroupColorPicker" value="#ff334b" class="custom-color-picker" title="Cor personalizada">
               </div>
             </div>
 
@@ -535,14 +596,48 @@
         <div class="modal-body-clean">
           <!-- Bloco do Link Compartilhável -->
           <div class="field-group">
-            <label for="inputShareUrl" class="field-label">Link da Peça (Qualquer pessoa com este link pode editar)</label>
+            <label for="inputShareUrl" class="field-label" id="labelShareUrl">Link Compartilhável da Peça</label>
             <div class="share-url-row">
               <input type="text" id="inputShareUrl" class="clean-input share-input" readonly spellcheck="false">
               <button type="button" id="btnCopyShareUrl" class="btn-red-sm btn-copy-link">
                 <span id="copyIcon">📋</span> <span id="copyText">Copiar Link</span>
               </button>
             </div>
-            <span class="field-hint">Compartilhe este link com outros músicos ou alunos. Todas as alterações sincronizam instantaneamente estilo Google Docs.</span>
+            <span class="field-hint" id="hintShareUrl">Compartilhe este link com outros músicos ou alunos.</span>
+          </div>
+
+          <!-- Controle de Acesso e Permissões (Privada vs Ouvinte vs Edição) -->
+          <div class="field-group access-control-box">
+            <span class="field-label">Quem tem acesso a esta peça</span>
+            <div class="access-radios-list">
+              <label class="access-radio-item" id="labelAccessPrivate">
+                <input type="radio" name="pieceAccessChoice" value="private" id="radioAccessPrivate">
+                <div class="access-item-text">
+                  <strong>🔒 Privada (Somente Eu)</strong>
+                  <span>Apenas você conectado na sua conta tem acesso a esta partitura.</span>
+                </div>
+              </label>
+
+              <label class="access-radio-item" id="labelAccessView">
+                <input type="radio" name="pieceAccessChoice" value="view_link" id="radioAccessView">
+                <div class="access-item-text">
+                  <strong>🎧 Link de Ouvinte (Não Listada)</strong>
+                  <span>Qualquer pessoa com o link pode ouvir, ver o runner e treinar. Alterações na partitura bloqueadas.</span>
+                </div>
+              </label>
+
+              <label class="access-radio-item" id="labelAccessEdit">
+                <input type="radio" name="pieceAccessChoice" value="edit_link" id="radioAccessEdit">
+                <div class="access-item-text">
+                  <strong>✏️ Link de Colaboração (Não Listada)</strong>
+                  <span>Qualquer pessoa com o link pode compor e editar em tempo real com você estilo Google Docs.</span>
+                </div>
+              </label>
+            </div>
+            <div id="accessLoginRequiredNotice" class="access-notice" style="display:none">
+              <span>💡 Para criar ou manter peças <strong>Privadas</strong>, entre na sua conta Google ou faça cadastro com e-mail.</span>
+              <button type="button" id="btnNoticeLogin" class="btn-notice-action">Fazer Login</button>
+            </div>
           </div>
 
           <!-- Perfil do Usuário / Colaborador -->
@@ -568,15 +663,95 @@
               <!-- Lista de usuários online -->
             </div>
           </div>
+        </div>
+      </div>
+    </div>
 
-          <!-- Status do Servidor / Nuvem -->
-          <div class="cloud-info-box">
-            <span class="cloud-info-icon">⚡</span>
+    <!-- MODAL DE AUTENTICAÇÃO (GOOGLE E E-MAIL/SENHA) -->
+    <div id="modalAuth" class="modal-overlay" style="display:none">
+      <div class="modal-window modal-auth-window">
+        <div class="modal-top">
+          <span class="modal-measure-tag" style="background:#2563eb; color:#fff;">Sua Conta</span>
+          <h3 class="modal-heading" id="authModalTitle">Entrar na Conta</h3>
+          <button type="button" class="modal-x" id="btnAuthModalClose">&times;</button>
+        </div>
+
+        <div class="modal-body-clean">
+          <p class="auth-subtitle" id="authModalSubtitle">Acesse suas peças privadas em qualquer aparelho e salve suas composições na nuvem.</p>
+
+          <!-- Botão de Login com Google -->
+          <button type="button" id="btnGoogleSignIn" class="btn-google-login">
+            <svg class="google-icon" viewBox="0 0 24 24" width="20" height="20">
+              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+            </svg>
+            <span>Continuar com Google</span>
+          </button>
+
+          <div class="auth-divider">
+            <span>ou com e-mail</span>
+          </div>
+
+          <!-- Mensagem de Alerta -->
+          <div id="authAlertBox" class="auth-alert" style="display:none"></div>
+
+          <!-- Formulário de E-mail e Senha -->
+          <form id="formAuthEmail" class="auth-form" onsubmit="return false;">
+            <div class="field-group" id="groupAuthName" style="display:none">
+              <label for="inputAuthName" class="field-label">Seu Nome / Apelido</label>
+              <input type="text" id="inputAuthName" class="clean-input" placeholder="Ex: Maestro Carlos">
+            </div>
+
+            <div class="field-group">
+              <label for="inputAuthEmail" class="field-label">E-mail</label>
+              <input type="email" id="inputAuthEmail" class="clean-input" placeholder="seu@email.com" required autocomplete="email">
+            </div>
+
+            <div class="field-group" id="groupAuthPassword">
+              <div class="field-label-row">
+                <label for="inputAuthPassword" class="field-label">Senha</label>
+                <button type="button" id="btnForgotPass" class="btn-link-action">Esqueceu a senha?</button>
+              </div>
+              <input type="password" id="inputAuthPassword" class="clean-input" placeholder="Sua senha" required autocomplete="current-password">
+            </div>
+
+            <button type="submit" id="btnAuthSubmit" class="btn-red-sm btn-auth-submit">
+              Entrar
+            </button>
+          </form>
+
+          <!-- Alternar Modo de Autenticação -->
+          <div class="auth-footer-toggle">
+            <span id="authTogglePrompt">Não tem uma conta?</span>
+            <button type="button" id="btnAuthToggleMode" class="btn-link-action highlight">Criar Conta</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL DE ACESSO NEGADO (PEÇA PRIVADA) -->
+    <div id="modalAccessDenied" class="modal-overlay" style="display:none">
+      <div class="modal-window modal-confirm-window">
+        <div class="modal-top">
+          <span class="modal-measure-tag" style="background:#dc2626; color:#fff;">Acesso Restrito</span>
+          <h3 class="modal-heading">Peça Privada</h3>
+        </div>
+        <div class="modal-body-clean">
+          <p style="margin: 8px 0 16px; color: var(--text-secondary); line-height: 1.5;">
+            Esta composição foi configurada como <strong>Privada</strong> pelo autor e não está disponível para acesso público.
+          </p>
+          <div class="cloud-info-box" style="border-left: 3px solid #dc2626;">
+            <span class="cloud-info-icon">🔒</span>
             <div class="cloud-info-text">
-              <strong>Google Cloud Firestore (São Paulo) Ativo</strong>
-              <span>Sincronização com latência ultrabaixa (~10ms) e histórico de até 500 versões salvas permanentemente.</span>
+              <span>Se você é o proprietário desta peça, faça login com sua conta Google ou e-mail para editá-la.</span>
             </div>
           </div>
+        </div>
+        <div class="modal-bottom confirm-bottom">
+          <button type="button" class="btn-ghost-sm" id="btnAccessDeniedGoHome">Ir para Peça Padrão</button>
+          <button type="button" class="btn-primary-sm" id="btnAccessDeniedLogin" style="background:#2563eb; border:none; color:#fff; border-radius:8px; padding:8px 16px;">Fazer Login</button>
         </div>
       </div>
     </div>

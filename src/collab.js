@@ -14,8 +14,10 @@ import {
   orderBy, 
   limit, 
   deleteDoc,
-  getDocs
+  getDocs,
+  where
 } from 'firebase/firestore';
+import { authService } from './auth.js';
 
 const MAX_HISTORY_ITEMS = 500;
 const USER_PROFILE_KEY = 'sergio_collab_profile';
@@ -34,6 +36,11 @@ const DEFAULT_NAMES = [
 class CollabService {
   constructor() {
     this.currentPieceId = null;
+    this.currentPieceOwnerId = null;
+    this.currentPieceAccess = 'edit_link'; // 'private' | 'view_link' | 'edit_link'
+    this.isReadOnly = false;
+    this.isPrivateAccessDenied = false;
+
     this.localUser = this.loadLocalProfile();
     this.activeCollaborators = [];
     this.historyList = [];
@@ -49,11 +56,74 @@ class CollabService {
     this.onHistoryChange = null;
     this.onPresenceChange = null;
     this.onSyncStatusChange = null;
+    this.onPermissionChange = null;
+    this.onAccessDenied = null;
 
     // Flag para evitar eco de alterações locais
     this.isApplyingRemote = false;
     this.lastSentPayloadHash = null;
     this.pendingCommitTimer = null;
+
+    // Integração automática com o Auth
+    authService.onUserChange((user, isLoggedIn) => {
+      if (isLoggedIn && user) {
+        this.localUser.id = user.uid;
+        this.localUser.name = user.displayName || user.email?.split('@')[0] || this.localUser.name;
+        this.localUser.photoURL = user.photoURL || null;
+        this.localUser.isCustomized = true;
+      } else {
+        const local = this.loadLocalProfile();
+        this.localUser.id = local.id;
+        this.localUser.name = local.name;
+        this.localUser.color = local.color;
+        this.localUser.photoURL = null;
+      }
+      this.evaluateCurrentPermissions();
+      if (this.currentPieceId && db) {
+        this.sendPresenceHeartbeat();
+      }
+    });
+  }
+
+  // Avalia permissões da peça atual com base no usuário e tipo de acesso
+  evaluateCurrentPermissions() {
+    if (!this.currentPieceId) {
+      this.isReadOnly = false;
+      this.isPrivateAccessDenied = false;
+      return;
+    }
+
+    const currentUid = authService.getUid();
+    const isOwner = Boolean(
+      (this.currentPieceOwnerId && currentUid && this.currentPieceOwnerId === currentUid) ||
+      (!this.currentPieceOwnerId && !authService.isLoggedIn())
+    );
+
+    if (this.currentPieceAccess === 'private') {
+      if (!isOwner) {
+        this.isPrivateAccessDenied = true;
+        this.isReadOnly = true;
+      } else {
+        this.isPrivateAccessDenied = false;
+        this.isReadOnly = false;
+      }
+    } else if (this.currentPieceAccess === 'view_link') {
+      this.isPrivateAccessDenied = false;
+      this.isReadOnly = !isOwner;
+    } else {
+      // edit_link ou legado
+      this.isPrivateAccessDenied = false;
+      this.isReadOnly = false;
+    }
+
+    if (this.onPermissionChange) {
+      this.onPermissionChange({
+        isReadOnly: this.isReadOnly,
+        isPrivateAccessDenied: this.isPrivateAccessDenied,
+        access: this.currentPieceAccess,
+        isOwner
+      });
+    }
   }
 
   // Carrega ou cria perfil de colaborador local
@@ -173,8 +243,11 @@ class CollabService {
       const pieceRef = doc(db, 'pieces', pieceId);
       const pieceSnap = await getDoc(pieceRef);
 
+      const currentUid = authService.getUid();
+
       // Se a peça ainda não existe no Firestore, criamos a partir do estado atual
       if (!pieceSnap.exists()) {
+        const initialAccess = currentStateSnapshot?.access || (authService.isLoggedIn() ? 'private' : 'edit_link');
         const initialData = currentStateSnapshot ? {
           id: pieceId,
           name: currentStateSnapshot.name || "Nova Peça Colaborativa",
@@ -183,6 +256,9 @@ class CollabService {
           presentationBpm: currentStateSnapshot.presentationBpm || currentStateSnapshot.baseBpm || 120,
           measures: currentStateSnapshot.measures || [],
           groups: currentStateSnapshot.groups || [],
+          ownerId: currentUid,
+          ownerName: authService.getDisplayName(),
+          access: initialAccess,
           updatedAt: Date.now(),
           updatedBy: this.localUser,
           lastAction: "Peça criada na nuvem"
@@ -193,10 +269,17 @@ class CollabService {
           baseBpm: 120,
           measures: [],
           groups: [],
+          ownerId: currentUid,
+          ownerName: authService.getDisplayName(),
+          access: initialAccess,
           updatedAt: Date.now(),
           updatedBy: this.localUser,
           lastAction: "Peça criada na nuvem"
         };
+
+        this.currentPieceOwnerId = currentUid;
+        this.currentPieceAccess = initialAccess;
+        this.evaluateCurrentPermissions();
 
         await setDoc(pieceRef, initialData);
         // Cria primeira entrada no histórico
@@ -204,6 +287,18 @@ class CollabService {
       } else {
         // Carrega dados iniciais do Firestore para o app local
         const data = pieceSnap.data();
+        this.currentPieceOwnerId = data.ownerId || null;
+        this.currentPieceAccess = data.access || 'edit_link';
+        this.evaluateCurrentPermissions();
+
+        if (this.isPrivateAccessDenied) {
+          this.setSyncStatus('error', 'Peça Privada: Acesso Restrito');
+          if (this.onAccessDenied) {
+            this.onAccessDenied({ pieceId, name: data.name, ownerName: data.ownerName || 'o autor' });
+          }
+          return false;
+        }
+
         if (this.onRemoteStateChange) {
           this.isApplyingRemote = true;
           this.onRemoteStateChange(data);
@@ -215,6 +310,17 @@ class CollabService {
       this.unsubPiece = onSnapshot(pieceRef, (snap) => {
         if (!snap.exists()) return;
         const remoteData = snap.data();
+
+        this.currentPieceOwnerId = remoteData.ownerId || null;
+        this.currentPieceAccess = remoteData.access || 'edit_link';
+        this.evaluateCurrentPermissions();
+
+        if (this.isPrivateAccessDenied) {
+          if (this.onAccessDenied) {
+            this.onAccessDenied({ pieceId, name: remoteData.name, ownerName: remoteData.ownerName || 'o autor' });
+          }
+          return;
+        }
         
         // Evita reprocessar se foi a própria aba que enviou
         if (remoteData.updatedBy?.id === this.localUser.id) {
@@ -252,7 +358,7 @@ class CollabService {
       // 3. OUVINTE EM TEMPO REAL: Presença de colaboradores
       this.setupPresence(pieceId);
 
-      this.setSyncStatus('synced', 'Conectado em tempo real');
+      this.setSyncStatus('synced', this.isReadOnly ? 'Conectado (Modo Ouvinte)' : 'Conectado em tempo real');
       return true;
     } catch (err) {
       console.error("Erro ao conectar à peça:", err);
@@ -264,6 +370,10 @@ class CollabService {
   // Envia alteração local para o Firestore (com debounce inteligente para evitar spam)
   commitLocalChange(actionDescription, stateData) {
     if (!db || !this.currentPieceId || this.isApplyingRemote) return;
+    if (this.isReadOnly) {
+      console.warn("Alteração local não enviada: peça está em Modo Ouvinte (Apenas Leitura).");
+      return;
+    }
 
     this.setSyncStatus('syncing', 'Salvando na nuvem...');
     clearTimeout(this.pendingCommitTimer);
@@ -277,6 +387,9 @@ class CollabService {
           description: stateData.description || "",
           baseBpm: stateData.presentationBpm || stateData.baseBpm,
           presentationBpm: stateData.presentationBpm || stateData.baseBpm,
+          ownerId: this.currentPieceOwnerId || authService.getUid() || null,
+          ownerName: authService.getDisplayName(),
+          access: this.currentPieceAccess || 'edit_link',
           measures: stateData.measures.map(m => ({
             id: m.id,
             nickname: m.nickname || "",
@@ -304,7 +417,7 @@ class CollabService {
         this.lastSentPayloadHash = this.computeHash(payload);
         await setDoc(pieceRef, payload);
 
-        // Adiciona ao histórico na nuvem (limite de 200 itens)
+        // Adiciona ao histórico na nuvem (limite de 500 itens)
         await this.addHistoryEntry(this.currentPieceId, actionDescription, payload);
 
         this.setSyncStatus('synced', 'Salvo na nuvem');
@@ -313,6 +426,54 @@ class CollabService {
         this.setSyncStatus('error', 'Erro ao salvar na nuvem');
       }
     }, 350);
+  }
+
+  // Atualiza visibilidade de acesso da peça ('private' | 'view_link' | 'edit_link')
+  async updatePieceAccess(newAccess) {
+    if (!db || !this.currentPieceId) return false;
+    try {
+      const pieceRef = doc(db, 'pieces', this.currentPieceId);
+      this.currentPieceAccess = newAccess;
+      const currentUid = authService.getUid();
+
+      const updateData = {
+        access: newAccess,
+        updatedAt: Date.now(),
+        lastAction: `Alterou visibilidade para ${newAccess}`
+      };
+
+      if (!this.currentPieceOwnerId && currentUid) {
+        this.currentPieceOwnerId = currentUid;
+        updateData.ownerId = currentUid;
+        updateData.ownerName = authService.getDisplayName();
+      }
+
+      await setDoc(pieceRef, updateData, { merge: true });
+      this.evaluateCurrentPermissions();
+      return true;
+    } catch (err) {
+      console.error("Erro ao atualizar visibilidade da peça:", err);
+      throw err;
+    }
+  }
+
+  // Busca todas as peças salvas na nuvem do usuário logado
+  async getUserCloudPieces(uid = authService.getUid()) {
+    if (!db || !uid) return [];
+    try {
+      const piecesCol = collection(db, 'pieces');
+      const q = query(piecesCol, where('ownerId', '==', uid));
+      const snap = await getDocs(q);
+      const list = [];
+      snap.forEach(docSnap => {
+        list.push(docSnap.data());
+      });
+      list.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+      return list;
+    } catch (err) {
+      console.warn("Erro ao buscar peças da nuvem:", err);
+      return [];
+    }
   }
 
   // Registra nova versão no histórico (grava na nuvem e atualiza localmente sem gastar leituras)

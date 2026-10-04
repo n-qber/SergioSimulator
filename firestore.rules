@@ -1,0 +1,42 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /pieces/{pieceId} {
+      // 1. Leitura:
+      // Permitida se a peça for pública/unlisted (edit_link ou view_link),
+      // ou se o documento não tiver restrição de acesso (legado),
+      // ou se for privada e o usuário logado for o proprietário (ownerId).
+      allow read: if resource == null
+                  || resource.data.access == 'view_link'
+                  || resource.data.access == 'edit_link'
+                  || !('access' in resource.data)
+                  || (request.auth != null && resource.data.ownerId == request.auth.uid);
+
+      // 2. Criação:
+      // Aberta para usuários logados ou convidados anônimos.
+      allow create: if true;
+
+      // 3. Atualização (edição):
+      // Permitida se o usuário for o dono da peça,
+      // OU se a peça estiver configurada para colaboração com link ('edit_link' ou legado).
+      // Peças em modo 'view_link' ou 'private' só podem ser alteradas pelo dono.
+      allow update: if (resource.data.access == 'edit_link' || !('access' in resource.data))
+                    || (request.auth != null && resource.data.ownerId == request.auth.uid);
+
+      // 4. Exclusão:
+      // Apenas o proprietário registrado pode excluir uma peça na nuvem.
+      allow delete: if request.auth != null && resource.data.ownerId == request.auth.uid;
+
+      // Subcoleção de Histórico de Versões
+      match /history/{historyId} {
+        allow read, write: if true;
+      }
+
+      // Subcoleção de Presença de Colaboradores Online (heartbeat)
+      match /presence/{userId} {
+        allow read, write: if true;
+      }
+    }
+  }
+}
