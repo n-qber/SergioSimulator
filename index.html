@@ -48,27 +48,48 @@
         </div>
       </div>
 
-      <!-- Centro: Nome da Peça -->
+      <!-- Centro: Nome da Peça & Status Unificado de Salvamento -->
       <div class="header-center">
         <div class="mobile-group-title mobile-piece-header-title" style="display:none">🎼 Peça Atual</div>
-        <input type="text" id="inputPieceName" class="piece-title-input" value="Estudo de Modulações Rítmicas (3/2 & 4/3)" placeholder="Nome da Peça" title="Clique para editar">
+        <div class="piece-title-wrapper">
+          <input type="text" id="inputPieceName" class="piece-title-input" value="Estudo de Modulações Rítmicas (3/2 & 4/3)" placeholder="Nome da Peça" title="Clique para editar">
+          <div id="syncStatusPill" class="sync-status-pill synced" title="Status de salvamento e sincronização">
+            <span id="syncStatusIcon" class="sync-status-icon">☁️</span>
+            <span id="syncStatusText" class="sync-status-text">Salvo</span>
+          </div>
+        </div>
       </div>
 
       <!-- Lado Direito: Ações Rápidas & Menu de Peça -->
       <div class="header-right" id="headerRightArea">
-        <!-- Grupo 1: Nuvem & Compartilhamento -->
+        <!-- Grupo 1: Edição & Peças -->
+        <div class="header-group group-actions">
+          <div class="mobile-group-title">📁 Peças & Edição</div>
+          <div class="undo-redo-row">
+            <button type="button" id="btnUndo" class="btn-icon-action btn-undo" title="Desfazer (Ctrl+Z)" disabled>↩</button>
+            <button type="button" id="btnRedo" class="btn-icon-action btn-redo" title="Refazer (Ctrl+Y)" disabled>↪</button>
+          </div>
+
+          <button type="button" id="btnNewPiece" class="btn-text-action btn-new-piece" title="Iniciar Nova Peça em Branco (Ctrl+N)">
+            <span class="btn-icon">📄</span> Nova Peça
+          </button>
+
+          <select id="selectPreset" class="clean-select" title="Carregar Exemplo ou Nova Peça">
+            <option value="" disabled selected>Peças de Exemplo...</option>
+          </select>
+          
+          <div class="file-actions-row">
+            <button type="button" id="btnExport" class="btn-text-action" title="Exportar Peça">Exportar</button>
+            <label class="btn-text-action file-btn" title="Importar Peça">
+              Importar
+              <input type="file" id="inputImport" accept=".json" style="display:none">
+            </label>
+          </div>
+        </div>
+
+        <!-- Grupo 2: Nuvem, Compartilhamento & Perfil -->
         <div class="header-group group-cloud">
           <div class="mobile-group-title">☁️ Sincronização & Colaboração</div>
-          <div id="saveIndicator" class="save-status-pill" title="Peça salva automaticamente no navegador">
-            <span class="save-dot"></span>
-            <span class="save-text">Salvo</span>
-          </div>
-
-          <div id="cloudStatusPill" class="cloud-status-pill offline" title="Status da Sincronização na Nuvem">
-            <span class="cloud-dot"></span>
-            <span id="cloudStatusText">Nuvem</span>
-          </div>
-
           <div id="presenceRow" class="presence-row" title="Colaboradores Online"></div>
 
           <button type="button" id="btnOpenHistory" class="btn-text-action btn-history" title="Histórico de Versões na Nuvem (até 500 alterações)">
@@ -79,9 +100,9 @@
             <span class="btn-icon">🔗</span> Compartilhar
           </button>
 
-          <!-- Perfil e Autenticação do Usuário -->
+          <!-- Perfil e Autenticação do Usuário (Perfil Único) -->
           <div class="user-auth-wrapper">
-            <button type="button" id="btnAuth" class="btn-user-auth" title="Fazer Login ou Criar Conta">
+            <button type="button" id="btnAuth" class="btn-user-auth" title="Sua Conta ou Fazer Login">
               <span id="userAuthAvatar" class="user-avatar-tiny">👤</span>
               <span id="userAuthLabel" class="user-auth-name">Entrar</span>
             </button>
@@ -637,19 +658,6 @@
             <div id="accessLoginRequiredNotice" class="access-notice" style="display:none">
               <span>💡 Para criar ou manter peças <strong>Privadas</strong>, entre na sua conta Google ou faça cadastro com e-mail.</span>
               <button type="button" id="btnNoticeLogin" class="btn-notice-action">Fazer Login</button>
-            </div>
-          </div>
-
-          <!-- Perfil do Usuário / Colaborador -->
-          <div class="collab-profile-box">
-            <span class="field-label">Seu Perfil de Colaborador</span>
-            <div class="profile-edit-row">
-              <div id="userAvatarPreview" class="user-avatar-circle" title="Sua cor">P</div>
-              <input type="text" id="inputCollabName" class="clean-input collab-name-input" placeholder="Seu Nome ou Apelido" maxlength="30">
-            </div>
-
-            <div class="avatar-colors-row" id="avatarColorPicker">
-              <!-- Swatches de cores inseridos dinamicamente ou estáticos -->
             </div>
           </div>
 

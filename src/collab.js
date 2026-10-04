@@ -207,11 +207,25 @@ class CollabService {
 
   // Define ID da peça na URL sem recarregar a página
   updateUrlPieceId(pieceId) {
-    if (typeof window === 'undefined' || !window.history) return;
+    if (typeof window === 'undefined' || !window.history || !pieceId) return;
     const url = new URL(window.location.href);
     url.searchParams.set('piece', pieceId);
     url.searchParams.delete('room');
     window.history.replaceState({}, '', url.toString());
+  }
+
+  // Remove ID da peça da URL mantendo o endereço limpo sem parâmetro de peça inacessível
+  clearUrlPieceId() {
+    if (typeof window === 'undefined' || !window.history) return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete('piece');
+    url.searchParams.delete('room');
+    if (window.location.hash.startsWith('#piece=')) {
+      window.location.hash = '';
+    }
+    const cleanSearch = url.searchParams.toString();
+    const cleanUrl = url.pathname + (cleanSearch ? `?${cleanSearch}` : '') + url.hash;
+    window.history.replaceState({}, '', cleanUrl || '/');
   }
 
   // Gera link compartilhável para a peça atual
@@ -235,8 +249,6 @@ class CollabService {
     }
 
     this.disconnect();
-    this.currentPieceId = pieceId;
-    this.updateUrlPieceId(pieceId);
     this.setSyncStatus('syncing', 'Conectando à nuvem...');
 
     try {
@@ -277,6 +289,7 @@ class CollabService {
           lastAction: "Peça criada na nuvem"
         };
 
+        this.currentPieceId = pieceId;
         this.currentPieceOwnerId = currentUid;
         this.currentPieceAccess = initialAccess;
         this.evaluateCurrentPermissions();
@@ -284,6 +297,7 @@ class CollabService {
         await setDoc(pieceRef, initialData);
         // Cria primeira entrada no histórico
         await this.addHistoryEntry(pieceId, "Peça inicializada na nuvem", initialData);
+        this.updateUrlPieceId(pieceId);
       } else {
         // Carrega dados iniciais do Firestore para o app local
         const data = pieceSnap.data();
@@ -293,11 +307,16 @@ class CollabService {
 
         if (this.isPrivateAccessDenied) {
           this.setSyncStatus('error', 'Peça Privada: Acesso Restrito');
+          this.clearUrlPieceId();
+          this.currentPieceId = null;
           if (this.onAccessDenied) {
             this.onAccessDenied({ pieceId, name: data.name, ownerName: data.ownerName || 'o autor' });
           }
           return false;
         }
+
+        this.currentPieceId = pieceId;
+        this.updateUrlPieceId(pieceId);
 
         if (this.onRemoteStateChange) {
           this.isApplyingRemote = true;
@@ -316,6 +335,8 @@ class CollabService {
         this.evaluateCurrentPermissions();
 
         if (this.isPrivateAccessDenied) {
+          this.clearUrlPieceId();
+          this.currentPieceId = null;
           if (this.onAccessDenied) {
             this.onAccessDenied({ pieceId, name: remoteData.name, ownerName: remoteData.ownerName || 'o autor' });
           }
@@ -349,7 +370,18 @@ class CollabService {
         }, 800);
       }, (err) => {
         console.error("Erro no listener da peça Firestore:", err);
-        this.setSyncStatus('error', 'Erro de conexão');
+        const isPerm = err.code === 'permission-denied' || (err.message && err.message.toLowerCase().includes('permission'));
+        if (isPerm) {
+          this.isPrivateAccessDenied = true;
+          this.setSyncStatus('error', 'Peça Privada: Acesso Restrito');
+          this.clearUrlPieceId();
+          this.currentPieceId = null;
+          if (this.onAccessDenied) {
+            this.onAccessDenied({ pieceId, name: 'Peça Privada', ownerName: 'o autor' });
+          }
+        } else {
+          this.setSyncStatus('error', 'Erro de conexão');
+        }
       });
 
       // 2. Histórico agora é carregado sob demanda (evita centenas de leituras no Firestore a cada reload)
@@ -362,7 +394,18 @@ class CollabService {
       return true;
     } catch (err) {
       console.error("Erro ao conectar à peça:", err);
-      this.setSyncStatus('error', 'Falha ao sincronizar');
+      const isPerm = err.code === 'permission-denied' || (err.message && err.message.toLowerCase().includes('permission'));
+      this.clearUrlPieceId();
+      this.currentPieceId = null;
+      if (isPerm) {
+        this.isPrivateAccessDenied = true;
+        this.setSyncStatus('error', 'Peça Privada: Acesso Restrito');
+        if (this.onAccessDenied) {
+          this.onAccessDenied({ pieceId, name: 'Peça Privada', ownerName: 'o autor' });
+        }
+      } else {
+        this.setSyncStatus('error', 'Falha ao sincronizar');
+      }
       return false;
     }
   }

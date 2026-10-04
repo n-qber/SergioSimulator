@@ -153,14 +153,17 @@ class SergioApp {
       btnRedo: document.getElementById('btnRedo'),
       btnThemeToggle: document.getElementById('btnThemeToggle'),
       themeIcon: document.getElementById('themeIcon'),
-      saveIndicator: document.getElementById('saveIndicator'),
+      saveIndicator: document.getElementById('syncStatusPill') || document.getElementById('saveIndicator'),
+      syncStatusPill: document.getElementById('syncStatusPill'),
+      syncStatusText: document.getElementById('syncStatusText'),
+      syncStatusIcon: document.getElementById('syncStatusIcon'),
       btnMute: document.getElementById('btnMute'),
       muteIcon: document.getElementById('muteIcon'),
       selectSoundType: document.getElementById('selectSoundType'),
 
       // Nuvem, Colaboração e Histórico
-      cloudStatusPill: document.getElementById('cloudStatusPill'),
-      cloudStatusText: document.getElementById('cloudStatusText'),
+      cloudStatusPill: document.getElementById('syncStatusPill') || document.getElementById('cloudStatusPill'),
+      cloudStatusText: document.getElementById('syncStatusText') || document.getElementById('cloudStatusText'),
       presenceRow: document.getElementById('presenceRow'),
       btnOpenHistory: document.getElementById('btnOpenHistory'),
       historyBadgeCount: document.getElementById('historyBadgeCount'),
@@ -870,15 +873,9 @@ class SergioApp {
     const updateOnlineStatus = () => {
       if (!navigator.onLine) {
         this.showToast('Modo Offline ativado • Peças salvas no aparelho', '📡');
-        if (this.dom.cloudStatusPill) {
-          this.dom.cloudStatusPill.className = 'cloud-status-pill offline';
-          if (this.dom.cloudStatusText) this.dom.cloudStatusText.textContent = 'Offline';
-        }
+        this.updateSyncStatus('offline', 'Salvo local');
       } else {
-        if (this.dom.cloudStatusPill) {
-          this.dom.cloudStatusPill.className = 'cloud-status-pill synced';
-          if (this.dom.cloudStatusText) this.dom.cloudStatusText.textContent = 'Online';
-        }
+        this.updateSyncStatus('synced', 'Salvo');
       }
     };
 
@@ -2264,23 +2261,8 @@ class SergioApp {
     defaultOpt.value = '';
     defaultOpt.disabled = true;
     defaultOpt.selected = true;
-    defaultOpt.textContent = 'Peças & Modelos...';
+    defaultOpt.textContent = 'Carregar Peça / Modelo...';
     select.appendChild(defaultOpt);
-
-    const actionGroup = document.createElement('optgroup');
-    actionGroup.label = 'Ações da Peça';
-
-    const newOpt = document.createElement('option');
-    newOpt.value = '__new_piece__';
-    newOpt.textContent = '✨ Nova Peça (Salva a atual)';
-    actionGroup.appendChild(newOpt);
-
-    const resetOpt = document.createElement('option');
-    resetOpt.value = '__reset_default__';
-    resetOpt.textContent = '🔄 Restaurar Estudo Padrão';
-    actionGroup.appendChild(resetOpt);
-
-    select.appendChild(actionGroup);
 
     // 📁 Grupo de Minhas Peças Salvas Localmente
     const libraryPieces = state.getLibraryPieces ? state.getLibraryPieces() : [];
@@ -2452,21 +2434,42 @@ class SergioApp {
     // Conexão inicial: Se houver ?piece= na URL, conecta àquela peça; se não, sincroniza com o ID da peça atual
     const urlPieceId = collab.getPieceIdFromUrl();
     if (urlPieceId) {
-      collab.connectToPiece(urlPieceId, state);
-      this.checkJoinModalOnSharedLink(urlPieceId);
+      collab.connectToPiece(urlPieceId, state).then(success => {
+        if (success) {
+          this.checkJoinModalOnSharedLink(urlPieceId);
+        } else {
+          collab.clearUrlPieceId();
+        }
+      });
     } else {
       collab.connectToPiece(state.id, state);
     }
   }
 
   updateSyncStatus(status, text) {
-    const pill = this.dom.cloudStatusPill;
-    const label = this.dom.cloudStatusText;
+    const pill = this.dom.syncStatusPill || this.dom.cloudStatusPill;
+    const label = this.dom.syncStatusText || this.dom.cloudStatusText;
+    const icon = this.dom.syncStatusIcon;
     if (!pill || !label) return;
 
-    pill.className = `cloud-status-pill ${status}`;
-    label.textContent = text || (status === 'synced' ? 'Nuvem OK' : 'Sincronizando...');
-    pill.title = text || (status === 'synced' ? 'Nuvem sincronizada' : 'Sincronizando...');
+    pill.className = `sync-status-pill ${status}`;
+    if (status === 'synced') {
+      if (icon) icon.textContent = '☁️';
+      label.textContent = text || 'Salvo';
+      pill.title = 'Peça salva no seu navegador e sincronizada na nuvem';
+    } else if (status === 'syncing') {
+      if (icon) icon.textContent = '🔄';
+      label.textContent = text || 'Salvando...';
+      pill.title = text || 'Sincronizando com a nuvem...';
+    } else if (status === 'offline') {
+      if (icon) icon.textContent = '💾';
+      label.textContent = 'Salvo local';
+      pill.title = 'Sem conexão com a nuvem. Alterações salvas no seu aparelho.';
+    } else if (status === 'error') {
+      if (icon) icon.textContent = '⚠️';
+      label.textContent = 'Não sincronizado';
+      pill.title = text || 'Acesso restrito ou falha de conexão na nuvem.';
+    }
   }
 
   renderPresenceAvatars(activeUsers) {
@@ -2481,13 +2484,27 @@ class SergioApp {
       const pill = document.createElement('div');
       pill.className = 'presence-avatar-pill';
       pill.style.backgroundColor = u.color || '#3b82f6';
-      const initial = (u.name || 'U').charAt(0).toUpperCase();
-      pill.textContent = initial;
+      if (u.photoURL) {
+        pill.innerHTML = `<img src="${u.photoURL}" alt="${u.name}" class="presence-avatar-img">`;
+      } else {
+        const initial = (u.name || 'U').charAt(0).toUpperCase();
+        pill.textContent = initial;
+      }
       const isMe = u.id === collab.localUser.id;
-      pill.title = isMe ? `${u.name} (Você - clique para editar seu perfil)` : u.name;
+      pill.title = isMe ? `${u.name} (Você)` : u.name;
       if (isMe) {
         pill.style.cursor = 'pointer';
-        pill.addEventListener('click', () => this.openShareModal());
+        pill.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (this.authService.isLoggedIn()) {
+            const isHidden = !this.dom.userMenuDropdown || this.dom.userMenuDropdown.style.display === 'none';
+            if (this.dom.userMenuDropdown) {
+              this.dom.userMenuDropdown.style.display = isHidden ? 'flex' : 'none';
+            }
+          } else {
+            this.openAuthModal('login');
+          }
+        });
       }
       row.appendChild(pill);
     });
@@ -2543,44 +2560,6 @@ class SergioApp {
 
     // Copiar Link
     this.dom.btnCopyShareUrl?.addEventListener('click', () => this.copyShareUrl());
-
-    // Configuração do perfil local
-    if (this.dom.inputCollabName) {
-      this.dom.inputCollabName.value = collab.localUser.name;
-      this.dom.inputCollabName.addEventListener('input', (e) => {
-        collab.updateProfile(e.target.value);
-        this.updateCollabAvatarPreview();
-      });
-    }
-
-    // Gerador de botões de cor
-    if (this.dom.avatarColorPicker) {
-      this.dom.avatarColorPicker.innerHTML = '';
-      const colors = ['#FF334B', '#3B82F6', '#10B981', '#8B5CF6', '#F59E0B', '#EC4899', '#06B6D4', '#14B8A6'];
-      colors.forEach(c => {
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = `avatar-color-btn ${c === collab.localUser.color ? 'selected' : ''}`;
-        btn.style.backgroundColor = c;
-        btn.title = `Cor ${c}`;
-        btn.addEventListener('click', () => {
-          this.dom.avatarColorPicker.querySelectorAll('.avatar-color-btn').forEach(b => b.classList.remove('selected'));
-          btn.classList.add('selected');
-          collab.updateProfile(this.dom.inputCollabName.value, c);
-          this.updateCollabAvatarPreview();
-        });
-        this.dom.avatarColorPicker.appendChild(btn);
-      });
-    }
-
-    this.updateCollabAvatarPreview();
-  }
-
-  updateCollabAvatarPreview() {
-    const preview = this.dom.userAvatarPreview;
-    if (!preview) return;
-    preview.style.backgroundColor = collab.localUser.color;
-    preview.textContent = (collab.localUser.name || 'U').charAt(0).toUpperCase();
   }
 
   openShareModal() {
@@ -2592,10 +2571,6 @@ class SergioApp {
       this.dom.inputShareUrl.value = shareLink;
     }
 
-    if (this.dom.inputCollabName) {
-      this.dom.inputCollabName.value = collab.localUser.name;
-    }
-    this.updateCollabAvatarPreview();
     this.renderCollabModalUsers(collab.activeCollaborators);
     this.updateShareModalLinkDisplay();
 
@@ -2616,6 +2591,18 @@ class SergioApp {
     this.authService.onUserChange((user, isLoggedIn) => {
       this.updateAuthUi(user, isLoggedIn);
       this.initPresetsDropdown();
+
+      // Se havia uma peça privada que foi negada antes e o usuário acabou de logar, tenta reconectar
+      if (isLoggedIn && this.pendingDeniedPieceId) {
+        const retryId = this.pendingDeniedPieceId;
+        this.pendingDeniedPieceId = null;
+        if (this.dom.modalAccessDenied) this.dom.modalAccessDenied.style.display = 'none';
+        collab.connectToPiece(retryId, state).then(success => {
+          if (success) {
+            this.showToast('Acesso autorizado! Peça carregada da sua conta.', '🔓');
+          }
+        });
+      }
     });
 
     // Abrir menu de usuário ou modal de login ao clicar no botão do cabeçalho
@@ -2675,6 +2662,8 @@ class SergioApp {
     // Modal de Acesso Negado
     this.dom.btnAccessDeniedGoHome?.addEventListener('click', () => {
       if (this.dom.modalAccessDenied) this.dom.modalAccessDenied.style.display = 'none';
+      this.pendingDeniedPieceId = null;
+      collab.clearUrlPieceId();
       state.resetToDefault();
       collab.connectToPiece(state.id, state);
       this.seekTo(0);
@@ -2937,6 +2926,11 @@ class SergioApp {
   }
 
   handleCollabAccessDenied(info) {
+    this.pendingDeniedPieceId = info?.pieceId || null;
+    collab.clearUrlPieceId();
+    if (this.dom.modalJoinCollab) {
+      this.dom.modalJoinCollab.style.display = 'none';
+    }
     if (this.dom.modalAccessDenied) {
       this.dom.modalAccessDenied.style.display = 'flex';
     }
@@ -2948,15 +2942,25 @@ class SergioApp {
 
   checkJoinModalOnSharedLink(urlPieceId) {
     if (!urlPieceId) return;
+    // Usuários autenticados no sistema já possuem identidade unificada (nome e avatar)
+    if (this.authService.isLoggedIn()) {
+      return;
+    }
+
     const sessionKey = `sergio_session_joined_${urlPieceId}`;
     try {
       const alreadyJoinedInThisTab = sessionStorage.getItem(sessionKey);
       if (!alreadyJoinedInThisTab) {
-        // Abre o modal de identificação perguntando nome e cor
+        // Se o usuário convidado já tem nome salvo, entra direto sem segundo modal
+        if (collab.localUser.isCustomized && collab.localUser.name && collab.localUser.name !== 'Convidado') {
+          return;
+        }
         this.openJoinModal(urlPieceId);
       }
     } catch (_) {
-      this.openJoinModal(urlPieceId);
+      if (!collab.localUser.isCustomized) {
+        this.openJoinModal(urlPieceId);
+      }
     }
   }
 

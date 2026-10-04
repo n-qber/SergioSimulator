@@ -310,17 +310,28 @@ button {
   letter-spacing: 0.2px;
 }
 
-/* Centro: Título da Peça */
+/* Centro: Título da Peça & Status Unificado */
 .header-center {
   flex: 1;
-  max-width: 420px;
+  max-width: 480px;
   display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.piece-title-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
   justify-content: center;
 }
 
 .piece-title-input {
-  width: 100%;
-  font-size: 0.95rem;
+  flex: 1;
+  min-width: 130px;
+  max-width: 320px;
+  font-size: 0.92rem;
   font-weight: 700;
   color: var(--white-pure);
   text-align: center;
@@ -335,6 +346,82 @@ button {
   border-bottom-color: var(--border-medium);
 }
 
+/* Status Unificado de Salvamento & Nuvem */
+.sync-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--bg-stage);
+  border: 1px solid var(--border-light);
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-size: 0.70rem;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--white-muted);
+  cursor: default;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.sync-status-pill .sync-status-icon {
+  font-size: 0.8rem;
+  line-height: 1;
+}
+
+.sync-status-pill.synced {
+  color: #10b981;
+  border-color: rgba(16, 185, 129, 0.35);
+  background: rgba(16, 185, 129, 0.08);
+}
+
+.sync-status-pill.syncing {
+  color: #f59e0b;
+  border-color: rgba(245, 158, 11, 0.35);
+  background: rgba(245, 158, 11, 0.08);
+}
+
+.sync-status-pill.syncing .sync-status-icon {
+  animation: spinSync 1.2s linear infinite;
+  display: inline-block;
+}
+
+.sync-status-pill.offline {
+  color: var(--white-dim);
+  border-color: var(--border-light);
+  background: var(--bg-stage);
+}
+
+.sync-status-pill.error {
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.35);
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.sync-status-pill.just-saved {
+  transform: scale(1.05);
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.4);
+}
+
+@keyframes spinSync {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+[data-theme="light"] .sync-status-pill.synced {
+  color: #059669;
+  border-color: #a7f3d0;
+  background: #ecfdf5;
+}
+
+[data-theme="light"] .sync-status-pill.syncing {
+  color: #d97706;
+  border-color: #fde68a;
+  background: #fffbeb;
+}
+
 /* Lado Direito */
 .header-right {
   display: flex;
@@ -345,46 +432,23 @@ button {
 .header-group {
   display: flex;
   align-items: center;
-  gap: 8px;
-}
-
-.mobile-group-title {
-  display: none;
-}
-
-.save-status-pill {
-  display: inline-flex;
-  align-items: center;
   gap: 6px;
-  font-size: 0.68rem;
-  font-weight: 600;
-  font-family: var(--font-mono);
-  color: var(--white-muted);
-  background: var(--bg-stage);
-  border: 1px solid var(--border-light);
-  padding: 4px 8px;
-  border-radius: 12px;
-  transition: all 0.25s ease;
-  user-select: none;
 }
 
-.save-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #10b981;
-  transition: all 0.25s ease;
+.undo-redo-row {
+  display: flex;
+  align-items: center;
+  gap: 3px;
 }
 
-.save-status-pill.just-saved {
-  color: #10b981;
-  border-color: rgba(16, 185, 129, 0.35);
-  background: rgba(16, 185, 129, 0.08);
-}
-
-.save-status-pill.just-saved .save-dot {
-  transform: scale(1.3);
-  box-shadow: 0 0 8px rgba(16, 185, 129, 0.8);
+.undo-redo-row .btn-icon-action {
+  width: 28px;
+  height: 28px;
+  font-size: 0.85rem;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .clean-select {
