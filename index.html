@@ -48,133 +48,118 @@
         </div>
       </div>
 
-      <!-- Centro: Nome da Peça & Status Unificado de Salvamento -->
+      <!-- Centro: Nome da Peça, Status de Salvamento e Desfazer/Refazer -->
       <div class="header-center">
         <div class="mobile-group-title mobile-piece-header-title" style="display:none">🎼 Peça Atual</div>
         <div class="piece-title-wrapper">
-          <input type="text" id="inputPieceName" class="piece-title-input" value="Estudo de Modulações Rítmicas (3/2 & 4/3)" placeholder="Nome da Peça" title="Clique para editar">
+          <input type="text" id="inputPieceName" class="piece-title-input" value="Estudo de Modulações Rítmicas (3/2 & 4/3)" placeholder="Nome da Peça" title="Clique para editar o título">
           <div id="syncStatusPill" class="sync-status-pill synced" title="Status de salvamento e sincronização">
             <span id="syncStatusIcon" class="sync-status-icon">☁️</span>
             <span id="syncStatusText" class="sync-status-text">Salvo</span>
           </div>
         </div>
+
+        <div class="undo-redo-row" title="Histórico de Edições">
+          <button type="button" id="btnUndo" class="btn-icon-action btn-undo" title="Desfazer (Ctrl+Z)" disabled>↩</button>
+          <button type="button" id="btnRedo" class="btn-icon-action btn-redo" title="Refazer (Ctrl+Y)" disabled>↪</button>
+        </div>
       </div>
 
-      <!-- Lado Direito: Ações Rápidas & Menu de Peça -->
+      <!-- Lado Direito: Presença, Compartilhamento, Perfil, Tema e Hamburguinho -->
       <div class="header-right" id="headerRightArea">
-        <!-- Grupo 1: Edição & Peças -->
-        <div class="header-group group-actions">
-          <div class="mobile-group-title">📁 Peças & Edição</div>
-          <div class="undo-redo-row">
-            <button type="button" id="btnUndo" class="btn-icon-action btn-undo" title="Desfazer (Ctrl+Z)" disabled>↩</button>
-            <button type="button" id="btnRedo" class="btn-icon-action btn-redo" title="Refazer (Ctrl+Y)" disabled>↪</button>
-          </div>
+        <div id="presenceRow" class="presence-row" title="Colaboradores Online"></div>
 
-          <button type="button" id="btnNewPiece" class="btn-text-action btn-new-piece" title="Iniciar Nova Peça em Branco (Ctrl+N)">
-            <span class="btn-icon">📄</span> Nova Peça
+        <button type="button" id="btnSharePiece" class="btn-share-highlight" title="Compartilhar Peça e Colaborar em Tempo Real">
+          <span class="btn-icon">🔗</span> Compartilhar
+        </button>
+
+        <!-- Perfil e Autenticação do Usuário (Perfil Único) -->
+        <div class="user-auth-wrapper">
+          <button type="button" id="btnAuth" class="btn-user-auth" title="Sua Conta ou Fazer Login">
+            <span id="userAuthAvatar" class="user-avatar-tiny">👤</span>
+            <span id="userAuthLabel" class="user-auth-name">Entrar</span>
           </button>
-
-          <select id="selectPreset" class="clean-select" title="Carregar Exemplo ou Nova Peça">
-            <option value="" disabled selected>Peças de Exemplo...</option>
-          </select>
-          
-          <div class="file-actions-row">
-            <button type="button" id="btnExport" class="btn-text-action" title="Exportar Peça">Exportar</button>
-            <label class="btn-text-action file-btn" title="Importar Peça">
-              Importar
-              <input type="file" id="inputImport" accept=".json" style="display:none">
-            </label>
-          </div>
-        </div>
-
-        <!-- Grupo 2: Nuvem, Compartilhamento & Perfil -->
-        <div class="header-group group-cloud">
-          <div class="mobile-group-title">☁️ Sincronização & Colaboração</div>
-          <div id="presenceRow" class="presence-row" title="Colaboradores Online"></div>
-
-          <button type="button" id="btnOpenHistory" class="btn-text-action btn-history" title="Histórico de Versões na Nuvem (até 500 alterações)">
-            <span class="btn-icon">🕒</span> Histórico <span id="historyBadgeCount" class="history-badge">0</span>
-          </button>
-
-          <button type="button" id="btnSharePiece" class="btn-share-highlight" title="Compartilhar Peça e Colaborar em Tempo Real">
-            <span class="btn-icon">🔗</span> Compartilhar
-          </button>
-
-          <!-- Perfil e Autenticação do Usuário (Perfil Único) -->
-          <div class="user-auth-wrapper">
-            <button type="button" id="btnAuth" class="btn-user-auth" title="Sua Conta ou Fazer Login">
-              <span id="userAuthAvatar" class="user-avatar-tiny">👤</span>
-              <span id="userAuthLabel" class="user-auth-name">Entrar</span>
-            </button>
-            <div id="userMenuDropdown" class="user-menu-dropdown" style="display:none">
-              <div class="user-menu-header">
-                <div id="userMenuAvatarLarge" class="user-avatar-circle-sm">👤</div>
-                <div class="user-menu-info">
-                  <div id="userMenuName" class="user-menu-name">Convidado</div>
-                  <div id="userMenuEmail" class="user-menu-email">Não conectado</div>
-                </div>
+          <div id="userMenuDropdown" class="user-menu-dropdown" style="display:none">
+            <div class="user-menu-header">
+              <div id="userMenuAvatarLarge" class="user-avatar-circle-sm">👤</div>
+              <div class="user-menu-info">
+                <div id="userMenuName" class="user-menu-name">Convidado</div>
+                <div id="userMenuEmail" class="user-menu-email">Não conectado</div>
               </div>
-              <div class="user-menu-divider"></div>
-              <button type="button" id="btnUserCloudPieces" class="user-menu-item">
-                <span class="menu-item-icon">☁️</span> Minhas Peças na Nuvem
-              </button>
-              <button type="button" id="btnUserLogout" class="user-menu-item user-menu-logout">
-                <span class="menu-item-icon">🚪</span> Sair da Conta
-              </button>
             </div>
-          </div>
-
-          <button type="button" id="btnInstallPwa" class="btn-text-action btn-install-app" title="Instalar aplicativo no aparelho para uso offline sem internet">
-            <span class="btn-icon">📲</span> Instalar App
-          </button>
-        </div>
-
-        <!-- Grupo 2: Peças & Histórico Local -->
-        <div class="header-group group-actions">
-          <div class="mobile-group-title">📁 Peças & Edição</div>
-          <div class="undo-redo-row">
-            <button type="button" id="btnUndo" class="btn-text-action btn-undo" title="Desfazer última alteração (Ctrl+Z)" disabled>
-              <span class="btn-icon">↩</span> Desfazer
+            <div class="user-menu-divider"></div>
+            <button type="button" id="btnUserCloudPieces" class="user-menu-item">
+              <span class="menu-item-icon">☁️</span> Minhas Peças na Nuvem
             </button>
-
-            <button type="button" id="btnRedo" class="btn-text-action btn-redo" title="Refazer alteração (Ctrl+Y)" disabled>
-              <span class="btn-icon">↪</span> Refazer
+            <button type="button" id="btnUserLogout" class="user-menu-item user-menu-logout">
+              <span class="menu-item-icon">🚪</span> Sair da Conta
             </button>
-          </div>
-
-          <button type="button" id="btnNewPiece" class="btn-text-action btn-new-piece" title="Iniciar Nova Peça em Branco (Ctrl+N)">
-            <span class="btn-icon">📄</span> Nova Peça
-          </button>
-
-          <select id="selectPreset" class="clean-select" title="Carregar Exemplo ou Nova Peça">
-            <option value="" disabled selected>Peças de Exemplo...</option>
-          </select>
-          
-          <div class="file-actions-row">
-            <button type="button" id="btnExport" class="btn-text-action" title="Exportar Peça">Exportar</button>
-            <label class="btn-text-action file-btn" title="Importar Peça">
-              Importar
-              <input type="file" id="fileImport" accept=".json" style="display:none">
-            </label>
           </div>
         </div>
 
-        <!-- Grupo 3: Preferências de Áudio e Visual -->
-        <div class="header-group group-prefs">
-          <div class="mobile-group-title">🔊 Som & Tema</div>
-          <button type="button" id="btnThemeToggle" class="btn-icon-action" title="Alternar Tema Claro / Escuro (T)">
-            <span id="themeIcon">☀️</span>
+        <!-- Alternar Tema Claro / Escuro -->
+        <button type="button" id="btnThemeToggle" class="btn-icon-action" title="Alternar Tema Claro / Escuro (T)">
+          <span id="themeIcon">☀️</span>
+        </button>
+
+        <!-- Menu Hamburguinho de Configurações & Arquivo (☰) -->
+        <div class="app-menu-wrapper" id="appMenuWrapper">
+          <button type="button" id="btnAppMenu" class="btn-icon-action btn-app-menu" title="Menu e Configurações (Arquivo, Peças, Som, Histórico)" aria-label="Menu Principal">
+            <span class="menu-hamburger-icon">☰</span>
           </button>
 
-          <button type="button" id="btnMute" class="btn-icon-mute active" title="Mudo (M)">
-            <span id="muteIcon">🔊</span>
-          </button>
-          <select id="selectSoundType" class="clean-select" title="Timbre de Percussão">
-            <option value="woodblock">Bloco de Madeira</option>
-            <option value="clave">Clave / Rimshot</option>
-            <option value="click">Click Digital</option>
-            <option value="beep">Bip</option>
-          </select>
+          <div id="appMenuDropdown" class="app-menu-dropdown" style="display:none">
+            <!-- Seção: Arquivo & Peça -->
+            <div class="app-menu-section-header">📁 Peça & Arquivo</div>
+            
+            <button type="button" id="btnNewPiece" class="app-menu-item" title="Iniciar Nova Peça em Branco (Ctrl+N)">
+              <span class="menu-item-icon">📄</span> Nova Peça
+            </button>
+
+            <div class="app-menu-select-wrap">
+              <label for="selectPreset" class="app-menu-label">🎼 Modelos & Peças:</label>
+              <select id="selectPreset" class="app-menu-select" title="Carregar Exemplo ou Modelo">
+                <option value="" disabled selected>Peças de Exemplo...</option>
+              </select>
+            </div>
+
+            <button type="button" id="btnOpenHistory" class="app-menu-item" title="Histórico de Versões na Nuvem">
+              <span class="menu-item-icon">🕒</span> Histórico de Versões
+              <span id="historyBadgeCount" class="history-badge">0</span>
+            </button>
+
+            <div class="app-menu-row-buttons">
+              <button type="button" id="btnExport" class="app-menu-item-half" title="Exportar arquivo .json da peça">
+                <span class="menu-item-icon">💾</span> Exportar (.json)
+              </button>
+              <label class="app-menu-item-half file-btn" title="Importar arquivo .json de peça">
+                <span class="menu-item-icon">📂</span> Importar
+                <input type="file" id="fileImport" accept=".json" style="display:none">
+              </label>
+            </div>
+
+            <div class="app-menu-divider"></div>
+
+            <!-- Seção: Áudio & Timbre -->
+            <div class="app-menu-section-header">🔊 Áudio & Som</div>
+            <div class="app-menu-audio-row">
+              <button type="button" id="btnMute" class="btn-icon-mute active" title="Mudo (M)">
+                <span id="muteIcon">🔊</span>
+              </button>
+              <select id="selectSoundType" class="app-menu-select flex-grow" title="Timbre de Percussão">
+                <option value="woodblock">Bloco de Madeira</option>
+                <option value="clave">Clave / Rimshot</option>
+                <option value="click">Click Digital</option>
+                <option value="beep">Bip</option>
+              </select>
+            </div>
+
+            <!-- Seção: Aplicativo (PWA) -->
+            <div class="app-menu-divider"></div>
+            <button type="button" id="btnInstallPwa" class="app-menu-item app-menu-install" title="Instalar aplicativo para uso offline">
+              <span class="menu-item-icon">📲</span> Instalar Aplicativo
+            </button>
+          </div>
         </div>
       </div>
     </header>

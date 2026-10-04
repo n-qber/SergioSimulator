@@ -147,12 +147,14 @@ class SergioApp {
       inputPieceName: document.getElementById('inputPieceName'),
       selectPreset: document.getElementById('selectPreset'),
       btnExport: document.getElementById('btnExport'),
-      fileImport: document.getElementById('fileImport'),
+      fileImport: document.getElementById('fileImport') || document.getElementById('inputImport'),
       btnNewPiece: document.getElementById('btnNewPiece'),
       btnUndo: document.getElementById('btnUndo'),
       btnRedo: document.getElementById('btnRedo'),
       btnThemeToggle: document.getElementById('btnThemeToggle'),
       themeIcon: document.getElementById('themeIcon'),
+      btnAppMenu: document.getElementById('btnAppMenu'),
+      appMenuDropdown: document.getElementById('appMenuDropdown'),
       saveIndicator: document.getElementById('syncStatusPill') || document.getElementById('saveIndicator'),
       syncStatusPill: document.getElementById('syncStatusPill'),
       syncStatusText: document.getElementById('syncStatusText'),
@@ -2613,17 +2615,51 @@ class SergioApp {
         if (this.dom.userMenuDropdown) {
           this.dom.userMenuDropdown.style.display = isHidden ? 'flex' : 'none';
         }
+        if (this.dom.appMenuDropdown) {
+          this.dom.appMenuDropdown.style.display = 'none';
+          this.dom.btnAppMenu?.classList.remove('active');
+        }
       } else {
         this.openAuthModal('login');
       }
     });
 
-    // Fechar dropdown de usuário ao clicar fora
-    document.addEventListener('click', (e) => {
-      if (this.dom.userMenuDropdown && !this.dom.userMenuDropdown.contains(e.target) && e.target !== this.dom.btnAuth) {
+    // Abrir menu principal / hamburguinho de configurações & arquivo
+    this.dom.btnAppMenu?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isHidden = !this.dom.appMenuDropdown || this.dom.appMenuDropdown.style.display === 'none';
+      if (this.dom.appMenuDropdown) {
+        this.dom.appMenuDropdown.style.display = isHidden ? 'flex' : 'none';
+        this.dom.btnAppMenu.classList.toggle('active', isHidden);
+      }
+      if (this.dom.userMenuDropdown) {
         this.dom.userMenuDropdown.style.display = 'none';
       }
     });
+
+    // Fechar dropdowns ao clicar fora
+    document.addEventListener('click', (e) => {
+      if (this.dom.userMenuDropdown && !this.dom.userMenuDropdown.contains(e.target) && !this.dom.btnAuth?.contains(e.target)) {
+        this.dom.userMenuDropdown.style.display = 'none';
+      }
+      if (this.dom.appMenuDropdown && !this.dom.appMenuDropdown.contains(e.target) && !this.dom.btnAppMenu?.contains(e.target)) {
+        this.dom.appMenuDropdown.style.display = 'none';
+        this.dom.btnAppMenu?.classList.remove('active');
+      }
+    });
+
+    // Fechar menu de arquivo ao selecionar ou disparar ações
+    const closeAppMenu = () => {
+      if (this.dom.appMenuDropdown) {
+        this.dom.appMenuDropdown.style.display = 'none';
+        this.dom.btnAppMenu?.classList.remove('active');
+      }
+    };
+    this.dom.btnNewPiece?.addEventListener('click', closeAppMenu);
+    this.dom.btnOpenHistory?.addEventListener('click', closeAppMenu);
+    this.dom.btnExport?.addEventListener('click', closeAppMenu);
+    this.dom.fileImport?.addEventListener('change', closeAppMenu);
+    this.dom.selectPreset?.addEventListener('change', closeAppMenu);
 
     // Botão de Logout
     this.dom.btnUserLogout?.addEventListener('click', async () => {
@@ -2639,9 +2675,13 @@ class SergioApp {
     // Botão "Minhas Peças na Nuvem" no menu de usuário
     this.dom.btnUserCloudPieces?.addEventListener('click', () => {
       if (this.dom.userMenuDropdown) this.dom.userMenuDropdown.style.display = 'none';
+      if (this.dom.appMenuDropdown) {
+        this.dom.appMenuDropdown.style.display = 'flex';
+        this.dom.btnAppMenu?.classList.add('active');
+      }
       if (this.dom.selectPreset) {
         this.dom.selectPreset.focus();
-        this.showToast('Selecione uma peça na lista de Peças Salvas na Nuvem', '☁️');
+        this.showToast('Selecione uma peça na lista de Peças & Modelos', '☁️');
       }
     });
 

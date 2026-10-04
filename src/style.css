@@ -313,17 +313,18 @@ button {
 /* Centro: Título da Peça & Status Unificado */
 .header-center {
   flex: 1;
-  max-width: 480px;
+  max-width: 560px;
   display: flex;
   justify-content: center;
   align-items: center;
+  gap: 10px;
 }
 
 .piece-title-wrapper {
   display: flex;
   align-items: center;
   gap: 8px;
-  width: 100%;
+  min-width: 0;
   justify-content: center;
 }
 
@@ -532,6 +533,200 @@ button {
 
 .btn-icon-mute:hover {
   border-color: var(--red-primary);
+}
+
+/* ==========================================================================
+   MENU PRINCIPAL / HAMBÚRGUER DE CONFIGURAÇÕES (☰)
+   ========================================================================== */
+.app-menu-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.btn-app-menu {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-stage);
+  border: 1px solid var(--border-light);
+  color: var(--white-pure);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 1.15rem;
+  line-height: 1;
+  transition: all 0.15s ease;
+}
+
+.btn-app-menu:hover,
+.btn-app-menu.active {
+  background: var(--bg-card-hover);
+  border-color: var(--red-primary);
+  color: var(--red-primary);
+  transform: translateY(-1px);
+}
+
+.app-menu-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 250px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-medium);
+  border-radius: 12px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  animation: fadeInAppMenu 0.15s ease-out;
+}
+
+@keyframes fadeInAppMenu {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.app-menu-section-header {
+  font-size: 0.65rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--white-muted);
+  padding: 4px 6px 2px 6px;
+}
+
+.app-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: 7px;
+  border: none;
+  background: transparent;
+  color: var(--white-pure);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.15s ease;
+  position: relative;
+}
+
+.app-menu-item:hover {
+  background: var(--bg-card-hover);
+  color: var(--red-primary);
+}
+
+.app-menu-item .menu-item-icon {
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.app-menu-item .history-badge {
+  margin-left: auto;
+}
+
+.app-menu-select-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 4px 6px;
+}
+
+.app-menu-label {
+  font-size: 0.7rem;
+  color: var(--white-muted);
+  font-weight: 600;
+}
+
+.app-menu-select {
+  width: 100%;
+  background: var(--bg-stage);
+  border: 1px solid var(--border-light);
+  color: var(--white-pure);
+  font-size: 0.78rem;
+  font-weight: 500;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+.app-menu-select:hover,
+.app-menu-select:focus {
+  border-color: var(--red-primary);
+  outline: none;
+}
+
+.app-menu-row-buttons {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 4px;
+}
+
+.app-menu-item-half {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: var(--bg-stage);
+  border: 1px solid var(--border-light);
+  color: var(--white-pure);
+  font-size: 0.76rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: center;
+}
+
+.app-menu-item-half:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--red-primary);
+  color: var(--red-primary);
+}
+
+.app-menu-divider {
+  height: 1px;
+  background: var(--border-light);
+  margin: 4px 0;
+}
+
+.app-menu-audio-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 6px;
+}
+
+.app-menu-audio-row .btn-icon-mute {
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+}
+
+.app-menu-audio-row .flex-grow {
+  flex: 1;
+}
+
+.app-menu-install {
+  color: var(--red-primary);
 }
 
 /* ==========================================================================
@@ -1591,6 +1786,59 @@ button {
 
 [data-theme="light"] .user-menu-item:hover {
   background: #f1f5f9;
+}
+
+[data-theme="light"] .btn-app-menu {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  color: #1e293b;
+}
+
+[data-theme="light"] .btn-app-menu:hover,
+[data-theme="light"] .btn-app-menu.active {
+  background: #f1f5f9;
+  border-color: var(--red-primary);
+  color: var(--red-primary);
+}
+
+[data-theme="light"] .app-menu-dropdown {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  box-shadow: 0 14px 36px rgba(15, 23, 42, 0.16);
+}
+
+[data-theme="light"] .app-menu-item {
+  color: #1e293b;
+}
+
+[data-theme="light"] .app-menu-item:hover {
+  background: #f1f5f9;
+}
+
+[data-theme="light"] .app-menu-item-half {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  color: #1e293b;
+}
+
+[data-theme="light"] .app-menu-item-half:hover {
+  background: #f1f5f9;
+  border-color: var(--red-primary);
+  color: var(--red-primary);
+}
+
+[data-theme="light"] .app-menu-select {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  color: #1e293b;
+}
+
+[data-theme="light"] .app-menu-section-header {
+  color: #64748b;
+}
+
+[data-theme="light"] .app-menu-divider {
+  background: #e2e8f0;
 }
 
 /* Aba Peça & Nuvem no Celular no Tema Claro */
