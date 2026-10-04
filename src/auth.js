@@ -191,6 +191,8 @@ class AuthService {
         return 'Falha de conexão com os servidores de autenticação.';
       case 'auth/operation-not-allowed':
         return 'Este método de login não está ativado no console do Firebase.';
+      case 'auth/unauthorized-domain':
+        return `Domínio não autorizado no Firebase (${typeof window !== 'undefined' ? window.location.hostname : 'este domínio'}). Adicione-o no Firebase Console > Authentication > Settings > Authorized domains.`;
       default:
         return err.message || 'Ocorreu um erro na autenticação.';
     }
