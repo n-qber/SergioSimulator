@@ -1185,33 +1185,53 @@ class SergioApp {
       const hasModifier = e.ctrlKey || e.metaKey;
       const key = e.key.toLowerCase();
 
-      // Atalho Ctrl+Z / Cmd+Z: Desfazer
-      if (hasModifier && key === 'z' && !e.shiftKey) {
-        e.preventDefault();
-        const action = state.undo();
-        if (action) {
-          this.showToast(`Desfez: ${action}`, '↩');
-        } else {
-          this.showToast('Nada a desfazer', 'ℹ️');
+      // Se há tecla modificadora (Ctrl ou Cmd), processar apenas atalhos específicos do app
+      // e liberar todos os atalhos nativos do navegador (ex: Ctrl+R, Ctrl+Shift+R, Ctrl+T, Ctrl+W, Ctrl+Shift+I)
+      if (hasModifier) {
+        // Atalho Ctrl+Z / Cmd+Z: Desfazer
+        if (key === 'z' && !e.shiftKey) {
+          e.preventDefault();
+          const action = state.undo();
+          if (action) {
+            this.showToast(`Desfez: ${action}`, '↩');
+          } else {
+            this.showToast('Nada a desfazer', 'ℹ️');
+          }
+          return;
         }
-        return;
-      }
 
-      // Atalho Ctrl+Y ou Ctrl+Shift+Z / Cmd+Shift+Z: Refazer
-      if (hasModifier && ((key === 'z' && e.shiftKey) || key === 'y')) {
-        e.preventDefault();
-        const action = state.redo();
-        if (action) {
-          this.showToast(`Refez: ${action}`, '↪');
-        } else {
-          this.showToast('Nada a refazer', 'ℹ️');
+        // Atalho Ctrl+Y ou Ctrl+Shift+Z / Cmd+Shift+Z: Refazer
+        if ((key === 'z' && e.shiftKey) || key === 'y') {
+          e.preventDefault();
+          const action = state.redo();
+          if (action) {
+            this.showToast(`Refez: ${action}`, '↪');
+          } else {
+            this.showToast('Nada a refazer', 'ℹ️');
+          }
+          return;
         }
-        return;
-      }
 
-      if (hasModifier && key === 'n') {
-        e.preventDefault();
-        this.openConfirmNewModal();
+        // Atalho Ctrl+N / Cmd+N: Nova Peça
+        if (key === 'n') {
+          e.preventDefault();
+          this.openConfirmNewModal();
+          return;
+        }
+
+        // Atalho Ctrl+A / Cmd+A: Selecionar todos os compassos
+        if (key === 'a') {
+          e.preventDefault();
+          this.selectedMeasureIndices.clear();
+          for (let i = 0; i < state.measures.length; i++) {
+            this.selectedMeasureIndices.add(i);
+          }
+          this.lastSelectedMeasureIdx = state.measures.length > 0 ? state.measures.length - 1 : null;
+          this.syncSelectionUI();
+          return;
+        }
+
+        // Deixar qualquer outro atalho com Ctrl/Cmd seguir pro navegador (Ctrl+R, Ctrl+Shift+R, etc.)
         return;
       }
 
@@ -1247,18 +1267,6 @@ class SergioApp {
         }
       }
 
-      // Atalho Ctrl+A / Cmd+A: Selecionar todos os compassos
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
-        e.preventDefault();
-        this.selectedMeasureIndices.clear();
-        for (let i = 0; i < state.measures.length; i++) {
-          this.selectedMeasureIndices.add(i);
-        }
-        this.lastSelectedMeasureIdx = state.measures.length > 0 ? state.measures.length - 1 : null;
-        this.syncSelectionUI();
-        return;
-      }
-
       if (e.code === 'Space') {
         e.preventDefault();
         this.togglePlayPause();
@@ -1268,7 +1276,7 @@ class SergioApp {
       } else if (e.key === 'm' || e.key === 'M') {
         this.dom.btnMute.click();
       } else if (e.key === 't' || e.key === 'T') {
-        if (!e.ctrlKey && !e.metaKey && !e.altKey) {
+        if (!e.altKey) {
           this.dom.btnThemeToggle?.click();
         }
       } else if (e.altKey && e.key === 'ArrowLeft') {
