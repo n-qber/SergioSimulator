@@ -89,7 +89,12 @@ class PieceState {
       ratioDen: Math.max(1, parseInt(m.ratioDen, 10) || 1),
       customBpm: Math.max(20, Math.min(500, Number(m.customBpm) || this.baseBpm)),
       color: m.color || "#ff334b",
-      repeat: Math.max(1, Math.min(999, parseInt(m.repeat, 10) || 1))
+      repeat: Math.max(1, Math.min(999, parseInt(m.repeat, 10) || 1)),
+      sourcePieceId: m.sourcePieceId || null,
+      sourcePieceName: m.sourcePieceName || null,
+      sourceMeasureId: m.sourceMeasureId || null,
+      isLinked: m.isLinked === undefined ? (!!m.sourcePieceId) : !!m.isLinked,
+      isLocallyModified: !!m.isLocallyModified
     }));
 
     const maxIdx = this.measures.length > 0 ? this.measures.length - 1 : -1;
@@ -100,9 +105,22 @@ class PieceState {
         name: g.name || `Grupo ${idx + 1}`,
         color: g.color || "#3b82f6",
         startMeasure: Math.max(0, Math.min(maxIdx, parseInt(g.startMeasure, 10) || 0)),
-        endMeasure: Math.max(0, Math.min(maxIdx, parseInt(g.endMeasure, 10) || 0))
+        endMeasure: Math.max(0, Math.min(maxIdx, parseInt(g.endMeasure, 10) || 0)),
+        isBossaBlock: !!g.isBossaBlock,
+        sourcePieceId: g.sourcePieceId || null,
+        sourcePieceName: g.sourcePieceName || null,
+        isLinked: g.isLinked === undefined ? (!!g.sourcePieceId) : !!g.isLinked
       }))
       .filter(g => g.startMeasure <= g.endMeasure);
+
+    // Sincronização automática silenciosa de bossas vinculadas
+    if (!isRemote) {
+      try {
+        this.syncLinkedBossas();
+      } catch (err) {
+        console.warn("Aviso ao sincronizar bossas vinculadas:", err);
+      }
+    }
 
     this.recalculateTimings();
     this.currentSnapshot = this.getSnapshot();
@@ -544,6 +562,35 @@ class PieceState {
     if (updates.color !== undefined) m.color = updates.color;
     if (updates.repeat !== undefined) m.repeat = Math.max(1, Math.min(999, parseInt(updates.repeat, 10) || 1));
 
+    // Suporte a metadados de Bossa e cópia na escrita (copy-on-write)
+    if (updates.isLinked !== undefined) {
+      m.isLinked = !!updates.isLinked;
+    }
+    if (updates.isLocallyModified !== undefined) {
+      m.isLocallyModified = !!updates.isLocallyModified;
+    }
+    if (updates.sourcePieceId !== undefined) {
+      m.sourcePieceId = updates.sourcePieceId;
+    }
+    if (updates.sourcePieceName !== undefined) {
+      m.sourcePieceName = updates.sourcePieceName;
+    }
+
+    // Se o compasso faz parte de uma bossa vinculada e sofreu edição sem passar isLinked explicitamente,
+    // marca automaticamente como personalização local para não ser sobrescrito pelo auto-sync
+    if (m.sourcePieceId && m.isLinked && updates.isLinked === undefined && (
+      updates.nickname !== undefined ||
+      updates.beats !== undefined ||
+      updates.tempoMode !== undefined ||
+      updates.ratioNum !== undefined ||
+      updates.ratioDen !== undefined ||
+      updates.customBpm !== undefined ||
+      updates.repeat !== undefined
+    )) {
+      m.isLinked = false;
+      m.isLocallyModified = true;
+    }
+
     this.recalculateTimings();
     this.notify(`Atualizou compasso ${index + 1}`);
   }
@@ -583,6 +630,354 @@ class PieceState {
   removeGroup(groupId) {
     this.groups = this.groups.filter(g => g.id !== groupId);
     this.notify("Removeu grupo");
+  }
+
+  // =========================================================================
+  // SISTEMA DE BOSSAS / APRESENTAÇÕES POR REFERÊNCIA
+  // =========================================================================
+
+  // Sincroniza silenciosamente todas as bossas vinculadas com a fonte original
+  syncLinkedBossas() {
+    if (!this.measures || this.measures.length === 0) return 0;
+    
+    // Identifica todos os sourcePieceIds vinculados
+    const linkedPieceIds = new Set();
+    this.measures.forEach(m => {
+      if (m.sourcePieceId && m.isLinked) {
+        linkedPieceIds.add(m.sourcePieceId);
+      }
+    });
+
+    if (linkedPieceIds.size === 0) return 0;
+
+    const library = this.getLibraryPieces();
+    let updatedCount = 0;
+
+    linkedPieceIds.forEach(pieceId => {
+      // Busca a peça original na biblioteca ou nos presets
+      const origPiece = library.find(p => p.id === pieceId) 
+        || PRESETS.find(p => p.id === pieceId);
+
+      if (!origPiece || !Array.isArray(origPiece.measures) || origPiece.measures.length === 0) {
+        return;
+      }
+
+      // Atualiza nome da bossa nos grupos se mudou
+      this.groups.forEach(g => {
+        if (g.sourcePieceId === pieceId && g.isBossaBlock) {
+          g.sourcePieceName = origPiece.name;
+          if (g.isLinked && !g.name.includes(origPiece.name)) {
+            g.name = `🔗 ${origPiece.name}`;
+          }
+        }
+      });
+
+      // Mapeia os compassos da peça original por ID para correspondência precisa
+      const origMeasureMap = new Map();
+      origPiece.measures.forEach((om) => {
+        if (om.id) origMeasureMap.set(om.id, om);
+      });
+
+      // Atualiza os compassos que estão vinculados e não foram modificados localmente
+      this.measures.forEach((m) => {
+        if (m.sourcePieceId === pieceId && m.isLinked && !m.isLocallyModified) {
+          let targetOrig = null;
+          if (m.sourceMeasureId && origMeasureMap.has(m.sourceMeasureId)) {
+            targetOrig = origMeasureMap.get(m.sourceMeasureId);
+          } else {
+            // Acha o índice relativo do compasso dentro da bossa
+            const bossaMeasuresInPiece = this.measures.filter(item => item.sourcePieceId === pieceId);
+            const relIdx = bossaMeasuresInPiece.indexOf(m);
+            if (relIdx >= 0 && relIdx < origPiece.measures.length) {
+              targetOrig = origPiece.measures[relIdx];
+            }
+          }
+
+          if (targetOrig) {
+            // Atualiza propriedades musicais preservando personalizações
+            m.nickname = targetOrig.nickname || m.nickname;
+            m.beats = targetOrig.beats || m.beats;
+            m.beatUnit = targetOrig.beatUnit || m.beatUnit;
+            m.tempoMode = targetOrig.tempoMode || m.tempoMode;
+            m.ratioNum = targetOrig.ratioNum || m.ratioNum;
+            m.ratioDen = targetOrig.ratioDen || m.ratioDen;
+            m.customBpm = targetOrig.customBpm || m.customBpm;
+            m.repeat = targetOrig.repeat || m.repeat;
+            m.sourcePieceName = origPiece.name;
+            updatedCount++;
+          }
+        }
+      });
+    });
+
+    if (updatedCount > 0) {
+      this.recalculateTimings();
+    }
+    return updatedCount;
+  }
+
+  // Insere uma Bossa / Peça completa na partitura (por referência vinculada ou cópia estática)
+  insertBossa(bossaPiece, targetIndex = -1, isLinked = true) {
+    if (!bossaPiece) return null;
+
+    const sourceMeasures = Array.isArray(bossaPiece.measures) && bossaPiece.measures.length > 0
+      ? bossaPiece.measures
+      : [
+          {
+            id: `m-bossa-default`,
+            nickname: bossaPiece.name || "Bossa",
+            beats: 4,
+            beatUnit: 4,
+            tempoMode: "ratio",
+            ratioNum: 1,
+            ratioDen: 1,
+            customBpm: bossaPiece.baseBpm || this.baseBpm,
+            color: "#8b5cf6",
+            repeat: 1
+          }
+        ];
+
+    // Posição de inserção
+    const insertPos = (targetIndex >= 0 && targetIndex < this.measures.length)
+      ? targetIndex + 1
+      : this.measures.length;
+
+    // Cores temáticas para blocos de bossas
+    const bossaColors = [
+      "#8b5cf6", // Violeta
+      "#06b6d4", // Ciano
+      "#10b981", // Esmeralda
+      "#f59e0b", // Âmbar
+      "#ec4899", // Rosa choque
+      "#3b82f6"  // Azul royal
+    ];
+    const colorIdx = this.groups.filter(g => g.isBossaBlock).length % bossaColors.length;
+    const bossaColor = bossaPiece.color || bossaColors[colorIdx];
+
+    // Clona compassos e atribui metadados de referência
+    const bossaMeasures = sourceMeasures.map((om, idx) => ({
+      id: `m-${Date.now()}-${idx}-${Math.random().toString(36).substr(2, 4)}`,
+      nickname: (om.nickname || "").trim() || `${bossaPiece.name} (${idx + 1})`,
+      beats: Math.max(1, Math.min(32, parseInt(om.beats, 10) || 4)),
+      beatUnit: [2, 4, 8, 16].includes(parseInt(om.beatUnit, 10)) ? parseInt(om.beatUnit, 10) : 4,
+      tempoMode: om.tempoMode === "fixed" ? "fixed" : "ratio",
+      ratioNum: Math.max(1, parseInt(om.ratioNum, 10) || 1),
+      ratioDen: Math.max(1, parseInt(om.ratioDen, 10) || 1),
+      customBpm: Math.max(20, Math.min(500, Number(om.customBpm) || bossaPiece.baseBpm || this.baseBpm)),
+      color: bossaColor,
+      repeat: Math.max(1, Math.min(999, parseInt(om.repeat, 10) || 1)),
+      sourcePieceId: bossaPiece.id || null,
+      sourcePieceName: bossaPiece.name || "Bossa",
+      sourceMeasureId: om.id || null,
+      isLinked: !!isLinked,
+      isLocallyModified: false
+    }));
+
+    const count = bossaMeasures.length;
+
+    // Ajusta índices de grupos existentes que estejam após o ponto de inserção
+    this.groups.forEach(g => {
+      if (g.startMeasure >= insertPos) g.startMeasure += count;
+      if (g.endMeasure >= insertPos) g.endMeasure += count;
+    });
+
+    // Insere os compassos na partitura
+    this.measures.splice(insertPos, 0, ...bossaMeasures);
+
+    // Cria o Grupo da Bossa (com identificação de bloco)
+    const bossaGroup = {
+      id: `grp-bossa-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+      name: isLinked ? `🔗 ${bossaPiece.name || "Bossa"}` : `${bossaPiece.name || "Bossa"}`,
+      color: bossaColor,
+      startMeasure: insertPos,
+      endMeasure: insertPos + count - 1,
+      isBossaBlock: true,
+      sourcePieceId: bossaPiece.id || null,
+      sourcePieceName: bossaPiece.name || "Bossa",
+      isLinked: !!isLinked
+    };
+    this.groups.push(bossaGroup);
+
+    this.recalculateTimings();
+    this.notify(`Inseriu ${isLinked ? 'bossa vinculada' : 'cópia da bossa'} '${bossaPiece.name}' (${count} comp.)`);
+    return {
+      group: bossaGroup,
+      measures: bossaMeasures,
+      startIndex: insertPos,
+      count: count
+    };
+  }
+
+  // Sincroniza manualmente um bloco específico de bossa
+  syncBossaBlock(groupId) {
+    const grp = this.groups.find(g => g.id === groupId);
+    if (!grp || !grp.sourcePieceId) return false;
+
+    const library = this.getLibraryPieces();
+    const origPiece = library.find(p => p.id === grp.sourcePieceId) 
+      || PRESETS.find(p => p.id === grp.sourcePieceId);
+
+    if (!origPiece || !Array.isArray(origPiece.measures)) return false;
+
+    let updated = 0;
+    const start = Math.max(0, grp.startMeasure);
+    const end = Math.min(this.measures.length - 1, grp.endMeasure);
+
+    for (let i = start; i <= end; i++) {
+      const m = this.measures[i];
+      if (m && m.sourcePieceId === grp.sourcePieceId && m.isLinked && !m.isLocallyModified) {
+        const origM = origPiece.measures.find(om => om.id === m.sourceMeasureId) 
+          || origPiece.measures[i - start];
+        if (origM) {
+          m.nickname = origM.nickname || m.nickname;
+          m.beats = origM.beats;
+          m.beatUnit = origM.beatUnit;
+          m.tempoMode = origM.tempoMode;
+          m.ratioNum = origM.ratioNum;
+          m.ratioDen = origM.ratioDen;
+          m.customBpm = origM.customBpm;
+          m.repeat = origM.repeat || 1;
+          updated++;
+        }
+      }
+    }
+
+    if (updated > 0) {
+      this.recalculateTimings();
+      this.notify(`Sincronizou ${updated} compassos da bossa '${origPiece.name}'`);
+    }
+    return true;
+  }
+
+  // Desvincula todos os compassos de um bloco de bossa (torna 100% locais e independentes)
+  unlinkBossaBlock(groupId) {
+    const grp = this.groups.find(g => g.id === groupId);
+    if (!grp) return false;
+
+    const start = Math.max(0, grp.startMeasure);
+    const end = Math.min(this.measures.length - 1, grp.endMeasure);
+
+    for (let i = start; i <= end; i++) {
+      const m = this.measures[i];
+      if (m) {
+        m.isLinked = false;
+        m.isLocallyModified = true;
+      }
+    }
+
+    grp.name = grp.name.replace(/^🔗\s*/, '');
+    grp.isLinked = false;
+    grp.isBossaBlock = false;
+
+    this.notify(`Desvinculou bossa '${grp.name}' (agora é independente)`);
+    return true;
+  }
+
+  // Desvincula um único compasso para edição local livre
+  unlinkMeasure(measureIndex) {
+    if (measureIndex < 0 || measureIndex >= this.measures.length) return false;
+    const m = this.measures[measureIndex];
+    m.isLinked = false;
+    m.isLocallyModified = true;
+    this.notify(`Desvinculou compasso ${measureIndex + 1} para edição local`);
+    return true;
+  }
+
+  // Restaura um compasso modificado de volta para a versão da bossa original
+  restoreMeasureFromBossa(measureIndex) {
+    if (measureIndex < 0 || measureIndex >= this.measures.length) return false;
+    const m = this.measures[measureIndex];
+    if (!m.sourcePieceId) return false;
+
+    const library = this.getLibraryPieces();
+    const origPiece = library.find(p => p.id === m.sourcePieceId) 
+      || PRESETS.find(p => p.id === m.sourcePieceId);
+
+    if (!origPiece || !Array.isArray(origPiece.measures)) return false;
+
+    const origM = origPiece.measures.find(om => om.id === m.sourceMeasureId) 
+      || origPiece.measures[0];
+
+    if (!origM) return false;
+
+    m.nickname = origM.nickname || m.nickname;
+    m.beats = origM.beats;
+    m.beatUnit = origM.beatUnit;
+    m.tempoMode = origM.tempoMode;
+    m.ratioNum = origM.ratioNum;
+    m.ratioDen = origM.ratioDen;
+    m.customBpm = origM.customBpm;
+    m.repeat = origM.repeat || 1;
+    m.isLinked = true;
+    m.isLocallyModified = false;
+
+    this.recalculateTimings();
+    this.notify(`Restaurou compasso ${measureIndex + 1} da bossa original`);
+    return true;
+  }
+
+  // Salva uma seleção de compassos como uma nova Bossa / Peça na biblioteca local
+  saveMeasuresAsBossa(indices, bossaName) {
+    if (!indices || indices.length === 0) return null;
+    const sorted = Array.from(new Set(indices))
+      .filter(idx => typeof idx === 'number' && idx >= 0 && idx < this.measures.length)
+      .sort((a, b) => a - b);
+
+    if (sorted.length === 0) return null;
+
+    const name = (bossaName || "").trim() || `Bossa (${sorted.length} comp.)`;
+    const newId = `piece-bossa-${Date.now()}`;
+
+    const bossaMeasures = sorted.map((idx, i) => {
+      const m = this.measures[idx];
+      return {
+        id: `m-bossa-${Date.now()}-${i}`,
+        nickname: m.nickname || `Compasso ${i + 1}`,
+        beats: m.beats,
+        beatUnit: m.beatUnit,
+        tempoMode: m.tempoMode,
+        ratioNum: m.ratioNum,
+        ratioDen: m.ratioDen,
+        customBpm: m.customBpm,
+        color: m.color || "#8b5cf6",
+        repeat: m.repeat || 1
+      };
+    });
+
+    const bossaData = {
+      id: newId,
+      name: name,
+      description: `Bossa extraída da apresentação '${this.name}'`,
+      presentationBpm: this.presentationBpm,
+      baseBpm: this.baseBpm,
+      measures: bossaMeasures,
+      groups: [
+        {
+          id: `grp-${newId}`,
+          name: name,
+          color: "#8b5cf6",
+          startMeasure: 0,
+          endMeasure: bossaMeasures.length - 1,
+          isBossaBlock: true
+        }
+      ],
+      updatedAt: new Date().toISOString()
+    };
+
+    // Salva na biblioteca local
+    let library = this.getLibraryPieces();
+    library.unshift(bossaData);
+    if (library.length > 50) library = library.slice(0, 50);
+    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+      try {
+        localStorage.setItem(LIBRARY_KEY, JSON.stringify(library));
+      } catch (e) {
+        console.warn("Não foi possível salvar bossa na biblioteca local:", e);
+      }
+    }
+
+    this.notify(`Criou e salvou nova bossa '${name}'`);
+    return bossaData;
   }
 
   // Retorna o grupo ao qual pertence o compasso, se houver

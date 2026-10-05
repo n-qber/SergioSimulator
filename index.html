@@ -116,6 +116,10 @@
               <span class="menu-item-icon">📄</span> Nova Peça
             </button>
 
+            <button type="button" id="btnMenuInsertBossa" class="app-menu-item" title="Inserir outra apresentação ou bossa por referência nesta peça">
+              <span class="menu-item-icon">🔗</span> Inserir Bossa / Peça Externa
+            </button>
+
             <div class="app-menu-select-wrap">
               <label for="selectPreset" class="app-menu-label">🎼 Modelos & Peças:</label>
               <select id="selectPreset" class="app-menu-select" title="Carregar Exemplo ou Modelo">
@@ -245,6 +249,8 @@
           <div class="toolbar-actions">
             <button type="button" id="btnMoveMeasureLeft" class="btn-toolbar-opt" title="Mover Compasso para Trás (Alt + ←)">◀ Mover</button>
             <button type="button" id="btnMoveMeasureRight" class="btn-toolbar-opt" title="Mover Compasso para Frente (Alt + →)">Mover ▶</button>
+            <button type="button" id="btnToolbarInsertBossa" class="btn-toolbar-opt" title="Inserir uma Bossa ou Apresentação por referência logo após este compasso">🔗 Inserir Bossa</button>
+            <button type="button" id="btnToolbarSaveAsBossa" class="btn-toolbar-opt" title="Salvar compasso(s) selecionado(s) como nova bossa independente na biblioteca">💾 Criar Bossa</button>
             <button type="button" id="btnGroupSelectedMeasures" class="btn-toolbar-opt" style="display:none" title="Criar grupo com os compassos selecionados">📁 Agrupar</button>
             <button type="button" id="btnConfigureSelectedMeasure" class="btn-toolbar-opt primary" title="Configurar Métrica e Andamento">⚙ Configurar</button>
             <button type="button" id="btnDuplicateSelectedMeasure" class="btn-toolbar-opt" title="Duplicar Compasso(s)">⧉ Duplicar</button>
@@ -298,6 +304,7 @@
           </div>
           <div class="section-top-buttons">
             <button type="button" id="btnClearAllMeasures" class="btn-ghost-sm" title="Remover todos os compassos da peça">Limpar Peça</button>
+            <button type="button" id="btnOpenInsertBossaModal" class="btn-bossa-sm" title="Inserir outra apresentação ou bossa por referência nesta peça">🔗 Inserir Bossa</button>
             <button type="button" id="btnOpenGroupModal" class="btn-ghost-sm">Novo Grupo</button>
             <button type="button" id="btnAddMeasureBottom" class="btn-red-sm">+ Compasso</button>
           </div>
@@ -343,6 +350,21 @@
 
         <form id="formMeasureEdit" class="modal-body-clean">
           <input type="hidden" id="editMeasureIndex" value="-1">
+
+          <!-- Banner Informativo de Compasso Vinculado à Bossa -->
+          <div id="measureBossaBanner" class="measure-bossa-banner" style="display:none">
+            <div class="bossa-banner-header">
+              <span class="bossa-banner-badge">🔗 Bossa Vinculada</span>
+              <span id="bossaBannerName" class="bossa-banner-name">Bossa 1</span>
+            </div>
+            <p class="bossa-banner-desc">
+              Este compasso puxa informações por referência da bossa original. Você pode editar qualquer valor livremente; suas alterações serão salvas nesta apresentação como personalização local sem afetar a original.
+            </p>
+            <div class="bossa-banner-actions">
+              <button type="button" id="btnMeasureUnlinkModal" class="btn-bossa-banner-action" title="Desvincular este compasso da bossa original">🔓 Desvincular Agora</button>
+              <button type="button" id="btnMeasureRestoreModal" class="btn-bossa-banner-action ghost" style="display:none" title="Restaurar valores da bossa original">↺ Restaurar da Bossa</button>
+            </div>
+          </div>
 
           <!-- Apelido / Nome do Compasso (Opcional) -->
           <div class="field-group hero-field">
@@ -508,6 +530,100 @@
             <span class="field-label" style="margin-bottom:8px; display:block">Grupos Criados</span>
             <div id="existingGroupsList" class="clean-groups-list"></div>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL DE INSERIR BOSSA / PEÇA POR REFERÊNCIA -->
+    <div id="modalInsertBossa" class="modal-overlay" style="display:none">
+      <div class="modal-window modal-bossa-window">
+        <div class="modal-top">
+          <span class="modal-measure-tag" style="background: rgba(139, 92, 246, 0.15); color: #a78bfa; border: 1px solid rgba(139, 92, 246, 0.3);">🔗 Apresentação Embutida</span>
+          <h3 class="modal-heading">Inserir Bossa ou Peça</h3>
+          <button type="button" class="modal-x" id="btnInsertBossaClose">&times;</button>
+        </div>
+
+        <div class="modal-body-clean bossa-modal-body">
+          <p class="bossa-modal-subtitle">
+            Inclua outra apresentação ou bossa como um bloco na partitura atual. Ela continuará conectada à peça original por referência (atualizações automáticas), mas com total liberdade para você personalizar localmente.
+          </p>
+
+          <!-- Filtro / Abas de Origem -->
+          <div class="bossa-source-tabs">
+            <button type="button" class="bossa-tab-btn active" id="tabBossaLibrary" data-tab="library">Minhas Peças & Bossas</button>
+            <button type="button" class="bossa-tab-btn" id="tabBossaPresets" data-tab="presets">Bossas & Modelos Prontos</button>
+          </div>
+
+          <!-- Lista de Peças/Bossas Disponíveis -->
+          <div class="bossa-list-container" id="bossaListContainer">
+            <!-- Renderizado dinamicamente via JS -->
+          </div>
+
+          <!-- Opções de Inserção -->
+          <div class="bossa-options-card">
+            <div class="bossa-option-group">
+              <span class="bossa-option-label">Posição de Inserção na Partitura:</span>
+              <div class="bossa-radio-row">
+                <label class="bossa-radio-label">
+                  <input type="radio" name="bossaPosition" value="end" checked id="radioBossaPosEnd">
+                  <span>No final da peça</span>
+                </label>
+                <label class="bossa-radio-label">
+                  <input type="radio" name="bossaPosition" value="selected" id="radioBossaPosSelected">
+                  <span id="labelBossaPosSelected">Após o compasso selecionado (c. 1)</span>
+                </label>
+              </div>
+            </div>
+
+            <div class="bossa-option-group">
+              <span class="bossa-option-label">Modo de Inclusão:</span>
+              <div class="bossa-radio-row">
+                <label class="bossa-radio-label">
+                  <input type="radio" name="bossaMode" value="linked" checked id="radioBossaModeLinked">
+                  <span>🔗 <strong>Vinculada por Referência</strong> (Recomendado: atualiza automaticamente se a bossa original mudar)</span>
+                </label>
+                <label class="bossa-radio-label">
+                  <input type="radio" name="bossaMode" value="unlinked" id="radioBossaModeUnlinked">
+                  <span>📋 <strong>Cópia Independente</strong> (Insere compassos estáticos sem vínculo à peça original)</span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-bottom bossa-modal-bottom">
+          <button type="button" class="btn-clean-ghost" id="btnCancelInsertBossa">Cancelar</button>
+          <button type="button" class="btn-clean-primary" id="btnConfirmInsertBossa" disabled>
+            <span class="btn-icon">🔗</span> Inserir Bossa na Peça
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL DE SALVAR TRECHO COMO NOVA BOSSA -->
+    <div id="modalSaveAsBossa" class="modal-overlay" style="display:none">
+      <div class="modal-window modal-confirm-window">
+        <div class="modal-top">
+          <span class="modal-measure-tag" style="background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3);">Exportar Repertório</span>
+          <h3 class="modal-heading">Salvar como Nova Bossa</h3>
+          <button type="button" class="modal-x" id="btnSaveAsBossaClose">&times;</button>
+        </div>
+
+        <div class="modal-body-clean confirm-body">
+          <p class="confirm-desc">
+            Você está criando uma nova bossa independente a partir dos <strong id="saveAsBossaCount">0</strong> compassos selecionados. Ela ficará salva na sua biblioteca para ser incluída por referência em qualquer apresentação!
+          </p>
+          <div class="form-group-clean">
+            <label for="inputBossaName" class="form-label-clean">Nome da Bossa:</label>
+            <input type="text" id="inputBossaName" class="input-clean" placeholder="Ex: Bossa 1 - Telefone" value="Nova Bossa">
+          </div>
+        </div>
+
+        <div class="modal-bottom confirm-bottom">
+          <button type="button" class="btn-clean-ghost" id="btnCancelSaveAsBossa">Cancelar</button>
+          <button type="button" class="btn-clean-primary" id="btnConfirmSaveAsBossa" style="background: #10b981; border-color: #10b981;">
+            <span class="btn-icon">💾</span> Salvar Bossa na Biblioteca
+          </button>
         </div>
       </div>
     </div>

@@ -147,5 +147,51 @@ export const PRESETS = [
       { id: "c-5", nickname: "Estabilidade Rápida", beats: 4, beatUnit: 4, tempoMode: "ratio", ratioNum: 5, ratioDen: 4, customBpm: 120, color: "#ff334b" },
       { id: "c-6", nickname: "Resolução", beats: 2, beatUnit: 4, tempoMode: "ratio", ratioNum: 5, ratioDen: 4, customBpm: 120, color: "#ff334b" }
     ]
+  },
+  {
+    id: "bossa-teleco-teco",
+    name: "Bossa 1: Teleco-Teco Sincopado",
+    description: "Convenção clássica de bateria e percussão brasileira com síncopes e modulação 3/2 nos tamborins.",
+    baseBpm: 120,
+    isBossa: true,
+    color: "#8b5cf6",
+    groups: [
+      {
+        id: "grp-bossa-1",
+        name: "Teleco-Teco",
+        color: "#8b5cf6",
+        startMeasure: 0,
+        endMeasure: 3
+      }
+    ],
+    measures: [
+      { id: "bt-1", nickname: "Chamada de Caixa", beats: 4, beatUnit: 4, tempoMode: "ratio", ratioNum: 1, ratioDen: 1, customBpm: 120, color: "#8b5cf6", repeat: 1 },
+      { id: "bt-2", nickname: "Frase Sincopada A", beats: 4, beatUnit: 4, tempoMode: "ratio", ratioNum: 3, ratioDen: 2, customBpm: 120, color: "#8b5cf6", repeat: 2 },
+      { id: "bt-3", nickname: "Frase Sincopada B", beats: 4, beatUnit: 4, tempoMode: "ratio", ratioNum: 3, ratioDen: 2, customBpm: 120, color: "#8b5cf6", repeat: 2 },
+      { id: "bt-4", nickname: "Corte e Retomada", beats: 2, beatUnit: 4, tempoMode: "ratio", ratioNum: 1, ratioDen: 1, customBpm: 120, color: "#8b5cf6", repeat: 1 }
+    ]
+  },
+  {
+    id: "bossa-paradinha-funk",
+    name: "Bossa 2: Paradinha Funk (Quebra Rítmica)",
+    description: "Parada dinâmica com quebra em 4/3 e corte seco, ideal para convenções de destaque.",
+    baseBpm: 120,
+    isBossa: true,
+    color: "#06b6d4",
+    groups: [
+      {
+        id: "grp-bossa-2",
+        name: "Paradinha Funk",
+        color: "#06b6d4",
+        startMeasure: 0,
+        endMeasure: 3
+      }
+    ],
+    measures: [
+      { id: "bf-1", nickname: "Corte Seco do Surdo", beats: 4, beatUnit: 4, tempoMode: "ratio", ratioNum: 1, ratioDen: 1, customBpm: 120, color: "#06b6d4", repeat: 1 },
+      { id: "bf-2", nickname: "Groove Rápido (4/3)", beats: 4, beatUnit: 4, tempoMode: "ratio", ratioNum: 4, ratioDen: 3, customBpm: 120, color: "#06b6d4", repeat: 2 },
+      { id: "bf-3", nickname: "Subida Triunfal", beats: 4, beatUnit: 4, tempoMode: "ratio", ratioNum: 4, ratioDen: 3, customBpm: 120, color: "#06b6d4", repeat: 1 },
+      { id: "bf-4", nickname: "Virada de Repique", beats: 4, beatUnit: 4, tempoMode: "ratio", ratioNum: 1, ratioDen: 1, customBpm: 120, color: "#06b6d4", repeat: 1 }
+    ]
   }
 ];

@@ -47,6 +47,12 @@ class SergioApp {
     this.selectedMeasureIndices = new Set();
     this.lastSelectedMeasureIdx = null;
 
+    // Gestão de Bossas Embutidas
+    this.selectedBossaPiece = null;
+    this.currentBossaTab = 'library';
+    this.bossaTargetIndex = null;
+    this._saveBossaIndices = [];
+
     this.dom = {};
   }
 
@@ -66,6 +72,7 @@ class SergioApp {
     this.setupAccessControlUi();
     this.setupHistoryModal();
     this.setupJoinModal();
+    this.setupBossaModals();
     this.updateBpmPracticeUI();
     this.updateUndoRedoUI();
     this.setupMobileNav();
@@ -364,7 +371,35 @@ class SergioApp {
       measuresSection: document.getElementById('measuresSection'),
       stageContainer: document.querySelector('.stage-container'),
       headerRightArea: document.getElementById('headerRightArea'),
-      btnInstallPwa: document.getElementById('btnInstallPwa')
+      btnInstallPwa: document.getElementById('btnInstallPwa'),
+
+      // Modais e Controles de Bossa Embutida
+      measureBossaBanner: document.getElementById('measureBossaBanner'),
+      bossaBannerName: document.getElementById('bossaBannerName'),
+      btnMeasureUnlinkModal: document.getElementById('btnMeasureUnlinkModal'),
+      btnMeasureRestoreModal: document.getElementById('btnMeasureRestoreModal'),
+      btnOpenInsertBossaModal: document.getElementById('btnOpenInsertBossaModal'),
+      btnToolbarInsertBossa: document.getElementById('btnToolbarInsertBossa'),
+      btnToolbarSaveAsBossa: document.getElementById('btnToolbarSaveAsBossa'),
+      btnMenuInsertBossa: document.getElementById('btnMenuInsertBossa'),
+      modalInsertBossa: document.getElementById('modalInsertBossa'),
+      btnInsertBossaClose: document.getElementById('btnInsertBossaClose'),
+      btnCancelInsertBossa: document.getElementById('btnCancelInsertBossa'),
+      btnConfirmInsertBossa: document.getElementById('btnConfirmInsertBossa'),
+      bossaListContainer: document.getElementById('bossaListContainer'),
+      tabBossaLibrary: document.getElementById('tabBossaLibrary'),
+      tabBossaPresets: document.getElementById('tabBossaPresets'),
+      radioBossaPosEnd: document.getElementById('radioBossaPosEnd'),
+      radioBossaPosSelected: document.getElementById('radioBossaPosSelected'),
+      labelBossaPosSelected: document.getElementById('labelBossaPosSelected'),
+      radioBossaModeLinked: document.getElementById('radioBossaModeLinked'),
+      radioBossaModeUnlinked: document.getElementById('radioBossaModeUnlinked'),
+      modalSaveAsBossa: document.getElementById('modalSaveAsBossa'),
+      btnSaveAsBossaClose: document.getElementById('btnSaveAsBossaClose'),
+      btnCancelSaveAsBossa: document.getElementById('btnCancelSaveAsBossa'),
+      btnConfirmSaveAsBossa: document.getElementById('btnConfirmSaveAsBossa'),
+      saveAsBossaCount: document.getElementById('saveAsBossaCount'),
+      inputBossaName: document.getElementById('inputBossaName')
     };
   }
 
@@ -1236,6 +1271,14 @@ class SergioApp {
       }
 
       if (e.key === 'Escape') {
+        if (this.dom.modalInsertBossa && this.dom.modalInsertBossa.style.display === 'flex') {
+          this.closeInsertBossaModal();
+          return;
+        }
+        if (this.dom.modalSaveAsBossa && this.dom.modalSaveAsBossa.style.display === 'flex') {
+          this.closeSaveAsBossaModal();
+          return;
+        }
         if (this.dom.modalJoinCollab && this.dom.modalJoinCollab.style.display === 'flex') {
           this.closeJoinModal();
           return;
@@ -1548,6 +1591,13 @@ class SergioApp {
           this.dom.btnDuplicateSelectedMeasure.textContent = `⧉ Duplicar (${count})`;
           this.dom.btnDuplicateSelectedMeasure.style.display = 'inline-flex';
         }
+        if (this.dom.btnToolbarSaveAsBossa) {
+          this.dom.btnToolbarSaveAsBossa.textContent = `💾 Salvar Bossa (${count})`;
+          this.dom.btnToolbarSaveAsBossa.style.display = 'inline-flex';
+        }
+        if (this.dom.btnToolbarInsertBossa) {
+          this.dom.btnToolbarInsertBossa.style.display = 'none';
+        }
         if (this.dom.btnDeleteSelectedMeasure) {
           this.dom.btnDeleteSelectedMeasure.textContent = `✕ Excluir (${count}) (Del)`;
           this.dom.btnDeleteSelectedMeasure.style.display = 'inline-flex';
@@ -1566,6 +1616,13 @@ class SergioApp {
         }
         if (this.dom.btnConfigureSelectedMeasure) this.dom.btnConfigureSelectedMeasure.style.display = 'inline-flex';
         if (this.dom.btnGroupSelectedMeasures) this.dom.btnGroupSelectedMeasures.style.display = 'none';
+        if (this.dom.btnToolbarSaveAsBossa) {
+          this.dom.btnToolbarSaveAsBossa.textContent = '💾 Salvar Bossa';
+          this.dom.btnToolbarSaveAsBossa.style.display = 'inline-flex';
+        }
+        if (this.dom.btnToolbarInsertBossa) {
+          this.dom.btnToolbarInsertBossa.style.display = 'inline-flex';
+        }
         if (this.dom.btnDuplicateSelectedMeasure) {
           this.dom.btnDuplicateSelectedMeasure.textContent = '⧉ Duplicar';
           this.dom.btnDuplicateSelectedMeasure.style.display = 'inline-flex';
@@ -1729,6 +1786,60 @@ class SergioApp {
       const timing = state.getFirstTimingForMeasure(idx) || { effectiveBpm: state.baseBpm };
       const grp = state.getGroupByMeasureIndex(idx);
 
+      // Se for o primeiro compasso de um bloco de Bossa, renderiza o cabeçalho do bloco
+      if (grp && grp.isBossaBlock && grp.startMeasure === idx) {
+        const blockHeader = document.createElement('div');
+        blockHeader.className = 'bossa-block-header';
+        const bColor = grp.color || '#8b5cf6';
+        blockHeader.style.setProperty('--bossa-color', bColor);
+        const count = (grp.endMeasure - grp.startMeasure) + 1;
+        blockHeader.innerHTML = `
+          <div class="bossa-block-header-info">
+            <span class="bossa-block-header-badge" style="background:${bColor}25; color:${bColor}">
+              ${grp.isLinked ? '🔗 Bossa Vinculada' : '📦 Bloco Bossa'}
+            </span>
+            <span class="bossa-block-header-title">${grp.name}</span>
+            <span class="bossa-block-header-range">c. ${grp.startMeasure + 1} a ${grp.endMeasure + 1} (${count} ${count === 1 ? 'compasso' : 'compassos'})</span>
+          </div>
+          <div class="bossa-block-header-actions">
+            ${grp.isLinked ? `
+              <button type="button" class="btn-bossa-block-action btn-sync-bossa-block" title="Sincronizar este bloco com a bossa original">
+                🔄 Sincronizar
+              </button>
+              <button type="button" class="btn-bossa-block-action btn-unlink-bossa-block" title="Desvincular bloco inteiro da peça original (tornar edições independentes)">
+                🔓 Desvincular Bloco
+              </button>
+            ` : ''}
+          </div>
+        `;
+
+        const btnSync = blockHeader.querySelector('.btn-sync-bossa-block');
+        if (btnSync) {
+          btnSync.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const res = state.syncBossaBlock(grp.id);
+            if (res) {
+              this.renderMeasuresList();
+              this.showToast(`Bloco '${grp.name}' sincronizado com a bossa original!`, '🔄');
+            } else {
+              this.showToast(`Bossa original não encontrada na biblioteca ou presets.`, '⚠️');
+            }
+          });
+        }
+
+        const btnUnlink = blockHeader.querySelector('.btn-unlink-bossa-block');
+        if (btnUnlink) {
+          btnUnlink.addEventListener('click', (e) => {
+            e.stopPropagation();
+            state.unlinkBossaBlock(grp.id);
+            this.renderMeasuresList();
+            this.showToast(`Bloco '${grp.name}' desvinculado! Todas as edições agora são locais.`, '🔓');
+          });
+        }
+
+        grid.appendChild(blockHeader);
+      }
+
       const card = document.createElement('div');
       card.className = 'measure-card';
       if ((m.repeat || 1) > 1) {
@@ -1747,6 +1858,17 @@ class SergioApp {
       let groupTagHtml = '';
       if (grp) {
         groupTagHtml = `<span class="measure-card-group-tag" style="background:${grp.color}33; color:${grp.color}">${grp.name}</span>`;
+      }
+
+      let bossaPillHtml = '';
+      if (m.sourcePieceId) {
+        if (m.isLinked) {
+          bossaPillHtml = `<span class="measure-bossa-pill linked" title="Vinculado por referência à '${m.sourcePieceName || 'Bossa'}'. Atualizações da original serão sincronizadas automaticamente.">🔗 ${m.sourcePieceName || 'Bossa'}</span>`;
+        } else if (m.isLocallyModified) {
+          bossaPillHtml = `<span class="measure-bossa-pill modified" title="Modificado localmente (baseado em '${m.sourcePieceName || 'Bossa'}')">✏️ Local (${m.sourcePieceName || 'Bossa'})</span>`;
+        } else {
+          bossaPillHtml = `<span class="measure-bossa-pill unlinked" title="Desvinculado de '${m.sourcePieceName || 'Bossa'}'">🔓 ${m.sourcePieceName || 'Bossa'}</span>`;
+        }
       }
 
       let tempoDesc = '';
@@ -1774,7 +1896,10 @@ class SergioApp {
       card.innerHTML += `
         <div class="measure-card-header">
           ${headerIndexHtml}
-          ${groupTagHtml}
+          <div class="measure-card-tags">
+            ${bossaPillHtml}
+            ${groupTagHtml}
+          </div>
         </div>
 
         <!-- APELIDO DO COMPASSO OU NÚMERO C. X -->
@@ -1799,6 +1924,8 @@ class SergioApp {
           <button type="button" class="btn-card-icon btn-card-move-left" title="Mover Compasso para Trás (←)" ${idx === 0 ? 'disabled style="opacity:0.3;pointer-events:none"' : ''}>◀</button>
           <button type="button" class="btn-card-icon btn-card-move-right" title="Mover Compasso para Frente (→)" ${idx === measures.length - 1 ? 'disabled style="opacity:0.3;pointer-events:none"' : ''}>▶</button>
           <button type="button" class="btn-card-icon btn-card-dup" title="Duplicar Compasso">⧉</button>
+          ${m.sourcePieceId && m.isLinked ? '<button type="button" class="btn-card-icon btn-card-unlink-m" title="Desvincular compasso para edição local">🔓</button>' : ''}
+          ${m.sourcePieceId && m.isLocallyModified ? '<button type="button" class="btn-card-icon btn-card-restore-m" title="Restaurar compasso da versão original da bossa">↺</button>' : ''}
           <button type="button" class="btn-card-icon btn-card-del" title="Excluir Compasso">✕</button>
           <button type="button" class="btn-card-edit">Configurar</button>
         </div>
@@ -1880,6 +2007,24 @@ class SergioApp {
         if (e.target.closest('.btn-card-dup')) {
           e.stopPropagation();
           state.duplicateMeasure(idx);
+          return;
+        }
+        if (e.target.closest('.btn-card-unlink-m')) {
+          e.stopPropagation();
+          state.unlinkMeasure(idx);
+          this.renderMeasuresList();
+          this.showToast(`Compasso c. ${idx + 1} desvinculado para edição local!`, '🔓');
+          return;
+        }
+        if (e.target.closest('.btn-card-restore-m')) {
+          e.stopPropagation();
+          const restored = state.restoreMeasureFromBossa(idx);
+          if (restored) {
+            this.renderMeasuresList();
+            this.showToast(`Compasso c. ${idx + 1} restaurado para o original da bossa!`, '↺');
+          } else {
+            this.showToast(`Não foi possível restaurar (peça original não encontrada).`, '⚠️');
+          }
           return;
         }
         if (e.target.closest('.btn-card-edit')) {
@@ -2061,6 +2206,30 @@ class SergioApp {
       state.duplicateMeasure(idx);
     });
 
+    this.dom.btnMeasureUnlinkModal?.addEventListener('click', () => {
+      const idx = parseInt(this.dom.editMeasureIndex.value, 10);
+      if (idx >= 0) {
+        state.unlinkMeasure(idx);
+        this.openMeasureModal(idx);
+        this.renderMeasuresList();
+        this.showToast('Compasso desvinculado! Alterações agora serão locais.', '🔓');
+      }
+    });
+
+    this.dom.btnMeasureRestoreModal?.addEventListener('click', () => {
+      const idx = parseInt(this.dom.editMeasureIndex.value, 10);
+      if (idx >= 0) {
+        const restored = state.restoreMeasureFromBossa(idx);
+        if (restored) {
+          this.openMeasureModal(idx);
+          this.renderMeasuresList();
+          this.showToast('Compasso restaurado para a versão da Bossa!', '↺');
+        } else {
+          this.showToast('Não foi possível restaurar (peça original não encontrada na biblioteca).', '⚠️');
+        }
+      }
+    });
+
     form.addEventListener('submit', (e) => {
       e.preventDefault();
       const idx = parseInt(this.dom.editMeasureIndex.value, 10);
@@ -2070,6 +2239,8 @@ class SergioApp {
       const num = parseInt(this.dom.editRatioNum.value, 10) || 1;
       const den = parseInt(this.dom.editRatioDen.value, 10) || 1;
       const fixedBpm = parseFloat(this.dom.editCustomBpm.value) || state.baseBpm;
+      const m = state.measures[idx];
+      const wasLinked = m && m.isLinked;
 
       state.updateMeasure(idx, {
         nickname: this.dom.editNickname.value,
@@ -2080,8 +2251,16 @@ class SergioApp {
         ratioNum: num,
         ratioDen: den,
         customBpm: fixedBpm,
-        color: this.dom.editColorPicker.value
+        color: this.dom.editColorPicker.value,
+        ...(m && m.sourcePieceId ? {
+          isLinked: false,
+          isLocallyModified: true
+        } : {})
       });
+
+      if (wasLinked) {
+        this.showToast('Compasso modificado localmente (desvinculado da bossa original).', '✏️');
+      }
 
       modal.style.display = 'none';
     });
@@ -2110,6 +2289,16 @@ class SergioApp {
     this.dom.editBeats.value = m.beats;
     if (this.dom.editBeatUnit) this.dom.editBeatUnit.value = m.beatUnit || 4;
     this.dom.editRepeat.value = m.repeat || 1;
+
+    // Configura o banner de Bossa Embutida
+    if (m.sourcePieceId) {
+      if (this.dom.measureBossaBanner) this.dom.measureBossaBanner.style.display = 'flex';
+      if (this.dom.bossaBannerName) this.dom.bossaBannerName.textContent = m.sourcePieceName || 'Bossa Vinculada';
+      if (this.dom.btnMeasureUnlinkModal) this.dom.btnMeasureUnlinkModal.style.display = m.isLinked ? 'inline-flex' : 'none';
+      if (this.dom.btnMeasureRestoreModal) this.dom.btnMeasureRestoreModal.style.display = m.isLocallyModified ? 'inline-flex' : 'none';
+    } else {
+      if (this.dom.measureBossaBanner) this.dom.measureBossaBanner.style.display = 'none';
+    }
 
     if (m.tempoMode === 'fixed') {
       this.dom.radioModeFixed.checked = true;
@@ -3354,6 +3543,287 @@ class SergioApp {
       event.target.value = '';
     };
     reader.readAsText(file);
+  }
+
+  // =========================================================================
+  // GESTÃO DE BOSSAS E PEÇAS EMBUTIDAS (MODAL DE INSERÇÃO & EXPORTAÇÃO)
+  // =========================================================================
+
+  setupBossaModals() {
+    // 1. Abertura do modal de inserção de bossa
+    this.dom.btnMenuInsertBossa?.addEventListener('click', () => {
+      if (this.dom.appMenuDropdown) this.dom.appMenuDropdown.style.display = 'none';
+      this.openInsertBossaModal();
+    });
+
+    this.dom.btnOpenInsertBossaModal?.addEventListener('click', () => {
+      this.openInsertBossaModal();
+    });
+
+    this.dom.btnToolbarInsertBossa?.addEventListener('click', () => {
+      const idx = this.renderer?.selectedMeasureIndex ?? (this.selectedMeasureIndices.size > 0 ? Math.max(...this.selectedMeasureIndices) : null);
+      this.openInsertBossaModal(idx);
+    });
+
+    this.dom.btnToolbarSaveAsBossa?.addEventListener('click', () => {
+      const indices = this.selectedMeasureIndices.size > 0
+        ? Array.from(this.selectedMeasureIndices)
+        : (this.renderer?.selectedMeasureIndex !== null ? [this.renderer.selectedMeasureIndex] : []);
+      this.openSaveAsBossaModal(indices);
+    });
+
+    // 2. Fechar modal de inserção de bossa
+    this.dom.btnInsertBossaClose?.addEventListener('click', () => this.closeInsertBossaModal());
+    this.dom.btnCancelInsertBossa?.addEventListener('click', () => this.closeInsertBossaModal());
+    this.dom.modalInsertBossa?.addEventListener('click', (e) => {
+      if (e.target === this.dom.modalInsertBossa) this.closeInsertBossaModal();
+    });
+
+    // 3. Abas do modal de inserção (Minhas Peças vs Bossas & Modelos Prontos)
+    this.dom.tabBossaLibrary?.addEventListener('click', () => {
+      this.currentBossaTab = 'library';
+      this.dom.tabBossaLibrary.classList.add('active');
+      this.dom.tabBossaPresets?.classList.remove('active');
+      this.renderBossaModalList();
+    });
+
+    this.dom.tabBossaPresets?.addEventListener('click', () => {
+      this.currentBossaTab = 'presets';
+      this.dom.tabBossaPresets.classList.add('active');
+      this.dom.tabBossaLibrary?.classList.remove('active');
+      this.renderBossaModalList();
+    });
+
+    // 4. Confirmar inserção
+    this.dom.btnConfirmInsertBossa?.addEventListener('click', () => {
+      this.handleConfirmInsertBossa();
+    });
+
+    // 5. Modal de salvar como Bossa
+    this.dom.btnSaveAsBossaClose?.addEventListener('click', () => this.closeSaveAsBossaModal());
+    this.dom.btnCancelSaveAsBossa?.addEventListener('click', () => this.closeSaveAsBossaModal());
+    this.dom.modalSaveAsBossa?.addEventListener('click', (e) => {
+      if (e.target === this.dom.modalSaveAsBossa) this.closeSaveAsBossaModal();
+    });
+
+    this.dom.btnConfirmSaveAsBossa?.addEventListener('click', () => {
+      this.handleConfirmSaveAsBossa();
+    });
+
+    this.dom.inputBossaName?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        this.handleConfirmSaveAsBossa();
+      }
+    });
+  }
+
+  openInsertBossaModal(targetIdx = null) {
+    if (!this.dom.modalInsertBossa) return;
+
+    if (targetIdx !== null && targetIdx !== undefined && targetIdx >= 0) {
+      this.bossaTargetIndex = targetIdx;
+    } else if (this.selectedMeasureIndices.size > 0) {
+      this.bossaTargetIndex = Math.max(...this.selectedMeasureIndices);
+    } else {
+      this.bossaTargetIndex = null;
+    }
+
+    if (this.bossaTargetIndex !== null && this.bossaTargetIndex < state.measures.length) {
+      if (this.dom.radioBossaPosSelected) {
+        this.dom.radioBossaPosSelected.disabled = false;
+        this.dom.radioBossaPosSelected.checked = true;
+      }
+      if (this.dom.labelBossaPosSelected) {
+        this.dom.labelBossaPosSelected.textContent = `Após o compasso selecionado (c. ${this.bossaTargetIndex + 1})`;
+      }
+    } else {
+      if (this.dom.radioBossaPosSelected) {
+        this.dom.radioBossaPosSelected.disabled = true;
+        this.dom.radioBossaPosSelected.checked = false;
+      }
+      if (this.dom.radioBossaPosEnd) {
+        this.dom.radioBossaPosEnd.checked = true;
+      }
+      if (this.dom.labelBossaPosSelected) {
+        this.dom.labelBossaPosSelected.textContent = 'Após o compasso selecionado (nenhum selecionado)';
+      }
+    }
+
+    this.selectedBossaPiece = null;
+    if (this.dom.btnConfirmInsertBossa) {
+      this.dom.btnConfirmInsertBossa.disabled = true;
+    }
+
+    // Inicializa na aba correta
+    if (this.currentBossaTab === 'presets') {
+      this.dom.tabBossaPresets?.classList.add('active');
+      this.dom.tabBossaLibrary?.classList.remove('active');
+    } else {
+      this.currentBossaTab = 'library';
+      this.dom.tabBossaLibrary?.classList.add('active');
+      this.dom.tabBossaPresets?.classList.remove('active');
+    }
+
+    this.renderBossaModalList();
+    this.dom.modalInsertBossa.style.display = 'flex';
+  }
+
+  closeInsertBossaModal() {
+    if (this.dom.modalInsertBossa) {
+      this.dom.modalInsertBossa.style.display = 'none';
+    }
+  }
+
+  renderBossaModalList() {
+    const container = this.dom.bossaListContainer;
+    if (!container) return;
+
+    container.innerHTML = '';
+    let pieces = [];
+
+    if (this.currentBossaTab === 'library') {
+      const allLibrary = state.getLibraryPieces();
+      // Não mostra a própria peça aberta para evitar autorreferência direta
+      pieces = allLibrary.filter(p => p.id !== state.id);
+
+      if (pieces.length === 0) {
+        container.innerHTML = `
+          <div class="bossa-empty-state">
+            <span class="bossa-empty-icon">📂</span>
+            <h4>Nenhuma outra peça na biblioteca</h4>
+            <p>Você pode salvar compassos da apresentação atual como Bossa (botão "Salvar como Bossa") ou explorar os modelos na aba "Bossas & Modelos Prontos".</p>
+          </div>
+        `;
+        return;
+      }
+    } else {
+      // Aba de Presets / Modelos Prontos
+      // Coloca as Bossas de percussão (teleco-teco, paradinha-funk) no topo
+      pieces = [...PRESETS].sort((a, b) => {
+        const aIsBossa = a.id?.startsWith('bossa-') ? 1 : 0;
+        const bIsBossa = b.id?.startsWith('bossa-') ? 1 : 0;
+        return bIsBossa - aIsBossa;
+      });
+    }
+
+    pieces.forEach(p => {
+      const card = document.createElement('div');
+      card.className = 'bossa-card-item';
+      if (this.selectedBossaPiece?.id === p.id) {
+        card.classList.add('selected');
+      }
+
+      const measureCount = Array.isArray(p.measures) ? p.measures.length : 0;
+      const bpm = p.presentationBpm || p.baseBpm || 120;
+      const isPresetBossa = p.id?.startsWith('bossa-');
+
+      card.innerHTML = `
+        <div class="bossa-card-item-top">
+          <div class="bossa-card-title-wrap">
+            <span class="bossa-card-badge">${isPresetBossa ? '🥁 Bossa' : '🎵 Peça'}</span>
+            <span class="bossa-card-title">${p.name || 'Sem título'}</span>
+          </div>
+          <span class="bossa-card-meta">${measureCount} comp. • ${bpm} BPM</span>
+        </div>
+        ${p.description ? `<p class="bossa-card-desc">${p.description}</p>` : ''}
+      `;
+
+      card.addEventListener('click', () => {
+        container.querySelectorAll('.bossa-card-item').forEach(c => c.classList.remove('selected'));
+        card.classList.add('selected');
+        this.selectedBossaPiece = p;
+        if (this.dom.btnConfirmInsertBossa) {
+          this.dom.btnConfirmInsertBossa.disabled = false;
+        }
+      });
+
+      card.addEventListener('dblclick', () => {
+        this.selectedBossaPiece = p;
+        this.handleConfirmInsertBossa();
+      });
+
+      container.appendChild(card);
+    });
+  }
+
+  handleConfirmInsertBossa() {
+    if (!this.selectedBossaPiece) return;
+
+    let targetIndex = state.measures.length;
+    if (this.dom.radioBossaPosSelected && this.dom.radioBossaPosSelected.checked && this.bossaTargetIndex !== null) {
+      targetIndex = this.bossaTargetIndex + 1;
+    }
+
+    const isLinked = this.dom.radioBossaModeLinked ? this.dom.radioBossaModeLinked.checked : true;
+
+    const result = state.insertBossa(this.selectedBossaPiece, targetIndex, isLinked);
+    this.closeInsertBossaModal();
+
+    if (result) {
+      this.renderMeasuresList();
+      this.handleMeasureSelected(result.startIndex);
+      const t = state.getFirstTimingForMeasure(result.startIndex);
+      if (t) this.seekTo(t.startTime);
+      this.showToast(
+        isLinked
+          ? `Bossa '${this.selectedBossaPiece.name}' vinculada com sucesso! Atualizações serão refletidas automaticamente.`
+          : `Bossa '${this.selectedBossaPiece.name}' inserida como cópia independente!`,
+        '🔗'
+      );
+    }
+  }
+
+  openSaveAsBossaModal(indices = []) {
+    if (!this.dom.modalSaveAsBossa) return;
+
+    if (!indices || indices.length === 0) {
+      if (this.renderer?.selectedMeasureIndex !== null && this.renderer?.selectedMeasureIndex !== undefined) {
+        indices = [this.renderer.selectedMeasureIndex];
+      } else {
+        this.showToast('Selecione ao menos um compasso na partitura para salvar como Bossa.', '⚠️');
+        return;
+      }
+    }
+
+    this._saveBossaIndices = indices.sort((a, b) => a - b);
+    const count = this._saveBossaIndices.length;
+
+    if (this.dom.saveAsBossaCount) {
+      this.dom.saveAsBossaCount.textContent = `${count} ${count === 1 ? 'compasso selecionado' : 'compassos selecionados'}`;
+    }
+
+    if (this.dom.inputBossaName) {
+      const minNum = this._saveBossaIndices[0] + 1;
+      const maxNum = this._saveBossaIndices[count - 1] + 1;
+      const rangeStr = count === 1 ? `c. ${minNum}` : `c. ${minNum}-${maxNum}`;
+      this.dom.inputBossaName.value = `Bossa - ${state.name} (${rangeStr})`;
+    }
+
+    this.dom.modalSaveAsBossa.style.display = 'flex';
+    setTimeout(() => {
+      this.dom.inputBossaName?.focus();
+      this.dom.inputBossaName?.select();
+    }, 50);
+  }
+
+  closeSaveAsBossaModal() {
+    if (this.dom.modalSaveAsBossa) {
+      this.dom.modalSaveAsBossa.style.display = 'none';
+    }
+  }
+
+  handleConfirmSaveAsBossa() {
+    if (!this._saveBossaIndices || this._saveBossaIndices.length === 0) return;
+
+    const name = (this.dom.inputBossaName?.value || '').trim() || 'Nova Bossa';
+    const newBossa = state.saveMeasuresAsBossa(this._saveBossaIndices, name);
+
+    this.closeSaveAsBossaModal();
+
+    if (newBossa) {
+      this.showToast(`Bossa '${name}' salva na sua biblioteca! Você pode inseri-la em outras peças.`, '💾');
+    }
   }
 }
 
