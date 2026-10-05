@@ -94,9 +94,9 @@ class CollabService {
     }
 
     const currentUid = authService.getUid();
+    // Apenas usuário autenticado correspondente ao ownerId pode ser proprietário
     const isOwner = Boolean(
-      (this.currentPieceOwnerId && currentUid && this.currentPieceOwnerId === currentUid) ||
-      (!this.currentPieceOwnerId && !authService.isLoggedIn())
+      this.currentPieceOwnerId && currentUid && this.currentPieceOwnerId === currentUid
     );
 
     if (this.currentPieceAccess === 'private') {
@@ -114,6 +114,13 @@ class CollabService {
       // edit_link ou legado
       this.isPrivateAccessDenied = false;
       this.isReadOnly = false;
+    }
+
+    if (this.isPrivateAccessDenied) {
+      this.clearUrlPieceId();
+      if (this.onAccessDenied) {
+        this.onAccessDenied({ pieceId: this.currentPieceId });
+      }
     }
 
     if (this.onPermissionChange) {
@@ -192,15 +199,18 @@ class CollabService {
     }
   }
 
-  // Lê ID da peça a partir da URL (?piece=ID ou ?room=ID ou hash)
+  // Lê ID da peça a partir da URL (?piece=ID ou ?p=ID ou ?room=ID ou hash)
   getPieceIdFromUrl() {
     if (typeof window === 'undefined') return null;
     const urlParams = new URLSearchParams(window.location.search);
-    const pieceId = urlParams.get('piece') || urlParams.get('room');
+    const pieceId = urlParams.get('piece') || urlParams.get('p') || urlParams.get('room');
     if (pieceId && pieceId.trim()) return pieceId.trim();
 
     if (window.location.hash.startsWith('#piece=')) {
       return window.location.hash.replace('#piece=', '').trim();
+    }
+    if (window.location.hash.startsWith('#p=')) {
+      return window.location.hash.replace('#p=', '').trim();
     }
     return null;
   }
@@ -210,6 +220,7 @@ class CollabService {
     if (typeof window === 'undefined' || !window.history || !pieceId) return;
     const url = new URL(window.location.href);
     url.searchParams.set('piece', pieceId);
+    url.searchParams.delete('p');
     url.searchParams.delete('room');
     window.history.replaceState({}, '', url.toString());
   }
@@ -219,12 +230,13 @@ class CollabService {
     if (typeof window === 'undefined' || !window.history) return;
     const url = new URL(window.location.href);
     url.searchParams.delete('piece');
+    url.searchParams.delete('p');
     url.searchParams.delete('room');
-    if (window.location.hash.startsWith('#piece=')) {
+    if (window.location.hash.startsWith('#piece=') || window.location.hash.startsWith('#p=')) {
       window.location.hash = '';
     }
     const cleanSearch = url.searchParams.toString();
-    const cleanUrl = url.pathname + (cleanSearch ? `?${cleanSearch}` : '') + url.hash;
+    const cleanUrl = url.pathname + (cleanSearch ? `?${cleanSearch}` : '') + (url.hash && !url.hash.includes('piece') && !url.hash.includes('p=') ? url.hash : '');
     window.history.replaceState({}, '', cleanUrl || '/');
   }
 

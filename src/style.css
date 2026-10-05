@@ -5288,3 +5288,18 @@ kbd {
 [data-theme="light"] .bossa-banner-desc {
   color: #475569;
 }
+
+/* Modal de Acesso Negado (Proteção Total de Privacidade) */
+#modalAccessDenied {
+  background: rgba(8, 10, 15, 0.97) !important;
+  backdrop-filter: blur(24px) !important;
+  -webkit-backdrop-filter: blur(24px) !important;
+  z-index: 9999 !important;
+}
+
+[data-theme="light"] #modalAccessDenied {
+  background: rgba(248, 250, 252, 0.98) !important;
+  backdrop-filter: blur(24px) !important;
+  -webkit-backdrop-filter: blur(24px) !important;
+  z-index: 9999 !important;
+}

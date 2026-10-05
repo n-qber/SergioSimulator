@@ -4,6 +4,7 @@ pkgs.mkShell {
   name = "sergio-simulator-env";
   buildInputs = with pkgs; [
     nodejs_22
+    firebase-tools
   ];
 
   shellHook = ''

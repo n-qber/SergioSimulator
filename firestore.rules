@@ -3,39 +3,46 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     match /pieces/{pieceId} {
+      // Função auxiliar para verificar se o usuário atual é o proprietário da peça
+      function isPieceOwner() {
+        return request.auth != null && resource.data.ownerId == request.auth.uid;
+      }
+
+      // Função auxiliar para verificar se a peça é acessível via link
+      function isLinkAccessible() {
+        return resource.data.access == 'view_link' || resource.data.access == 'edit_link';
+      }
+
       // 1. Leitura:
-      // Permitida se a peça for pública/unlisted (edit_link ou view_link),
-      // ou se o documento não tiver restrição de acesso (legado),
-      // ou se for privada e o usuário logado for o proprietário (ownerId).
-      allow read: if resource == null
-                  || resource.data.access == 'view_link'
-                  || resource.data.access == 'edit_link'
-                  || !('access' in resource.data)
-                  || (request.auth != null && resource.data.ownerId == request.auth.uid);
+      // Peças privadas ('private') NUNCA são lidas por usuários deslogados ou terceiros.
+      // Apenas o proprietário autenticado pode ler uma peça privada no Firestore.
+      allow read: if (resource.data.access == 'private' ? isPieceOwner() : (isLinkAccessible() || !('access' in resource.data)));
 
       // 2. Criação:
-      // Aberta para usuários logados ou convidados anônimos.
+      // Aberta para usuários autenticados ou convidados anônimos.
       allow create: if true;
 
       // 3. Atualização (edição):
-      // Permitida se o usuário for o dono da peça,
-      // OU se a peça estiver configurada para colaboração com link ('edit_link' ou legado).
-      // Peças em modo 'view_link' ou 'private' só podem ser alteradas pelo dono.
-      allow update: if (resource.data.access == 'edit_link' || !('access' in resource.data))
-                    || (request.auth != null && resource.data.ownerId == request.auth.uid);
+      // Peças 'edit_link' ou legadas podem ser alteradas por quem tem o link.
+      // Peças 'view_link' ou 'private' só podem ser alteradas pelo dono autenticado.
+      allow update: if isPieceOwner() || (resource.data.access == 'edit_link' || !('access' in resource.data));
 
       // 4. Exclusão:
-      // Apenas o proprietário registrado pode excluir uma peça na nuvem.
-      allow delete: if request.auth != null && resource.data.ownerId == request.auth.uid;
+      // Apenas o proprietário autenticado pode excluir uma peça na nuvem.
+      allow delete: if isPieceOwner();
 
-      // Subcoleção de Histórico de Versões
+      // Subcoleções protegidas: se a peça for privada, apenas o dono lê histórico e presença
       match /history/{historyId} {
-        allow read, write: if true;
+        allow read: if get(/databases/$(database)/documents/pieces/$(pieceId)).data.access != 'private'
+                    || (request.auth != null && get(/databases/$(database)/documents/pieces/$(pieceId)).data.ownerId == request.auth.uid);
+        allow write: if get(/databases/$(database)/documents/pieces/$(pieceId)).data.access == 'edit_link'
+                     || (request.auth != null && get(/databases/$(database)/documents/pieces/$(pieceId)).data.ownerId == request.auth.uid);
       }
 
-      // Subcoleção de Presença de Colaboradores Online (heartbeat)
       match /presence/{userId} {
-        allow read, write: if true;
+        allow read: if get(/databases/$(database)/documents/pieces/$(pieceId)).data.access != 'private'
+                    || (request.auth != null && get(/databases/$(database)/documents/pieces/$(pieceId)).data.ownerId == request.auth.uid);
+        allow write: if true;
       }
     }
   }

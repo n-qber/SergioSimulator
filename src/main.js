@@ -2863,6 +2863,24 @@ class SergioApp {
       try {
         await this.authService.logout();
         if (this.dom.userMenuDropdown) this.dom.userMenuDropdown.style.display = 'none';
+
+        // Se a peça aberta for privada ou restrita, limpa imediatamente da tela
+        if (state.access === 'private' || collab.currentPieceAccess === 'private' || collab.isPrivateAccessDenied) {
+          this.stopPlayback();
+          collab.clearUrlPieceId();
+          state.resetToDefault();
+          this.renderMeasuresList();
+          this.updateHUD(0);
+          this.closeMeasureToolbar();
+          if (this.renderer) {
+            this.renderer.setSelectedMeasures([]);
+            this.renderer.render(0);
+          }
+          this.preparePieceAudio();
+          collab.connectToPiece(state.id, state);
+          this.seekTo(0);
+        }
+
         this.showToast('Você saiu da sua conta', '👋');
       } catch (err) {
         this.showToast(err.message, '⚠️');
@@ -3160,14 +3178,31 @@ class SergioApp {
     if (this.dom.readOnlyBanner) {
       this.dom.readOnlyBanner.style.display = info.isReadOnly ? 'flex' : 'none';
     }
+    if (info.isPrivateAccessDenied) {
+      this.handleCollabAccessDenied({ pieceId: collab.currentPieceId });
+    }
   }
 
   handleCollabAccessDenied(info) {
-    this.pendingDeniedPieceId = info?.pieceId || null;
+    this.pendingDeniedPieceId = info?.pieceId || this.pendingDeniedPieceId || null;
+    this.stopPlayback();
     collab.clearUrlPieceId();
     if (this.dom.modalJoinCollab) {
       this.dom.modalJoinCollab.style.display = 'none';
     }
+
+    // SEGURANÇA BACKEND & FRONTEND: Descarrega completamente a peça privada da tela!
+    // Garante que nenhum compasso, nome, andamento ou canvas da peça privada fique visível atrás do modal.
+    state.resetToDefault();
+    this.renderMeasuresList();
+    this.updateHUD(0);
+    this.closeMeasureToolbar();
+    if (this.renderer) {
+      this.renderer.setSelectedMeasures([]);
+      this.renderer.render(0);
+    }
+    this.preparePieceAudio();
+
     if (this.dom.modalAccessDenied) {
       this.dom.modalAccessDenied.style.display = 'flex';
     }
