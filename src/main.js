@@ -2073,6 +2073,15 @@ class SergioApp {
         tempoDesc = `${Math.round(timing.effectiveBpm)} BPM (Fixo)`;
       }
 
+      // Mostra BPM apenas no 1º compasso e naqueles onde há alteração de andamento/proporção
+      const prevM = idx > 0 ? measures[idx - 1] : null;
+      const prevTiming = idx > 0 ? state.getFirstTimingForMeasure(idx - 1) : null;
+      const isBpmDiff = prevTiming ? Math.abs((timing.effectiveBpm || state.baseBpm) - (prevTiming.effectiveBpm || state.baseBpm)) > 0.05 : false;
+      const isRatioDiff = m.tempoMode === 'ratio' && prevM?.tempoMode === 'ratio' && (m.ratioNum !== prevM.ratioNum || m.ratioDen !== prevM.ratioDen);
+      const isModeDiff = prevM ? (m.tempoMode !== prevM.tempoMode) : false;
+      const isTempoChange = idx > 0 && (isBpmDiff || isRatioDiff || isModeDiff);
+      const showBpm = idx === 0 || isTempoChange;
+
       const repeatTagHtml = ((m.repeat || 1) > 1)
         ? `<span class="measure-card-repeat-tag" title="Este compasso se repete continuamente ${m.repeat} vezes">×${m.repeat}</span>`
         : '';
@@ -2085,6 +2094,10 @@ class SergioApp {
       const titleHtml = hasNickname
         ? `<h3 class="measure-card-nickname" title="${m.nickname}">${m.nickname}</h3>`
         : `<h3 class="measure-card-nickname is-unnamed"><span class="measure-card-idx-large" style="color:${m.color || '#ff334b'}">c. ${idx + 1}</span></h3>`;
+
+      const tempoHtml = showBpm
+        ? `<span class="measure-card-tempo ${isTempoChange ? 'is-tempo-change' : ''}" title="${idx === 0 ? 'Andamento inicial' : 'Mudança de andamento'}: ${tempoDesc}">${tempoDesc}</span>`
+        : '';
 
       card.innerHTML += `
         <div class="measure-card-header">
@@ -2099,8 +2112,8 @@ class SergioApp {
         ${titleHtml}
 
         <div class="measure-card-details">
-          <span class="measure-card-meter">${m.beats}T</span>
-          <span class="measure-card-tempo">${tempoDesc}</span>
+          <span class="measure-card-meter" title="${m.beats}T • Andamento: ${tempoDesc}">${m.beats}T</span>
+          ${tempoHtml}
         </div>
 
         <!-- CONTROLE RÁPIDO DE REPETIÇÕES -->

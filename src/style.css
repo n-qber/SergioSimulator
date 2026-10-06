@@ -2383,6 +2383,24 @@ button {
 .measure-card-tempo {
   color: var(--red-primary);
   font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.measure-card-tempo.is-tempo-change {
+  background: rgba(244, 63, 94, 0.12);
+  color: var(--red-primary);
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px solid rgba(244, 63, 94, 0.3);
+  font-weight: 700;
+}
+
+[data-theme="light"] .measure-card-tempo.is-tempo-change {
+  background: rgba(225, 29, 72, 0.08);
+  border-color: rgba(225, 29, 72, 0.25);
+  color: var(--red-primary);
 }
 
 /* Controle Rápido de Repetição */

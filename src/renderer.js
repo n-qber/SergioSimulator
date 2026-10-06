@@ -624,11 +624,23 @@ export class DJRunnerRenderer {
         tempoText = `${Math.round(t.effectiveBpm)} BPM`;
       }
 
+      // Mostra BPM no rodapé da régua apenas no 1º compasso e onde há alteração de andamento/proporção
+      const prevM = t.measureIndex > 0 ? this.state.measures[t.measureIndex - 1] : null;
+      const prevTiming = t.measureIndex > 0 ? this.state.getFirstTimingForMeasure(t.measureIndex - 1) : null;
+      const isFirstMeasure = t.measureIndex === 0 && t.repeatIteration === 0;
+      const isBpmDiff = prevTiming ? Math.abs((t.effectiveBpm || 0) - (prevTiming.effectiveBpm || 0)) > 0.05 : false;
+      const isRatioDiff = m.tempoMode === 'ratio' && prevM?.tempoMode === 'ratio' && (m.ratioNum !== prevM.ratioNum || m.ratioDen !== prevM.ratioDen);
+      const isModeDiff = prevM ? (m.tempoMode !== prevM.tempoMode) : false;
+      const showTrackBpm = (isFirstMeasure || isBpmDiff || isRatioDiff || isModeDiff) && t.repeatIteration === 0;
+
+      const tempoFoot = showTrackBpm ? ` • ${tempoText}` : '';
       const repFootText = (t.repeatCount > 1) ? ` • rep. ${t.repeatIteration + 1}/${t.repeatCount}` : '';
 
-      ctx.fillStyle = isLight ? "rgba(15, 23, 42, 0.55)" : "rgba(255, 255, 255, 0.4)";
-      ctx.font = "500 9.5px 'JetBrains Mono', monospace";
-      ctx.fillText(`• ${tempoText}${repFootText}`, nicknameX + meterWidth + 6, badgeY);
+      if (tempoFoot || repFootText) {
+        ctx.fillStyle = isLight ? "rgba(15, 23, 42, 0.55)" : "rgba(255, 255, 255, 0.4)";
+        ctx.font = "500 9.5px 'JetBrains Mono', monospace";
+        ctx.fillText(`${tempoFoot}${repFootText}`, nicknameX + meterWidth + 6, badgeY);
+      }
     }
 
     // 5. AGULHA CENTRAL (PLAYHEAD)
