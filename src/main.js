@@ -359,8 +359,14 @@ class SergioApp {
       modalMeasureIdx: document.getElementById('modalMeasureIdx'),
       editNickname: document.getElementById('editNickname'),
       editBeats: document.getElementById('editBeats'),
+      btnEditBeatsMinus: document.getElementById('btnEditBeatsMinus'),
+      btnEditBeatsPlus: document.getElementById('btnEditBeatsPlus'),
       editBeatUnit: document.getElementById('editBeatUnit'),
       editRepeat: document.getElementById('editRepeat'),
+      btnEditRepeatMinus: document.getElementById('btnEditRepeatMinus'),
+      btnEditRepeatPlus: document.getElementById('btnEditRepeatPlus'),
+      detailsTempoModulation: document.getElementById('detailsTempoModulation'),
+      accordionTempoSummary: document.getElementById('accordionTempoSummary'),
       radioModeRatio: document.getElementById('radioModeRatio'),
       radioModeFixed: document.getElementById('radioModeFixed'),
       panelTempoRatio: document.getElementById('panelTempoRatio'),
@@ -372,6 +378,7 @@ class SergioApp {
       editColorPicker: document.getElementById('editColorPicker'),
       btnDeleteMeasureModal: document.getElementById('btnDeleteMeasureModal'),
       btnDuplicateMeasureModal: document.getElementById('btnDuplicateMeasureModal'),
+      btnSaveMeasureEdit: document.getElementById('btnSaveMeasureEdit'),
 
       // Modal de Grupos
       modalGroupManage: document.getElementById('modalGroupManage'),
@@ -2486,6 +2493,35 @@ class SergioApp {
       state.duplicateMeasure(idx);
     });
 
+    // Steppers para Tempos (Pulsos) e Repetições (fácil de tocar no celular)
+    this.dom.btnEditBeatsMinus?.addEventListener('click', () => {
+      const cur = parseInt(this.dom.editBeats.value, 10) || 4;
+      this.dom.editBeats.value = Math.max(1, cur - 1);
+      this.dom.editBeats.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+
+    this.dom.btnEditBeatsPlus?.addEventListener('click', () => {
+      const cur = parseInt(this.dom.editBeats.value, 10) || 4;
+      this.dom.editBeats.value = Math.min(32, cur + 1);
+      this.dom.editBeats.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+
+    this.dom.btnEditRepeatMinus?.addEventListener('click', () => {
+      const cur = parseInt(this.dom.editRepeat.value, 10) || 1;
+      this.dom.editRepeat.value = Math.max(1, cur - 1);
+      this.dom.editRepeat.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+
+    this.dom.btnEditRepeatPlus?.addEventListener('click', () => {
+      const cur = parseInt(this.dom.editRepeat.value, 10) || 1;
+      this.dom.editRepeat.value = Math.min(999, cur + 1);
+      this.dom.editRepeat.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+
+    this.dom.editCustomBpm?.addEventListener('input', () => {
+      this.updateModalCalculatedBpm();
+    });
+
     this.dom.btnMeasureUnlinkModal?.addEventListener('click', () => {
       const idx = parseInt(this.dom.editMeasureIndex.value, 10);
       if (idx >= 0) {
@@ -2550,13 +2586,25 @@ class SergioApp {
     const isRatio = this.dom.radioModeRatio.checked;
     this.dom.panelTempoRatio.style.display = isRatio ? 'block' : 'none';
     this.dom.panelTempoFixed.style.display = isRatio ? 'none' : 'block';
+    this.updateModalCalculatedBpm();
   }
 
   updateModalCalculatedBpm() {
-    const num = Math.max(1, parseInt(this.dom.editRatioNum.value, 10) || 1);
-    const den = Math.max(1, parseInt(this.dom.editRatioDen.value, 10) || 1);
-    const eff = Math.round(state.baseBpm * (num / den));
-    this.dom.calcEffectiveBpm.textContent = `${eff} BPM`;
+    const isRatio = this.dom.radioModeRatio ? this.dom.radioModeRatio.checked : true;
+    let summaryText = '';
+    if (isRatio) {
+      const num = Math.max(1, parseInt(this.dom.editRatioNum.value, 10) || 1);
+      const den = Math.max(1, parseInt(this.dom.editRatioDen.value, 10) || 1);
+      const eff = Math.round(state.baseBpm * (num / den));
+      this.dom.calcEffectiveBpm.textContent = `${eff} BPM`;
+      summaryText = (num === 1 && den === 1) ? `${eff} BPM (1/1)` : `${eff} BPM (${num}/${den})`;
+    } else {
+      const fixedBpm = Math.round(parseFloat(this.dom.editCustomBpm.value) || state.baseBpm);
+      summaryText = `${fixedBpm} BPM (Fixo)`;
+    }
+    if (this.dom.accordionTempoSummary) {
+      this.dom.accordionTempoSummary.textContent = summaryText;
+    }
   }
 
   openMeasureModal(index) {
@@ -2586,6 +2634,11 @@ class SergioApp {
       this.dom.radioModeRatio.checked = true;
     }
     this.toggleTempoModePanels();
+
+    // Opção de andamento/modulação fica fechada por padrão
+    if (this.dom.detailsTempoModulation) {
+      this.dom.detailsTempoModulation.open = false;
+    }
 
     this.dom.editRatioNum.value = m.ratioNum || 1;
     this.dom.editRatioDen.value = m.ratioDen || 1;

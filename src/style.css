@@ -2950,17 +2950,19 @@ button {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding-top: 10px;
+  padding-top: 12px;
   border-top: 1px solid var(--border-light);
-  margin-top: 4px;
+  margin-top: 6px;
+  gap: 10px;
 }
 
 .btn-del {
   color: #ef4444;
-  font-size: 0.75rem;
+  font-size: 0.78rem;
   font-weight: 600;
-  padding: 5px 8px;
-  border-radius: 4px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  transition: all 0.15s ease;
 }
 
 .btn-del:hover {
@@ -2969,7 +2971,205 @@ button {
 
 .modal-bottom-right {
   display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Stepper com Arrows (Pulsos e Repetições) */
+.modal-number-stepper {
+  display: flex;
+  align-items: stretch;
   gap: 6px;
+  width: 100%;
+}
+
+.btn-modal-step {
+  width: 44px;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-card);
+  border: 1px solid var(--border-medium);
+  border-radius: 8px;
+  color: var(--white-pure);
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.btn-modal-step:hover {
+  background: rgba(244, 63, 94, 0.15);
+  border-color: var(--red-primary);
+  color: var(--red-primary);
+}
+
+.btn-modal-step:active {
+  transform: scale(0.94);
+  background: var(--red-primary);
+  color: #ffffff;
+}
+
+.modal-step-input {
+  text-align: center;
+  font-size: 1.15rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  flex: 1;
+  min-width: 0;
+}
+
+/* Accordion de Andamento & Modulação Métrica (Fechado por padrão) */
+.modal-accordion {
+  border: 1px solid var(--border-light);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+  overflow: hidden;
+  transition: border-color 0.2s ease, background 0.2s ease;
+  margin-top: 4px;
+}
+
+.modal-accordion[open] {
+  border-color: var(--border-medium);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.modal-accordion-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  cursor: pointer;
+  user-select: none;
+  list-style: none;
+  transition: background 0.15s ease;
+}
+
+.modal-accordion-summary::-webkit-details-marker {
+  display: none;
+}
+
+.modal-accordion-summary:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.modal-accordion-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.modal-accordion-title {
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: var(--white-pure);
+}
+
+.modal-accordion-badge {
+  font-size: 0.72rem;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--red-primary);
+  background: rgba(244, 63, 94, 0.12);
+  border: 1px solid rgba(244, 63, 94, 0.25);
+  padding: 2px 7px;
+  border-radius: 5px;
+}
+
+.modal-accordion-arrow {
+  font-size: 0.76rem;
+  color: var(--white-muted);
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  display: inline-block;
+}
+
+.modal-accordion[open] .modal-accordion-arrow {
+  transform: rotate(180deg);
+}
+
+.modal-accordion-body {
+  padding: 12px 14px;
+  border-top: 1px solid var(--border-light);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Botão Salvar do Modal de Compasso */
+.btn-modal-save {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  background: linear-gradient(135deg, var(--red-primary), var(--red-dark));
+  color: var(--white-pure);
+  font-size: 0.88rem;
+  font-weight: 700;
+  padding: 8px 18px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 2px 10px rgba(244, 63, 94, 0.35);
+  cursor: pointer;
+  transition: all 0.18s ease;
+  white-space: nowrap;
+}
+
+.btn-modal-save-icon {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.btn-modal-save:hover {
+  background: linear-gradient(135deg, var(--red-hover), var(--red-primary));
+  box-shadow: 0 4px 16px rgba(244, 63, 94, 0.5);
+  transform: translateY(-1px);
+}
+
+.btn-modal-save:active {
+  transform: scale(0.97);
+}
+
+/* Suporte ao Tema Claro para o Modal */
+[data-theme="light"] .btn-modal-step {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  color: #1e293b;
+}
+
+[data-theme="light"] .btn-modal-step:hover {
+  background: rgba(225, 29, 72, 0.1);
+  border-color: var(--red-primary);
+  color: var(--red-primary);
+}
+
+[data-theme="light"] .modal-accordion {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+}
+
+[data-theme="light"] .modal-accordion[open] {
+  border-color: #94a3b8;
+  background: #ffffff;
+}
+
+[data-theme="light"] .modal-accordion-title {
+  color: var(--text-heading);
+}
+
+[data-theme="light"] .modal-accordion-badge {
+  background: rgba(225, 29, 72, 0.08);
+  border-color: rgba(225, 29, 72, 0.25);
+  color: var(--red-primary);
+}
+
+[data-theme="light"] .btn-modal-save {
+  background: linear-gradient(135deg, #e11d48, #be123c);
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(225, 29, 72, 0.3);
 }
 
 /* Grupos */
@@ -3783,6 +3983,73 @@ kbd {
     background: #f8fafc;
     border-color: #cbd5e1;
     color: #334155;
+  }
+
+  /* MODAL DE COMPASSO NO MOBILE */
+  .modal-stepper-row {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .btn-modal-step {
+    width: 50px;
+    min-height: 46px;
+    font-size: 1.05rem;
+  }
+
+  .modal-step-input {
+    min-height: 46px;
+    font-size: 1.25rem;
+  }
+
+  .modal-bottom-row {
+    flex-direction: column-reverse;
+    gap: 10px;
+    align-items: stretch;
+    padding-top: 14px;
+  }
+
+  .modal-bottom-right {
+    flex-direction: column;
+    width: 100%;
+    gap: 10px;
+  }
+
+  .btn-modal-save {
+    width: 100%;
+    min-height: 48px;
+    font-size: 1.05rem;
+    font-weight: 700;
+    border-radius: 10px;
+    box-shadow: 0 4px 18px rgba(244, 63, 94, 0.45);
+    letter-spacing: 0.01em;
+  }
+
+  .btn-modal-save-icon {
+    font-size: 1.2rem;
+  }
+
+  #modalMeasureEdit .btn-del {
+    width: 100%;
+    min-height: 40px;
+    text-align: center;
+    border: 1px solid rgba(239, 68, 68, 0.25);
+    border-radius: 8px;
+    font-size: 0.88rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  #modalMeasureEdit #btnDuplicateMeasureModal {
+    width: 100%;
+    min-height: 40px;
+    border: 1px solid var(--border-medium);
+    border-radius: 8px;
+    font-size: 0.88rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 
   /* ABA DE PEÇA & NUVEM NO MOBILE */

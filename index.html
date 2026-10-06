@@ -563,62 +563,78 @@
             <input type="text" id="editNickname" class="clean-input nickname-input" placeholder="ex: Chamada de Caixa, Clímax (opcional)">
           </div>
 
-          <!-- Métrica e Repetições -->
-          <div class="field-row">
+          <!-- Métrica e Repetições com Stepper / Arrows para Mobile -->
+          <div class="field-row modal-stepper-row">
             <div class="field-group">
               <label for="editBeats" class="field-label">Quantidade de Tempos (Pulsos)</label>
-              <input type="number" id="editBeats" class="clean-input" min="1" max="32" value="4" required>
+              <div class="modal-number-stepper">
+                <button type="button" class="btn-modal-step btn-step-down" id="btnEditBeatsMinus" aria-label="Diminuir tempos" title="Diminuir tempos">▼</button>
+                <input type="number" id="editBeats" class="clean-input modal-step-input" min="1" max="32" value="4" required>
+                <button type="button" class="btn-modal-step btn-step-up" id="btnEditBeatsPlus" aria-label="Aumentar tempos" title="Aumentar tempos">▲</button>
+              </div>
             </div>
             <div class="field-group">
               <label for="editRepeat" class="field-label" title="Quantas vezes este compasso se repete continuamente">Repetições (x)</label>
-              <input type="number" id="editRepeat" class="clean-input" min="1" max="999" value="1" required>
-            </div>
-          </div>
-
-          <!-- Modulação de Andamento -->
-          <div class="field-group">
-            <label class="field-label">ANDAMENTO / MODULAÇÃO MATEMÁTICA</label>
-            <div class="mode-switch">
-              <label class="switch-opt">
-                <input type="radio" name="tempoMode" value="ratio" checked id="radioModeRatio">
-                <span>Relação Matemática (Frações)</span>
-              </label>
-              <label class="switch-opt">
-                <input type="radio" name="tempoMode" value="fixed" id="radioModeFixed">
-                <span>BPM Fixo</span>
-              </label>
-            </div>
-
-            <!-- Fração Matemática -->
-            <div id="panelTempoRatio" class="ratio-box">
-              <div class="preset-ratios">
-                <button type="button" class="btn-ratio-preset active" data-num="1" data-den="1">1/1</button>
-                <button type="button" class="btn-ratio-preset" data-num="3" data-den="2">3/2</button>
-                <button type="button" class="btn-ratio-preset" data-num="4" data-den="3">4/3</button>
-                <button type="button" class="btn-ratio-preset" data-num="2" data-den="3">2/3</button>
-                <button type="button" class="btn-ratio-preset" data-num="5" data-den="4">5/4</button>
-                <button type="button" class="btn-ratio-preset" data-num="3" data-den="4">3/4</button>
-                <button type="button" class="btn-ratio-preset" data-num="5" data-den="3">5/3</button>
-                <button type="button" class="btn-ratio-preset" data-num="7" data-den="4">7/4</button>
-              </div>
-
-              <div class="fraction-inputs">
-                <input type="number" id="editRatioNum" class="clean-input frac-num" min="1" max="64" value="1">
-                <span class="frac-div">/</span>
-                <input type="number" id="editRatioDen" class="clean-input frac-num" min="1" max="64" value="1">
-                <span class="arrow-sym">➔</span>
-                <span id="calcEffectiveBpm" class="eff-bpm-tag">120 BPM</span>
-              </div>
-            </div>
-
-            <!-- BPM Fixo -->
-            <div id="panelTempoFixed" class="ratio-box" style="display:none">
-              <div class="fixed-row">
-                <label for="editCustomBpm" style="font-size:0.8rem; color:#888">BPM específico:</label>
-                <input type="number" id="editCustomBpm" class="clean-input" min="20" max="400" value="120">
+              <div class="modal-number-stepper">
+                <button type="button" class="btn-modal-step btn-step-down" id="btnEditRepeatMinus" aria-label="Diminuir repetições" title="Diminuir repetições">▼</button>
+                <input type="number" id="editRepeat" class="clean-input modal-step-input" min="1" max="999" value="1" required>
+                <button type="button" class="btn-modal-step btn-step-up" id="btnEditRepeatPlus" aria-label="Aumentar repetições" title="Aumentar repetições">▲</button>
               </div>
             </div>
           </div>
+
+          <!-- Modulação de Andamento (Opção Retrátil / Fechada por Padrão) -->
+          <details id="detailsTempoModulation" class="modal-accordion">
+            <summary class="modal-accordion-summary">
+              <div class="modal-accordion-header">
+                <span class="modal-accordion-title">🎵 Andamento / Modulação Métrica</span>
+                <span id="accordionTempoSummary" class="modal-accordion-badge">120 BPM (1/1)</span>
+              </div>
+              <span class="modal-accordion-arrow">▼</span>
+            </summary>
+            <div class="modal-accordion-body">
+              <div class="mode-switch">
+                <label class="switch-opt">
+                  <input type="radio" name="tempoMode" value="ratio" checked id="radioModeRatio">
+                  <span>Relação Matemática (Frações)</span>
+                </label>
+                <label class="switch-opt">
+                  <input type="radio" name="tempoMode" value="fixed" id="radioModeFixed">
+                  <span>BPM Fixo</span>
+                </label>
+              </div>
+
+              <!-- Fração Matemática -->
+              <div id="panelTempoRatio" class="ratio-box">
+                <div class="preset-ratios">
+                  <button type="button" class="btn-ratio-preset active" data-num="1" data-den="1">1/1</button>
+                  <button type="button" class="btn-ratio-preset" data-num="3" data-den="2">3/2</button>
+                  <button type="button" class="btn-ratio-preset" data-num="4" data-den="3">4/3</button>
+                  <button type="button" class="btn-ratio-preset" data-num="2" data-den="3">2/3</button>
+                  <button type="button" class="btn-ratio-preset" data-num="5" data-den="4">5/4</button>
+                  <button type="button" class="btn-ratio-preset" data-num="3" data-den="4">3/4</button>
+                  <button type="button" class="btn-ratio-preset" data-num="5" data-den="3">5/3</button>
+                  <button type="button" class="btn-ratio-preset" data-num="7" data-den="4">7/4</button>
+                </div>
+
+                <div class="fraction-inputs">
+                  <input type="number" id="editRatioNum" class="clean-input frac-num" min="1" max="64" value="1">
+                  <span class="frac-div">/</span>
+                  <input type="number" id="editRatioDen" class="clean-input frac-num" min="1" max="64" value="1">
+                  <span class="arrow-sym">➔</span>
+                  <span id="calcEffectiveBpm" class="eff-bpm-tag">120 BPM</span>
+                </div>
+              </div>
+
+              <!-- BPM Fixo -->
+              <div id="panelTempoFixed" class="ratio-box" style="display:none">
+                <div class="fixed-row">
+                  <label for="editCustomBpm" style="font-size:0.8rem; color:#888">BPM específico:</label>
+                  <input type="number" id="editCustomBpm" class="clean-input" min="20" max="400" value="120">
+                </div>
+              </div>
+            </div>
+          </details>
 
           <!-- Cor -->
           <div class="field-group">
@@ -650,10 +666,13 @@
 
           <!-- Footer do Modal -->
           <div class="modal-bottom-row">
-            <button type="button" id="btnDeleteMeasureModal" class="btn-del">Excluir</button>
+            <button type="button" id="btnDeleteMeasureModal" class="btn-del" title="Excluir este compasso">Excluir</button>
             <div class="modal-bottom-right">
-              <button type="button" id="btnDuplicateMeasureModal" class="btn-ghost-sm">Duplicar</button>
-              <button type="submit" class="btn-red-sm">Salvar</button>
+              <button type="button" id="btnDuplicateMeasureModal" class="btn-ghost-sm" title="Duplicar este compasso">Duplicar</button>
+              <button type="submit" id="btnSaveMeasureEdit" class="btn-modal-save">
+                <span class="btn-modal-save-icon">💾</span>
+                <span>Salvar</span>
+              </button>
             </div>
           </div>
         </form>
