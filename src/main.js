@@ -2022,11 +2022,15 @@ class SergioApp {
       if (grp && grp.isBossaBlock && grp.startMeasure === idx) {
         const blockHeader = document.createElement('div');
         blockHeader.className = 'bossa-block-header';
+        blockHeader.setAttribute('draggable', 'true');
+        blockHeader.setAttribute('data-group-id', grp.id);
+        blockHeader.title = 'Arraste este bloco para reposicionar a bossa inteira na peça';
         const bColor = grp.color || '#8b5cf6';
         blockHeader.style.setProperty('--bossa-color', bColor);
         const count = (grp.endMeasure - grp.startMeasure) + 1;
         blockHeader.innerHTML = `
           <div class="bossa-block-header-info">
+            <span class="bossa-drag-handle" title="Arraste para reposicionar a bossa inteira na peça">⠿</span>
             <span class="bossa-block-header-badge" style="background:${bColor}25; color:${bColor}">
               ${grp.isLinked ? '🔗 Bossa Vinculada' : '📦 Bloco Bossa'}
             </span>
@@ -2034,6 +2038,12 @@ class SergioApp {
             <span class="bossa-block-header-range">c. ${grp.startMeasure + 1} a ${grp.endMeasure + 1} (${count} ${count === 1 ? 'compasso' : 'compassos'})</span>
           </div>
           <div class="bossa-block-header-actions">
+            <button type="button" class="btn-bossa-block-action btn-move-bossa-left" title="Mover bossa inteira para trás (←)" ${grp.startMeasure === 0 ? 'disabled style="opacity:0.35;pointer-events:none"' : ''}>
+              ◀ Mover Bossa
+            </button>
+            <button type="button" class="btn-bossa-block-action btn-move-bossa-right" title="Mover bossa inteira para frente (→)" ${grp.endMeasure >= measures.length - 1 ? 'disabled style="opacity:0.35;pointer-events:none"' : ''}>
+              Mover Bossa ▶
+            </button>
             ${grp.isLinked ? `
               <button type="button" class="btn-bossa-block-action btn-sync-bossa-block" title="Sincronizar este bloco com a bossa original">
                 🔄 Sincronizar
@@ -2044,6 +2054,30 @@ class SergioApp {
             ` : ''}
           </div>
         `;
+
+        const btnMoveLeft = blockHeader.querySelector('.btn-move-bossa-left');
+        if (btnMoveLeft) {
+          btnMoveLeft.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const moved = state.moveGroupLeft(grp.id);
+            if (moved) {
+              this.renderMeasuresList();
+              this.showToast(`Bossa '${grp.name}' movida para trás!`, '📦');
+            }
+          });
+        }
+
+        const btnMoveRight = blockHeader.querySelector('.btn-move-bossa-right');
+        if (btnMoveRight) {
+          btnMoveRight.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const moved = state.moveGroupRight(grp.id);
+            if (moved) {
+              this.renderMeasuresList();
+              this.showToast(`Bossa '${grp.name}' movida para frente!`, '📦');
+            }
+          });
+        }
 
         const btnSync = blockHeader.querySelector('.btn-sync-bossa-block');
         if (btnSync) {
@@ -2069,6 +2103,58 @@ class SergioApp {
           });
         }
 
+        // Drag & Drop no cabeçalho da bossa
+        blockHeader.addEventListener('dragstart', (e) => {
+          e.dataTransfer.setData('text/bossa-group-id', grp.id);
+          e.dataTransfer.setData('text/plain', `bossa:${grp.id}`);
+          blockHeader.classList.add('is-drag-source');
+          for (let bi = grp.startMeasure; bi <= grp.endMeasure; bi++) {
+            const bCard = grid.querySelector(`.measure-card[data-index="${bi}"]`);
+            bCard?.classList.add('is-bossa-dragging');
+          }
+        });
+
+        blockHeader.addEventListener('dragend', () => {
+          blockHeader.classList.remove('is-drag-source');
+          document.querySelectorAll('.is-bossa-dragging').forEach(el => el.classList.remove('is-bossa-dragging'));
+          document.querySelectorAll('.measure-card').forEach(c => c.classList.remove('is-drag-target'));
+          document.querySelectorAll('.bossa-block-header').forEach(h => h.classList.remove('is-drag-target'));
+        });
+
+        blockHeader.addEventListener('dragover', (e) => {
+          e.preventDefault();
+          blockHeader.classList.add('is-drag-target');
+        });
+
+        blockHeader.addEventListener('dragleave', () => {
+          blockHeader.classList.remove('is-drag-target');
+        });
+
+        blockHeader.addEventListener('drop', (e) => {
+          e.preventDefault();
+          blockHeader.classList.remove('is-drag-target');
+          const bossaGroupId = e.dataTransfer.getData('text/bossa-group-id');
+          const rawText = e.dataTransfer.getData('text/plain');
+
+          if (bossaGroupId || rawText?.startsWith('bossa:')) {
+            const gid = bossaGroupId || rawText.replace('bossa:', '');
+            if (gid !== grp.id) {
+              const res = state.moveGroup(gid, grp.startMeasure);
+              if (res) {
+                this.renderMeasuresList();
+                this.showToast(`Bossa inteira reposicionada!`, '📦');
+              }
+            }
+            return;
+          }
+
+          const fromIdx = parseInt(rawText, 10);
+          if (!isNaN(fromIdx) && (fromIdx < grp.startMeasure || fromIdx > grp.endMeasure)) {
+            state.moveMeasure(fromIdx, grp.startMeasure);
+            this.handleMeasureSelected(grp.startMeasure);
+          }
+        });
+
         grid.appendChild(blockHeader);
       }
 
@@ -2089,17 +2175,17 @@ class SergioApp {
 
       let groupTagHtml = '';
       if (grp) {
-        groupTagHtml = `<span class="measure-card-group-tag" style="background:${grp.color}33; color:${grp.color}">${grp.name}</span>`;
+        groupTagHtml = `<span class="measure-card-group-tag ${grp.isBossaBlock ? 'bossa-tag' : ''}" ${grp.isBossaBlock ? 'draggable="true" title="Arraste para mover o bloco inteiro da bossa"' : ''} style="background:${grp.color}33; color:${grp.color}">${grp.name}</span>`;
       }
 
       let bossaPillHtml = '';
       if (m.sourcePieceId) {
         if (m.isLinked) {
-          bossaPillHtml = `<span class="measure-bossa-pill linked" title="Vinculado por referência à '${m.sourcePieceName || 'Bossa'}'. Atualizações da original serão sincronizadas automaticamente.">🔗 ${m.sourcePieceName || 'Bossa'}</span>`;
+          bossaPillHtml = `<span class="measure-bossa-pill linked" draggable="true" title="Bossa vinculada à '${m.sourcePieceName || 'Bossa'}'. Arraste para mover o bloco da bossa inteira!">🔗 ${m.sourcePieceName || 'Bossa'}</span>`;
         } else if (m.isLocallyModified) {
-          bossaPillHtml = `<span class="measure-bossa-pill modified" title="Modificado localmente (baseado em '${m.sourcePieceName || 'Bossa'}')">✏️ Local (${m.sourcePieceName || 'Bossa'})</span>`;
+          bossaPillHtml = `<span class="measure-bossa-pill modified" draggable="true" title="Modificado localmente (baseado em '${m.sourcePieceName || 'Bossa'}'). Arraste para mover o bloco da bossa inteira!">✏️ Local (${m.sourcePieceName || 'Bossa'})</span>`;
         } else {
-          bossaPillHtml = `<span class="measure-bossa-pill unlinked" title="Desvinculado de '${m.sourcePieceName || 'Bossa'}'">🔓 ${m.sourcePieceName || 'Bossa'}</span>`;
+          bossaPillHtml = `<span class="measure-bossa-pill unlinked" draggable="true" title="Desvinculado de '${m.sourcePieceName || 'Bossa'}'. Arraste para mover o bloco da bossa inteira!">🔓 ${m.sourcePieceName || 'Bossa'}</span>`;
         }
       }
 
@@ -2299,13 +2385,32 @@ class SergioApp {
 
       // Arrastar e soltar cartões para reordenar
       card.addEventListener('dragstart', (e) => {
+        // Se o arrasto começou no pill ou tag da bossa, arrasta o bloco inteiro da bossa
+        const bossaTarget = e.target.closest('.measure-bossa-pill, .measure-card-group-tag, .bossa-drag-handle');
+        if (bossaTarget && grp && grp.isBossaBlock) {
+          e.dataTransfer.setData('text/bossa-group-id', grp.id);
+          e.dataTransfer.setData('text/plain', `bossa:${grp.id}`);
+          for (let bi = grp.startMeasure; bi <= grp.endMeasure; bi++) {
+            const bCard = grid.querySelector(`.measure-card[data-index="${bi}"]`);
+            bCard?.classList.add('is-bossa-dragging');
+          }
+          return;
+        }
+
         e.dataTransfer.setData('text/plain', idx);
         card.classList.add('is-drag-source');
       });
 
       card.addEventListener('dragend', () => {
         card.classList.remove('is-drag-source');
-        document.querySelectorAll('.measure-card').forEach(c => c.classList.remove('is-drag-target'));
+        document.querySelectorAll('.measure-card').forEach(c => {
+          c.classList.remove('is-drag-target');
+          c.classList.remove('is-bossa-dragging');
+        });
+        document.querySelectorAll('.bossa-block-header').forEach(h => {
+          h.classList.remove('is-drag-target');
+          h.classList.remove('is-drag-source');
+        });
       });
 
       card.addEventListener('dragover', (e) => {
@@ -2320,7 +2425,23 @@ class SergioApp {
       card.addEventListener('drop', (e) => {
         e.preventDefault();
         card.classList.remove('is-drag-target');
-        const fromIdx = parseInt(e.dataTransfer.getData('text/plain'), 10);
+        document.querySelectorAll('.is-bossa-dragging').forEach(el => el.classList.remove('is-bossa-dragging'));
+
+        const bossaGroupId = e.dataTransfer.getData('text/bossa-group-id');
+        const rawText = e.dataTransfer.getData('text/plain');
+
+        if (bossaGroupId || rawText?.startsWith('bossa:')) {
+          const gid = bossaGroupId || rawText.replace('bossa:', '');
+          const targetGrp = state.groups.find(g => g.id === gid);
+          const moved = state.moveGroup(gid, idx);
+          if (moved) {
+            this.renderMeasuresList();
+            this.showToast(`Bossa '${targetGrp?.name || ''}' movida para c. ${idx + 1}!`, '📦');
+          }
+          return;
+        }
+
+        const fromIdx = parseInt(rawText, 10);
         if (!isNaN(fromIdx) && fromIdx !== idx) {
           state.moveMeasure(fromIdx, idx);
           this.handleMeasureSelected(idx);
@@ -2380,7 +2501,23 @@ class SergioApp {
       addCard.addEventListener('drop', (e) => {
         e.preventDefault();
         addCard.classList.remove('is-drag-target');
-        const fromIdx = parseInt(e.dataTransfer.getData('text/plain'), 10);
+        document.querySelectorAll('.is-bossa-dragging').forEach(el => el.classList.remove('is-bossa-dragging'));
+
+        const bossaGroupId = e.dataTransfer.getData('text/bossa-group-id');
+        const rawText = e.dataTransfer.getData('text/plain');
+
+        if (bossaGroupId || rawText?.startsWith('bossa:')) {
+          const gid = bossaGroupId || rawText.replace('bossa:', '');
+          const targetGrp = state.groups.find(g => g.id === gid);
+          const moved = state.moveGroup(gid, state.measures.length);
+          if (moved) {
+            this.renderMeasuresList();
+            this.showToast(`Bossa '${targetGrp?.name || ''}' movida para o final da peça!`, '📦');
+          }
+          return;
+        }
+
+        const fromIdx = parseInt(rawText, 10);
         if (!isNaN(fromIdx) && fromIdx < state.measures.length - 1) {
           state.moveMeasure(fromIdx, state.measures.length - 1);
           this.handleMeasureSelected(state.measures.length - 1);

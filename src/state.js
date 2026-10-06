@@ -278,6 +278,75 @@ class PieceState {
     return true;
   }
 
+  // Mover bloco de bossa ou grupo inteiro para uma nova posição
+  moveGroup(groupId, targetIndex) {
+    const grp = this.groups.find(g => g.id === groupId);
+    if (!grp) return false;
+    const fromStart = grp.startMeasure;
+    const fromEnd = grp.endMeasure;
+    const count = (fromEnd - fromStart) + 1;
+    if (count <= 0 || fromStart < 0 || fromEnd >= this.measures.length) return false;
+
+    // Se o destino estiver dentro do próprio grupo, não precisa mover
+    if (targetIndex >= fromStart && targetIndex <= fromEnd) {
+      return false;
+    }
+
+    // Vincula cada compasso ao seu ID de grupo atual antes de mover
+    this.measures.forEach((m, idx) => {
+      const g = this.groups.find(x => idx >= x.startMeasure && idx <= x.endMeasure);
+      m._assignedGroupId = g ? g.id : null;
+    });
+
+    // Remove o bloco de compassos
+    const movedMeasures = this.measures.splice(fromStart, count);
+
+    // Calcula a posição real de inserção na lista restante
+    let insertIndex = targetIndex;
+    if (targetIndex > fromEnd) {
+      insertIndex = targetIndex - count + 1;
+    }
+    insertIndex = Math.max(0, Math.min(this.measures.length, insertIndex));
+
+    // Insere os compassos na nova posição
+    this.measures.splice(insertIndex, 0, ...movedMeasures);
+
+    // Atualiza limites de todos os grupos conforme nova distribuição
+    this.groups.forEach(g => {
+      const indices = [];
+      this.measures.forEach((m, idx) => {
+        if (m._assignedGroupId === g.id) {
+          indices.push(idx);
+        }
+      });
+      if (indices.length > 0) {
+        g.startMeasure = Math.min(...indices);
+        g.endMeasure = Math.max(...indices);
+      }
+    });
+
+    // Remove tags temporárias
+    this.measures.forEach(m => delete m._assignedGroupId);
+
+    this.recalculateTimings();
+    this.notify(`Moveu bossa '${grp.name}' para c. ${grp.startMeasure + 1}`);
+    return true;
+  }
+
+  // Mover bloco de bossa para trás (←)
+  moveGroupLeft(groupId) {
+    const grp = this.groups.find(g => g.id === groupId);
+    if (!grp || grp.startMeasure <= 0) return false;
+    return this.moveGroup(groupId, grp.startMeasure - 1);
+  }
+
+  // Mover bloco de bossa para frente (→)
+  moveGroupRight(groupId) {
+    const grp = this.groups.find(g => g.id === groupId);
+    if (!grp || grp.endMeasure >= this.measures.length - 1) return false;
+    return this.moveGroup(groupId, grp.endMeasure + 1);
+  }
+
   // Remover compasso (permite ficar com 0 compassos)
   removeMeasure(index) {
     if (this.measures.length === 0) return;
