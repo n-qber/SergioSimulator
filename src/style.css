@@ -5305,7 +5305,7 @@ kbd {
 }
 
 /* ==========================================================================
-   GERENCIADOR DE BOSSAS & REPERTÓRIO (PAINEL DEDICADO & SINCRONIZAÇÃO EM NUVEM)
+   GERENCIADOR DE BOSSAS & REPERTÓRIO (PÁGINA DEDICADA & SINCRONIZAÇÃO EM NUVEM)
    ========================================================================== */
 
 /* Botão de Destaque no Topo dos Compassos */
@@ -5323,41 +5323,104 @@ kbd {
   box-shadow: 0 2px 10px rgba(139, 92, 246, 0.25);
 }
 
-/* Janela Principal do Gerenciador de Bossas */
-.modal-bossa-manager-window {
-  max-width: 860px;
-  width: 95%;
-  max-height: 90vh;
-  display: flex;
-  flex-direction: column;
+/* Estrutura das Páginas SPA */
+.app-view-page {
+  width: 100%;
 }
 
-.bossa-mgr-top {
+/* PÁGINA DEDICADA DO GERENCIADOR DE BOSSAS */
+.bossa-page-view {
+  width: 100%;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-main, #0b0f19);
+  color: var(--text-primary, #e2e8f0);
+}
+
+/* Topbar da Página de Bossas */
+.bossa-page-topbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-  padding: 16px 20px;
+  padding: 12px 24px;
+  background: var(--bg-header, #131b2e);
   border-bottom: 1px solid var(--border-light);
+  position: sticky;
+  top: 0;
+  z-index: 90;
+  gap: 16px;
+  flex-wrap: wrap;
 }
 
-.bossa-mgr-title-row {
+.bossa-topbar-left {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 16px;
 }
 
-.tag-bossa-mgr {
-  background: rgba(139, 92, 246, 0.18);
+.btn-back-simulator {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(139, 92, 246, 0.15);
+  border: 1px solid rgba(139, 92, 246, 0.4);
   color: #c4b5fd;
-  border: 1px solid rgba(139, 92, 246, 0.35);
-  font-size: 0.72rem;
+  font-size: 0.82rem;
   font-weight: 800;
+  padding: 7px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-back-simulator:hover {
+  background: rgba(139, 92, 246, 0.3);
+  color: #ffffff;
+  border-color: #8b5cf6;
+  transform: translateX(-2px);
+  box-shadow: 0 2px 8px rgba(139, 92, 246, 0.25);
+}
+
+.btn-back-simulator .back-icon {
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.bossa-topbar-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.bossa-topbar-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(139, 92, 246, 0.15);
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: #c4b5fd;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  padding: 3px 8px;
-  border-radius: 6px;
+}
+
+.bossa-topbar-heading {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 900;
+  color: var(--white-pure);
+  letter-spacing: -0.3px;
+}
+
+.bossa-topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 /* Indicador de Sincronização na Nuvem */
@@ -5367,7 +5430,7 @@ kbd {
   gap: 8px;
   background: var(--bg-card);
   border: 1px solid var(--border-medium);
-  padding: 4px 10px;
+  padding: 5px 12px;
   border-radius: 20px;
   font-size: 0.75rem;
   color: var(--white-muted);
@@ -5427,61 +5490,151 @@ kbd {
   to { transform: rotate(360deg); }
 }
 
-/* Corpo do Gerenciador */
-.bossa-mgr-body {
-  padding: 16px 20px;
+/* Conteúdo Principal da Página */
+.bossa-page-body {
+  flex: 1;
+  padding: 24px 20px calc(80px + env(safe-area-inset-bottom, 0px)) 20px;
+  width: 100%;
+}
+
+.bossa-page-container {
+  max-width: 1280px;
+  width: 100%;
+  margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  overflow-y: auto;
-  max-height: calc(90vh - 140px);
+  gap: 22px;
 }
 
-.bossa-mgr-intro {
+/* Banner Hero */
+.bossa-page-hero {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.14) 0%, rgba(30, 41, 59, 0.7) 100%);
+  border: 1px solid rgba(139, 92, 246, 0.35);
+  border-radius: 16px;
+  padding: 24px 28px;
   display: flex;
-  align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  background: rgba(139, 92, 246, 0.06);
-  border: 1px solid rgba(139, 92, 246, 0.2);
-  border-radius: 10px;
-  padding: 12px 16px;
+  align-items: center;
+  gap: 20px;
   flex-wrap: wrap;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.18);
 }
 
-.bossa-mgr-desc {
-  margin: 0;
-  font-size: 0.82rem;
-  color: var(--white-muted);
-  line-height: 1.45;
+.bossa-hero-text {
   flex: 1;
-  min-width: 240px;
+  min-width: 280px;
 }
 
-.bossa-mgr-quick-actions {
+.bossa-hero-title {
+  margin: 0 0 6px 0;
+  font-size: 1.35rem;
+  font-weight: 900;
+  color: #ffffff;
+}
+
+.bossa-hero-desc {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--white-muted);
+  line-height: 1.5;
+  max-width: 680px;
+}
+
+.bossa-hero-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   flex-wrap: wrap;
 }
 
-.btn-mgr-action {
-  font-size: 0.8rem;
-  font-weight: 700;
-  padding: 6px 12px;
-  border-radius: 6px;
+.btn-bossa-hero-primary {
+  background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+  border: none;
+  color: #ffffff;
+  font-weight: 800;
+  font-size: 0.85rem;
+  padding: 10px 18px;
+  border-radius: 8px;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 10px rgba(139, 92, 246, 0.35);
+}
+
+.btn-bossa-hero-primary:hover {
+  background: linear-gradient(135deg, #9333ea, #6d28d9);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(139, 92, 246, 0.5);
+}
+
+.btn-bossa-hero-secondary {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border-medium);
+  color: var(--white-pure);
+  font-weight: 700;
+  font-size: 0.85rem;
+  padding: 10px 18px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   transition: all 0.2s ease;
 }
 
-/* Barra de Filtro e Busca */
-.bossa-mgr-filter-bar {
+.btn-bossa-hero-secondary:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: var(--border-light);
+  transform: translateY(-1px);
+}
+
+/* Cards de Métricas / Estatísticas */
+.bossa-page-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+}
+
+.bossa-stat-box {
+  background: var(--bg-card);
+  border: 1px solid var(--border-medium);
+  border-radius: 12px;
+  padding: 16px 20px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 4px;
+  box-shadow: var(--shadow-sm);
+  transition: all 0.2s ease;
+}
+
+.bossa-stat-box:hover {
+  border-color: rgba(139, 92, 246, 0.35);
+  transform: translateY(-1px);
+}
+
+.bossa-stat-box .stat-number {
+  font-size: 1.8rem;
+  font-weight: 900;
+  font-family: var(--font-mono);
+  color: #c4b5fd;
+  line-height: 1.1;
+}
+
+.bossa-stat-box .stat-title {
+  font-size: 0.74rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--white-muted);
+}
+
+/* Barra de Pesquisa e Filtros */
+.bossa-page-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .bossa-search-box {
@@ -5493,36 +5646,37 @@ kbd {
 
 .bossa-search-icon {
   position: absolute;
-  left: 12px;
-  font-size: 0.85rem;
+  left: 14px;
+  font-size: 0.95rem;
   opacity: 0.6;
   pointer-events: none;
 }
 
 .bossa-search-input {
   width: 100%;
-  padding: 9px 36px 9px 36px;
-  font-size: 0.85rem;
+  padding: 11px 40px 11px 42px;
+  font-size: 0.9rem;
   background: var(--bg-card);
   border: 1px solid var(--border-medium);
-  border-radius: 8px;
+  border-radius: 10px;
   color: var(--white-pure);
   transition: all 0.2s ease;
+  box-shadow: var(--shadow-sm);
 }
 
 .bossa-search-input:focus {
   border-color: #8b5cf6;
-  box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.25);
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.25);
   outline: none;
 }
 
 .btn-clear-search {
   position: absolute;
-  right: 10px;
+  right: 12px;
   background: transparent;
   border: none;
   color: var(--white-muted);
-  font-size: 1.1rem;
+  font-size: 1.2rem;
   cursor: pointer;
   line-height: 1;
   padding: 2px 6px;
@@ -5534,7 +5688,7 @@ kbd {
 
 .bossa-filter-tabs {
   display: flex;
-  gap: 6px;
+  gap: 8px;
   flex-wrap: wrap;
 }
 
@@ -5542,16 +5696,16 @@ kbd {
   background: var(--bg-card);
   border: 1px solid var(--border-light);
   color: var(--white-muted);
-  font-size: 0.78rem;
+  font-size: 0.8rem;
   font-weight: 700;
-  padding: 5px 12px;
+  padding: 6px 14px;
   border-radius: 20px;
   cursor: pointer;
   transition: all 0.18s ease;
 }
 
 .bossa-filter-pill:hover {
-  background: rgba(139, 92, 246, 0.1);
+  background: rgba(139, 92, 246, 0.12);
   color: var(--white-pure);
   border-color: rgba(139, 92, 246, 0.3);
 }
@@ -5563,36 +5717,37 @@ kbd {
   box-shadow: 0 2px 8px rgba(139, 92, 246, 0.35);
 }
 
-/* Grade de Cartões de Bossas */
-.bossa-mgr-cards-container {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  min-height: 180px;
+/* Grade de Bossas (Página Dedicada) */
+.bossa-page-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  gap: 16px;
+  min-height: 220px;
 }
 
 .bossa-mgr-card {
   background: var(--bg-card);
   border: 1px solid var(--border-medium);
-  border-radius: 12px;
-  padding: 14px 16px;
+  border-radius: 14px;
+  padding: 16px 18px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   transition: all 0.2s ease;
   position: relative;
+  box-shadow: var(--shadow-sm);
 }
 
 .bossa-mgr-card:hover {
-  border-color: rgba(139, 92, 246, 0.45);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
-  transform: translateY(-1px);
+  border-color: rgba(139, 92, 246, 0.5);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.22);
+  transform: translateY(-2px);
 }
 
 .bossa-mgr-card.is-playing {
   border-color: #8b5cf6;
   background: rgba(139, 92, 246, 0.08);
-  box-shadow: 0 0 16px rgba(139, 92, 246, 0.3);
+  box-shadow: 0 0 20px rgba(139, 92, 246, 0.35);
 }
 
 .bossa-mgr-card-header {
@@ -5611,7 +5766,7 @@ kbd {
 }
 
 .bossa-mgr-card-title {
-  font-size: 0.96rem;
+  font-size: 1rem;
   font-weight: 800;
   color: var(--white-pure);
   margin: 0;
@@ -5620,8 +5775,8 @@ kbd {
 .bossa-origin-badge {
   font-size: 0.68rem;
   font-weight: 800;
-  padding: 2px 7px;
-  border-radius: 4px;
+  padding: 2px 8px;
+  border-radius: 6px;
   white-space: nowrap;
 }
 
@@ -5644,11 +5799,11 @@ kbd {
 }
 
 .bossa-mgr-card-meta {
-  font-size: 0.76rem;
+  font-size: 0.78rem;
   color: var(--white-muted);
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   font-family: var(--font-mono);
 }
 
@@ -5667,7 +5822,7 @@ kbd {
   border: 1px solid var(--border-light);
   border-radius: 6px;
   padding: 3px 8px;
-  font-size: 0.72rem;
+  font-size: 0.74rem;
   font-family: var(--font-mono);
   color: var(--white-muted);
   white-space: nowrap;
@@ -5682,7 +5837,8 @@ kbd {
 
 .ribbon-measure-tag.ratio {
   color: #a78bfa;
-  border-color: rgba(139, 92, 246, 0.25);
+  border-color: rgba(139, 92, 246, 0.3);
+  background: rgba(139, 92, 246, 0.08);
 }
 
 /* Barra de Ações do Cartão */
@@ -5692,8 +5848,9 @@ kbd {
   justify-content: space-between;
   gap: 8px;
   flex-wrap: wrap;
-  padding-top: 6px;
+  padding-top: 10px;
   border-top: 1px solid var(--border-light);
+  margin-top: auto;
 }
 
 .bossa-actions-left {
@@ -5710,14 +5867,14 @@ kbd {
 }
 
 .btn-card-action {
-  font-size: 0.75rem;
+  font-size: 0.76rem;
   font-weight: 700;
-  padding: 5px 10px;
+  padding: 6px 11px;
   border-radius: 6px;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
   transition: all 0.18s ease;
   border: 1px solid transparent;
 }
@@ -5758,12 +5915,12 @@ kbd {
 }
 
 .btn-card-action.open:hover {
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.14);
   border-color: var(--border-medium);
 }
 
 .btn-card-action.icon-only {
-  padding: 5px 8px;
+  padding: 6px 9px;
   font-size: 0.85rem;
   background: transparent;
   border: 1px solid transparent;
@@ -5782,59 +5939,50 @@ kbd {
   border-color: rgba(239, 68, 68, 0.3);
 }
 
-/* Rodapé do Gerenciador */
-.bossa-mgr-bottom {
+/* Rodapé da Página */
+.bossa-page-bottom-info {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 12px 20px;
+  padding: 16px 0;
   border-top: 1px solid var(--border-light);
-}
-
-.bossa-mgr-stats {
-  font-size: 0.78rem;
+  font-size: 0.82rem;
   color: var(--white-muted);
-  font-family: var(--font-mono);
 }
 
-/* Aba e Link no Modal de Inserção */
-.bossa-source-tabs-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  border-bottom: 1px solid var(--border-light);
-  padding-bottom: 4px;
-  margin-top: 4px;
+/* Suporte ao Tema Claro na Página de Bossas */
+[data-theme="light"] .bossa-page-view {
+  background: #f8fafc;
+  color: #0f172a;
 }
 
-.bossa-source-tabs-row .bossa-source-tabs {
-  border-bottom: none;
-  padding-bottom: 0;
-  margin-top: 0;
+[data-theme="light"] .bossa-page-topbar {
+  background: #ffffff;
+  border-bottom-color: #e2e8f0;
 }
 
-.btn-mgr-link {
-  font-size: 0.78rem;
-  font-weight: 700;
-  color: #a78bfa;
-  padding: 4px 8px;
-  border-radius: 4px;
-  text-decoration: none;
-  transition: all 0.15s ease;
-  white-space: nowrap;
+[data-theme="light"] .bossa-page-hero {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.08) 0%, rgba(241, 245, 249, 0.9) 100%);
+  border-color: rgba(139, 92, 246, 0.25);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
 }
 
-.btn-mgr-link:hover {
-  background: rgba(139, 92, 246, 0.15);
-  color: #ffffff;
+[data-theme="light"] .bossa-hero-title {
+  color: #0f172a;
 }
 
-/* Suporte ao Tema Claro no Gerenciador de Bossas */
-[data-theme="light"] .bossa-mgr-intro {
-  background: rgba(139, 92, 246, 0.05);
-  border-color: rgba(139, 92, 246, 0.2);
+[data-theme="light"] .bossa-hero-desc {
+  color: #475569;
+}
+
+[data-theme="light"] .bossa-stat-box {
+  background: #ffffff;
+  border-color: #e2e8f0;
+}
+
+[data-theme="light"] .bossa-stat-box .stat-number {
+  color: #7c3aed;
 }
 
 [data-theme="light"] .bossa-search-input {
@@ -5850,7 +5998,7 @@ kbd {
 
 [data-theme="light"] .bossa-mgr-card:hover {
   border-color: #a78bfa;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
 }
 
 [data-theme="light"] .bossa-mgr-card.is-playing {
@@ -5872,34 +6020,48 @@ kbd {
   color: #0f172a;
 }
 
-/* Responsividade Mobile do Gerenciador de Bossas */
+/* Responsividade Mobile da Página de Bossas */
 @media (max-width: 768px) {
-  .modal-bossa-manager-window {
-    width: 98%;
-    max-height: 94vh;
+  .bossa-page-topbar {
+    padding: 10px 14px;
   }
 
-  .bossa-mgr-top {
-    padding: 12px 14px;
+  .bossa-page-brand {
+    display: none;
   }
 
-  .bossa-mgr-body {
-    padding: 12px 14px;
-    max-height: calc(94vh - 120px);
+  .bossa-topbar-heading {
+    font-size: 1rem;
   }
 
-  .bossa-mgr-intro {
+  .bossa-page-body {
+    padding: 16px 12px calc(80px + env(safe-area-inset-bottom, 0px)) 12px;
+  }
+
+  .bossa-page-hero {
+    padding: 18px 16px;
     flex-direction: column;
     align-items: flex-start;
   }
 
-  .bossa-mgr-quick-actions {
+  .bossa-hero-actions {
     width: 100%;
   }
 
-  .bossa-mgr-quick-actions .btn-mgr-action {
+  .bossa-hero-actions button,
+  .bossa-hero-actions label {
     flex: 1;
     justify-content: center;
+  }
+
+  .bossa-page-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+
+  .bossa-page-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
   }
 
   .bossa-card-actions {
@@ -5919,4 +6081,5 @@ kbd {
     justify-content: center;
   }
 }
+
 

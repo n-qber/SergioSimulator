@@ -23,8 +23,10 @@
 <body>
   <div id="app" class="app-container">
     
-    <!-- BARRA SUPERIOR (HEADER) -->
-    <header class="top-header" id="topHeader">
+    <!-- PÁGINA 1: SIMULADOR & EDITOR PRINCIPAL -->
+    <div id="viewSimulator" class="app-view-page active">
+      <!-- BARRA SUPERIOR (HEADER) -->
+      <header class="top-header" id="topHeader">
       <div class="header-left">
         <div class="brand">
           <div class="brand-icon">🥁</div>
@@ -328,7 +330,125 @@
         <svg id="floatingPauseIcon" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" style="display:none"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
       </button>
 
-    </main>
+    </div>
+    <!-- FIM DA PÁGINA 1: SIMULADOR -->
+
+    <!-- PÁGINA 2: GERENCIADOR DE BOSSAS & REPERTÓRIO (PÁGINA DEDICADA) -->
+    <div id="viewBossaManager" class="app-view-page bossa-page-view" style="display:none">
+      <!-- Topo da Página de Bossas -->
+      <header class="bossa-page-topbar">
+        <div class="bossa-topbar-left">
+          <button type="button" id="btnBackToSimulator" class="btn-back-simulator" title="Voltar ao Simulador Principal (Esc)">
+            <span class="back-icon">←</span>
+            <span class="back-text">Voltar ao Simulador</span>
+          </button>
+          <div class="brand bossa-page-brand">
+            <div class="brand-icon">🥁</div>
+            <span class="brand-title">SÉRGIO SIMULATOR</span>
+          </div>
+        </div>
+
+        <div class="bossa-topbar-center">
+          <div class="bossa-topbar-badge">
+            <span class="bossa-tag-icon">🥁</span>
+            <span class="bossa-tag-text">Repertório Musical</span>
+          </div>
+          <h1 class="bossa-topbar-heading">Gerenciador de Bossas</h1>
+        </div>
+
+        <div class="bossa-topbar-right">
+          <!-- Indicador e botão de sincronização em nuvem -->
+          <div class="bossa-mgr-sync-indicator" id="bossaMgrSyncIndicator">
+            <span class="sync-dot" id="bossaSyncDot"></span>
+            <span id="bossaMgrSyncText" class="sync-text">Sincronizado</span>
+            <button type="button" id="btnSyncBossasNow" class="btn-sync-bossas" title="Sincronizar com a Nuvem agora">
+              <span class="sync-icon">🔄</span> Sincronizar
+            </button>
+          </div>
+
+          <!-- Alternar Tema Claro / Escuro -->
+          <button type="button" id="btnThemeToggleBossaMgr" class="btn-icon-action" title="Alternar Tema Claro / Escuro">
+            <span id="themeIconBossaMgr">☀️</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Conteúdo da Página de Bossas -->
+      <main class="bossa-page-body">
+        <div class="bossa-page-container">
+          
+          <!-- Banner Hero com Apresentação e Ações Rápidas -->
+          <section class="bossa-page-hero">
+            <div class="bossa-hero-text">
+              <h2 class="bossa-hero-title">Biblioteca de Bossas & Convenções</h2>
+              <p class="bossa-hero-desc">
+                Organize, ouça e sincronize suas convenções de bateria e percussão. Suas bossas ficam salvas na nuvem com sua conta, permitindo que você componha no celular e abra no computador com perfeita continuidade.
+              </p>
+            </div>
+            <div class="bossa-hero-actions">
+              <button type="button" id="btnMgrNewBossaFromCurrent" class="btn-bossa-hero-primary" title="Criar nova bossa a partir dos compassos da peça aberta">
+                <span class="btn-icon">➕</span> Criar Bossa da Peça
+              </button>
+              <label class="btn-bossa-hero-secondary file-btn" title="Importar bossa de arquivo JSON">
+                <span class="btn-icon">📂</span> Importar JSON
+                <input type="file" id="fileImportBossa" accept=".json" style="display:none">
+              </label>
+            </div>
+          </section>
+
+          <!-- Cards de Métricas / Estatísticas -->
+          <section class="bossa-page-stats-grid">
+            <div class="bossa-stat-box">
+              <span class="stat-number" id="statTotalBossas">0</span>
+              <span class="stat-title">Total de Bossas</span>
+            </div>
+            <div class="bossa-stat-box">
+              <span class="stat-number" id="statMyBossas">0</span>
+              <span class="stat-title">Minhas Bossas</span>
+            </div>
+            <div class="bossa-stat-box">
+              <span class="stat-number" id="statCloudBossas">0</span>
+              <span class="stat-title">Na Nuvem ☁️</span>
+            </div>
+            <div class="bossa-stat-box">
+              <span class="stat-number" id="statPresetBossas">0</span>
+              <span class="stat-title">Modelos Didáticos ⭐</span>
+            </div>
+          </section>
+
+          <!-- Barra de Pesquisa e Filtros -->
+          <section class="bossa-page-toolbar">
+            <div class="bossa-search-box">
+              <span class="bossa-search-icon">🔍</span>
+              <input type="text" id="inputSearchBossas" class="clean-input bossa-search-input" placeholder="Buscar bossa por nome, andamento ou métrica...">
+              <button type="button" id="btnClearSearchBossas" class="btn-clear-search" style="display:none" title="Limpar busca">&times;</button>
+            </div>
+
+            <div class="bossa-filter-tabs">
+              <button type="button" class="bossa-filter-pill active" data-filter="all">Todas (<span id="countFilterAll">0</span>)</button>
+              <button type="button" class="bossa-filter-pill" data-filter="my">Minhas Bossas (<span id="countFilterMy">0</span>)</button>
+              <button type="button" class="bossa-filter-pill" data-filter="cloud">Na Nuvem ☁️ (<span id="countFilterCloud">0</span>)</button>
+              <button type="button" class="bossa-filter-pill" data-filter="presets">Modelos Prontos ⭐ (<span id="countFilterPresets">0</span>)</button>
+            </div>
+          </section>
+
+          <!-- Grade Principal de Bossas -->
+          <section class="bossa-page-grid" id="bossaMgrCardsContainer">
+            <!-- Renderizado dinamicamente via SergioApp -->
+          </section>
+
+          <!-- Barra Inferior de Informações -->
+          <div class="bossa-page-bottom-info">
+            <span id="bossaMgrStats">Carregando bossas...</span>
+            <button type="button" id="btnBackToSimulatorBottom" class="btn-link-action">
+              ← Voltar ao Simulador
+            </button>
+          </div>
+
+        </div>
+      </main>
+    </div>
+    <!-- FIM DA PÁGINA 2: GERENCIADOR DE BOSSAS -->
 
     <!-- BARRA DE NAVEGAÇÃO MOBILE FIXA (RODAPÉ) -->
     <nav class="mobile-bottom-nav" id="mobileBottomNav" aria-label="Navegação Mobile">
@@ -340,6 +460,10 @@
         <span class="nav-btn-icon">🎼</span>
         <span class="nav-btn-label">Compassos</span>
         <span class="nav-btn-badge" id="tabMeasuresBadge">0</span>
+      </button>
+      <button type="button" class="mobile-nav-btn" data-tab="bossas" id="tabNavBossas">
+        <span class="nav-btn-icon">🗂️</span>
+        <span class="nav-btn-label">Bossas</span>
       </button>
       <button type="button" class="mobile-nav-btn" data-tab="piece" id="tabNavPiece">
         <span class="nav-btn-icon">⚙️</span>
@@ -609,71 +733,6 @@
           <button type="button" class="btn-clean-primary" id="btnConfirmInsertBossa" disabled>
             <span class="btn-icon">🔗</span> Inserir Bossa na Peça
           </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- MODAL DO GERENCIADOR DE BOSSAS & REPERTÓRIO -->
-    <div id="modalBossaManager" class="modal-overlay" style="display:none">
-      <div class="modal-window modal-bossa-manager-window">
-        <div class="modal-top bossa-mgr-top">
-          <div class="bossa-mgr-title-row">
-            <span class="modal-measure-tag tag-bossa-mgr">🥁 Repertório</span>
-            <h3 class="modal-heading">Gerenciador de Bossas</h3>
-          </div>
-          <div class="bossa-mgr-sync-indicator" id="bossaMgrSyncIndicator">
-            <span class="sync-dot" id="bossaSyncDot"></span>
-            <span id="bossaMgrSyncText" class="sync-text">Sincronizado</span>
-            <button type="button" id="btnSyncBossasNow" class="btn-sync-bossas" title="Sincronizar com a Nuvem agora">
-              <span class="sync-icon">🔄</span> Sincronizar
-            </button>
-          </div>
-          <button type="button" class="modal-x" id="btnBossaManagerClose" title="Fechar">&times;</button>
-        </div>
-
-        <div class="modal-body-clean bossa-mgr-body">
-          <div class="bossa-mgr-intro">
-            <p class="bossa-mgr-desc">
-              Suas bossas sincronizam automaticamente com a sua conta para você compor no celular e continuar no computador com perfeição.
-            </p>
-            <div class="bossa-mgr-quick-actions">
-              <button type="button" id="btnMgrNewBossaFromCurrent" class="btn-clean-primary btn-mgr-action" title="Criar nova bossa a partir dos compassos da peça aberta">
-                <span class="btn-icon">➕</span> Criar Bossa da Peça
-              </button>
-              <label class="btn-clean-ghost btn-mgr-action file-btn" title="Importar bossa de arquivo JSON">
-                <span class="btn-icon">📂</span> Importar JSON
-                <input type="file" id="fileImportBossa" accept=".json" style="display:none">
-              </label>
-            </div>
-          </div>
-
-          <!-- Barra de Busca e Filtro de Bossas -->
-          <div class="bossa-mgr-filter-bar">
-            <div class="bossa-search-box">
-              <span class="bossa-search-icon">🔍</span>
-              <input type="text" id="inputSearchBossas" class="clean-input bossa-search-input" placeholder="Buscar bossa por nome ou BPM...">
-              <button type="button" id="btnClearSearchBossas" class="btn-clear-search" style="display:none" title="Limpar busca">&times;</button>
-            </div>
-
-            <div class="bossa-filter-tabs">
-              <button type="button" class="bossa-filter-pill active" data-filter="all">Todas (<span id="countFilterAll">0</span>)</button>
-              <button type="button" class="bossa-filter-pill" data-filter="my">Minhas Bossas (<span id="countFilterMy">0</span>)</button>
-              <button type="button" class="bossa-filter-pill" data-filter="cloud">Na Nuvem ☁️ (<span id="countFilterCloud">0</span>)</button>
-              <button type="button" class="bossa-filter-pill" data-filter="presets">Modelos Prontos ⭐ (<span id="countFilterPresets">0</span>)</button>
-            </div>
-          </div>
-
-          <!-- Container de Cartões de Bossas -->
-          <div class="bossa-mgr-cards-container" id="bossaMgrCardsContainer">
-            <!-- Renderizado dinamicamente via SergioApp -->
-          </div>
-        </div>
-
-        <div class="modal-bottom bossa-mgr-bottom">
-          <div class="bossa-mgr-stats" id="bossaMgrStats">
-            <span>Carregando bossas...</span>
-          </div>
-          <button type="button" class="btn-clean-ghost" id="btnBossaManagerDone">Fechar</button>
         </div>
       </div>
     </div>

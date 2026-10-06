@@ -65,6 +65,7 @@ class SergioApp {
     this.currentMgrFilter = 'all';
     this.mgrSearchQuery = '';
     this.activePreviewBossaId = null;
+    this.currentView = 'simulator'; // 'simulator' | 'bossas'
 
     this.dom = {};
   }
@@ -91,6 +92,7 @@ class SergioApp {
     this.setupMobileNav();
     this.renderQuickMeasureStrip();
     this.setupPwa();
+    this.setupRouting();
 
     // Sincroniza bossas com a nuvem na inicialização se o usuário já estiver conectado
     if (this.authService && this.authService.isLoggedIn()) {
@@ -121,14 +123,17 @@ class SergioApp {
       (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
     this.setTheme(savedTheme);
 
-    this.dom.btnThemeToggle?.addEventListener('click', () => {
+    const toggleTheme = () => {
       const current = document.documentElement.getAttribute('data-theme') || 'dark';
       const next = current === 'light' ? 'dark' : 'light';
       this.setTheme(next);
       if (this.renderer) {
         this.renderer.render(this.playbackTime);
       }
-    });
+    };
+
+    this.dom.btnThemeToggle?.addEventListener('click', toggleTheme);
+    this.dom.btnThemeToggleBossaMgr?.addEventListener('click', toggleTheme);
   }
 
   setTheme(theme) {
@@ -136,6 +141,9 @@ class SergioApp {
     localStorage.setItem('sergio_theme', theme);
     if (this.dom.themeIcon) {
       this.dom.themeIcon.textContent = theme === 'light' ? '🌙' : '☀️';
+    }
+    if (this.dom.themeIconBossaMgr) {
+      this.dom.themeIconBossaMgr.textContent = theme === 'light' ? '🌙' : '☀️';
     }
     if (this.dom.btnThemeToggle) {
       this.dom.btnThemeToggle.title = theme === 'light' ? 'Mudar para Tema Escuro (T)' : 'Mudar para Tema Claro (T)';
@@ -424,9 +432,19 @@ class SergioApp {
       btnConfirmSaveAsBossa: document.getElementById('btnConfirmSaveAsBossa'),
       saveAsBossaCount: document.getElementById('saveAsBossaCount'),
       inputBossaName: document.getElementById('inputBossaName'),
-      modalBossaManager: document.getElementById('modalBossaManager'),
-      btnBossaManagerClose: document.getElementById('btnBossaManagerClose'),
-      btnBossaManagerDone: document.getElementById('btnBossaManagerDone'),
+      // Página Dedicada do Gerenciador de Bossas (SPA)
+      viewSimulator: document.getElementById('viewSimulator'),
+      viewBossaManager: document.getElementById('viewBossaManager'),
+      modalBossaManager: document.getElementById('viewBossaManager'), // fallback compatível
+      btnBackToSimulator: document.getElementById('btnBackToSimulator'),
+      btnBackToSimulatorBottom: document.getElementById('btnBackToSimulatorBottom'),
+      btnThemeToggleBossaMgr: document.getElementById('btnThemeToggleBossaMgr'),
+      themeIconBossaMgr: document.getElementById('themeIconBossaMgr'),
+      tabNavBossas: document.getElementById('tabNavBossas'),
+      statTotalBossas: document.getElementById('statTotalBossas'),
+      statMyBossas: document.getElementById('statMyBossas'),
+      statCloudBossas: document.getElementById('statCloudBossas'),
+      statPresetBossas: document.getElementById('statPresetBossas'),
       btnSyncBossasNow: document.getElementById('btnSyncBossasNow'),
       bossaSyncDot: document.getElementById('bossaSyncDot'),
       bossaMgrSyncText: document.getElementById('bossaMgrSyncText'),
@@ -872,22 +890,57 @@ class SergioApp {
     this.dom.tabNavStage?.addEventListener('click', () => this.setMobileTab('stage'));
     this.dom.tabNavMeasures?.addEventListener('click', () => this.setMobileTab('measures'));
     this.dom.tabNavPiece?.addEventListener('click', () => this.setMobileTab('piece'));
+    this.dom.tabNavBossas?.addEventListener('click', () => this.setMobileTab('bossas'));
 
     this.dom.btnFloatingPlay?.addEventListener('click', () => this.togglePlayPause());
   }
 
   setMobileTab(tab) {
+    if (tab === 'bossas') {
+      this.openBossaManager(true);
+      return;
+    }
+
+    if (this.currentView === 'bossas') {
+      this.closeBossaManager(true);
+    }
+
     this.activeMobileTab = tab;
     document.body.setAttribute('data-mobile-tab', tab);
 
     this.dom.tabNavStage?.classList.toggle('active', tab === 'stage');
     this.dom.tabNavMeasures?.classList.toggle('active', tab === 'measures');
     this.dom.tabNavPiece?.classList.toggle('active', tab === 'piece');
+    this.dom.tabNavBossas?.classList.toggle('active', tab === 'bossas');
 
     if (tab === 'stage') {
       setTimeout(() => {
         this.renderer?.resize();
       }, 50);
+    }
+  }
+
+  setupRouting() {
+    const handleRoute = () => {
+      const hash = window.location.hash;
+      if (hash === '#/bossas' || hash === '#bossas') {
+        if (this.currentView !== 'bossas') {
+          this.openBossaManager(false);
+        }
+      } else {
+        if (this.currentView === 'bossas') {
+          this.closeBossaManager(false);
+        }
+      }
+    };
+
+    window.addEventListener('hashchange', handleRoute);
+    window.addEventListener('popstate', handleRoute);
+
+    // Roteamento inicial ao carregar a página
+    const initialHash = window.location.hash;
+    if (initialHash === '#/bossas' || initialHash === '#bossas') {
+      this.openBossaManager(false);
     }
   }
 
@@ -1322,8 +1375,8 @@ class SergioApp {
           this.closeRenameBossaModal();
           return;
         }
-        if (this.dom.modalBossaManager && this.dom.modalBossaManager.style.display === 'flex') {
-          this.closeBossaManager();
+        if (this.currentView === 'bossas' || (this.dom.viewBossaManager && this.dom.viewBossaManager.style.display === 'flex')) {
+          this.closeBossaManager(true);
           return;
         }
         if (this.dom.modalInsertBossa && this.dom.modalInsertBossa.style.display === 'flex') {
@@ -2850,7 +2903,7 @@ class SergioApp {
       if (isLoggedIn) {
         collab.syncUserLibraryWithCloud(state).then(() => {
           this.initPresetsDropdown();
-          if (this.dom.modalBossaManager && this.dom.modalBossaManager.style.display === 'flex') {
+          if (this.currentView === 'bossas' || (this.dom.viewBossaManager && this.dom.viewBossaManager.style.display === 'flex')) {
             this.renderBossaManagerCards();
           }
         }).catch(err => {
@@ -3680,26 +3733,23 @@ class SergioApp {
       this.openSaveAsBossaModal(indices);
     });
 
-    // Abrir o Gerenciador de Bossas
+    // Abrir a Página do Gerenciador de Bossas
     this.dom.btnOpenBossaManager?.addEventListener('click', () => {
-      this.openBossaManager();
+      this.openBossaManager(true);
     });
 
     this.dom.btnMenuManageBossas?.addEventListener('click', () => {
-      this.openBossaManager();
+      this.openBossaManager(true);
     });
 
     this.dom.btnOpenManagerFromInsert?.addEventListener('click', () => {
       this.closeInsertBossaModal();
-      this.openBossaManager();
+      this.openBossaManager(true);
     });
 
-    // Fechar Gerenciador de Bossas
-    this.dom.btnBossaManagerClose?.addEventListener('click', () => this.closeBossaManager());
-    this.dom.btnBossaManagerDone?.addEventListener('click', () => this.closeBossaManager());
-    this.dom.modalBossaManager?.addEventListener('click', (e) => {
-      if (e.target === this.dom.modalBossaManager) this.closeBossaManager();
-    });
+    // Fechar Gerenciador de Bossas / Voltar ao Simulador
+    this.dom.btnBackToSimulator?.addEventListener('click', () => this.closeBossaManager(true));
+    this.dom.btnBackToSimulatorBottom?.addEventListener('click', () => this.closeBossaManager(true));
 
     // Sincronizar Bossas na Nuvem
     this.dom.btnSyncBossasNow?.addEventListener('click', () => {
@@ -3737,7 +3787,7 @@ class SergioApp {
     });
 
     // Filtros de abas / pílulas no Gerenciador
-    const filterPills = this.dom.modalBossaManager?.querySelectorAll('.bossa-filter-pill');
+    const filterPills = this.dom.viewBossaManager?.querySelectorAll('.bossa-filter-pill');
     filterPills?.forEach(pill => {
       pill.addEventListener('click', () => {
         filterPills.forEach(p => p.classList.remove('active'));
@@ -4021,7 +4071,7 @@ class SergioApp {
         this.showToast(`Bossa '${name}' salva localmente! Conecte-se para sincronizar.`, '💾');
       }
       this.initPresetsDropdown();
-      if (this.dom.modalBossaManager && this.dom.modalBossaManager.style.display === 'flex') {
+      if (this.currentView === 'bossas' || (this.dom.viewBossaManager && this.dom.viewBossaManager.style.display === 'flex')) {
         this.renderBossaManagerCards();
       }
     }
@@ -4031,12 +4081,30 @@ class SergioApp {
      GERENCIADOR DE BOSSAS & REPERTÓRIO (PAINEL DEDICADO, PRÉVIA & NUVEM)
      ========================================================================= */
 
-  openBossaManager() {
-    if (!this.dom.modalBossaManager) return;
+  openBossaManager(updateHash = true) {
+    if (!this.dom.viewBossaManager) return;
     if (this.dom.appMenuDropdown) this.dom.appMenuDropdown.style.display = 'none';
     if (this.dom.userMenuDropdown) this.dom.userMenuDropdown.style.display = 'none';
 
-    this.dom.modalBossaManager.style.display = 'flex';
+    this.currentView = 'bossas';
+    if (this.dom.viewSimulator) {
+      this.dom.viewSimulator.style.display = 'none';
+      this.dom.viewSimulator.classList.remove('active');
+    }
+    this.dom.viewBossaManager.style.display = 'flex';
+    this.dom.viewBossaManager.classList.add('active');
+
+    // Atualiza tab do rodapé mobile
+    this.dom.tabNavStage?.classList.remove('active');
+    this.dom.tabNavMeasures?.classList.remove('active');
+    this.dom.tabNavPiece?.classList.remove('active');
+    this.dom.tabNavBossas?.classList.add('active');
+    document.body.setAttribute('data-view', 'bossas');
+
+    if (updateHash && window.location.hash !== '#bossas' && window.location.hash !== '#/bossas') {
+      history.pushState({ view: 'bossas' }, '', '#/bossas');
+    }
+
     this.updateBossaManagerSyncIndicator();
     this.renderBossaManagerCards();
 
@@ -4044,13 +4112,34 @@ class SergioApp {
     if (this.authService && this.authService.isLoggedIn()) {
       this.handleSyncBossas(false);
     }
+
+    window.scrollTo({ top: 0, behavior: 'instant' });
   }
 
-  closeBossaManager() {
+  closeBossaManager(updateHash = true) {
     this.stopBossaPreview();
-    if (this.dom.modalBossaManager) {
-      this.dom.modalBossaManager.style.display = 'none';
+    this.currentView = 'simulator';
+
+    if (this.dom.viewBossaManager) {
+      this.dom.viewBossaManager.style.display = 'none';
+      this.dom.viewBossaManager.classList.remove('active');
     }
+    if (this.dom.viewSimulator) {
+      this.dom.viewSimulator.style.display = 'flex';
+      this.dom.viewSimulator.classList.add('active');
+    }
+
+    this.dom.tabNavBossas?.classList.remove('active');
+    document.body.removeAttribute('data-view');
+    this.setMobileTab(this.activeMobileTab === 'bossas' ? 'stage' : this.activeMobileTab);
+
+    if (updateHash && (window.location.hash === '#bossas' || window.location.hash === '#/bossas')) {
+      history.pushState({ view: 'simulator' }, '', '#/');
+    }
+
+    setTimeout(() => {
+      this.renderer?.resize();
+    }, 60);
   }
 
   updateBossaManagerSyncIndicator(status = 'idle', message = null) {
@@ -4116,10 +4205,17 @@ class SergioApp {
     const presetBossas = PRESETS.filter(p => Boolean(p.isBossa || p.id?.startsWith('bossa-')));
 
     // Atualiza contadores dos filtros
-    if (this.dom.countFilterAll) this.dom.countFilterAll.textContent = myBossas.length + presetBossas.length;
+    const totalCount = myBossas.length + presetBossas.length;
+    if (this.dom.countFilterAll) this.dom.countFilterAll.textContent = totalCount;
     if (this.dom.countFilterMy) this.dom.countFilterMy.textContent = myBossas.length;
     if (this.dom.countFilterCloud) this.dom.countFilterCloud.textContent = cloudBossas.length;
     if (this.dom.countFilterPresets) this.dom.countFilterPresets.textContent = presetBossas.length;
+
+    // Atualiza cards de métricas no topo da página
+    if (this.dom.statTotalBossas) this.dom.statTotalBossas.textContent = totalCount;
+    if (this.dom.statMyBossas) this.dom.statMyBossas.textContent = myBossas.length;
+    if (this.dom.statCloudBossas) this.dom.statCloudBossas.textContent = cloudBossas.length;
+    if (this.dom.statPresetBossas) this.dom.statPresetBossas.textContent = presetBossas.length;
 
     // Seleção de itens conforme filtro ativo
     let items = [];
