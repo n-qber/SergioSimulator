@@ -473,6 +473,8 @@ class SergioApp {
       countFilterMy: document.getElementById('countFilterMy'),
       countFilterCloud: document.getElementById('countFilterCloud'),
       countFilterPresets: document.getElementById('countFilterPresets'),
+      btnClearAllPresets: document.getElementById('btnClearAllPresets'),
+      btnRestorePresets: document.getElementById('btnRestorePresets'),
       btnDeleteCurrentPiece: document.getElementById('btnDeleteCurrentPiece'),
       modalRenameBossa: document.getElementById('modalRenameBossa'),
       btnRenameBossaClose: document.getElementById('btnRenameBossaClose'),
@@ -2658,7 +2660,8 @@ class SergioApp {
           cloudGroup = document.createElement('optgroup');
           cloudGroup.label = '☁️ Minhas Peças & Bossas na Nuvem';
           cloudGroup.dataset.type = 'cloud';
-          select.insertBefore(cloudGroup, presetsGroup);
+          const existingPresetsGroup = select.querySelector('optgroup[data-type="presets"]');
+          select.insertBefore(cloudGroup, existingPresetsGroup || null);
         } else {
           cloudGroup.innerHTML = '';
         }
@@ -2678,18 +2681,22 @@ class SergioApp {
       }).catch(() => {});
     }
 
-    // 🎼 Grupo de Estudos Didáticos
-    const presetsGroup = document.createElement('optgroup');
-    presetsGroup.label = 'Estudos Didáticos';
+    // 🎼 Grupo de Estudos Didáticos (apenas modelos não ocultados pelo usuário)
+    const activePresets = this.getActivePresets();
+    if (activePresets.length > 0) {
+      const presetsGroup = document.createElement('optgroup');
+      presetsGroup.label = '⭐ Modelos de Estudo';
+      presetsGroup.dataset.type = 'presets';
 
-    PRESETS.forEach(p => {
-      const opt = document.createElement('option');
-      opt.value = p.id;
-      opt.textContent = p.name;
-      presetsGroup.appendChild(opt);
-    });
+      activePresets.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p.id;
+        opt.textContent = `⭐ ${p.name}`;
+        presetsGroup.appendChild(opt);
+      });
 
-    select.appendChild(presetsGroup);
+      select.appendChild(presetsGroup);
+    }
 
     if (!select._hasChangeListener) {
       select._hasChangeListener = true;
@@ -3840,6 +3847,14 @@ class SergioApp {
       this.handleCreateBossaFromCurrent();
     });
 
+    this.dom.btnClearAllPresets?.addEventListener('click', () => {
+      this.handleClearAllPresets();
+    });
+
+    this.dom.btnRestorePresets?.addEventListener('click', () => {
+      this.handleRestorePresets();
+    });
+
     this.dom.fileImportBossa?.addEventListener('change', (e) => {
       const file = e.target.files?.[0];
       if (file) {
@@ -4022,12 +4037,23 @@ class SergioApp {
       }
     } else {
       // Aba de Presets / Modelos Prontos
-      // Coloca as Bossas de percussão (teleco-teco, paradinha-funk) no topo
-      pieces = [...PRESETS].sort((a, b) => {
+      const activePresets = this.getActivePresets();
+      pieces = [...activePresets].sort((a, b) => {
         const aIsBossa = a.id?.startsWith('bossa-') ? 1 : 0;
         const bIsBossa = b.id?.startsWith('bossa-') ? 1 : 0;
         return bIsBossa - aIsBossa;
       });
+
+      if (pieces.length === 0) {
+        container.innerHTML = `
+          <div class="bossa-empty-state">
+            <span class="bossa-empty-icon">⭐</span>
+            <h4>Nenhum modelo disponível</h4>
+            <p>Você removeu os modelos de exemplo do seu repertório. Você pode restaurá-los na página de Repertório se desejar.</p>
+          </div>
+        `;
+        return;
+      }
     }
 
     pieces.forEach(p => {
@@ -4328,6 +4354,112 @@ class SergioApp {
     }
   }
 
+  // Retorna os modelos pré-definidos (PRESETS) excluindo os que o usuário removeu/ocultou
+  getActivePresets() {
+    try {
+      const raw = localStorage.getItem('sergio_hidden_presets');
+      const hidden = raw ? JSON.parse(raw) : [];
+      if (!Array.isArray(hidden) || hidden.length === 0) return [...PRESETS];
+      const hiddenSet = new Set(hidden);
+      return PRESETS.filter(p => !hiddenSet.has(p.id));
+    } catch (_) {
+      return [...PRESETS];
+    }
+  }
+
+  getHiddenPresetIds() {
+    try {
+      const raw = localStorage.getItem('sergio_hidden_presets');
+      const hidden = raw ? JSON.parse(raw) : [];
+      return Array.isArray(hidden) ? hidden : [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  setHiddenPresetIds(ids) {
+    try {
+      localStorage.setItem('sergio_hidden_presets', JSON.stringify(ids));
+    } catch (_) {}
+  }
+
+  // Remove individualmente um modelo pré-definido (PRESET) do repertório do usuário
+  handleDeletePreset(preset) {
+    if (!preset || !preset.id) return;
+    const confirmMsg = `Deseja remover o modelo "${preset.name || 'Modelo'}" do seu repertório?\n\n(Você poderá restaurá-lo depois se quiser).`;
+    if (!window.confirm(confirmMsg)) return;
+
+    if (this.activePreviewBossaId === preset.id) {
+      this.stopBossaPreview();
+    }
+
+    const hiddenIds = this.getHiddenPresetIds();
+    if (!hiddenIds.includes(preset.id)) {
+      hiddenIds.push(preset.id);
+      this.setHiddenPresetIds(hiddenIds);
+    }
+
+    // Se estiver com este preset aberto no palco, reseta para uma peça nova em branco
+    if (state.id === preset.id) {
+      state.createNewPiece("Nova Peça", 120);
+      collab.cleanupUrlPieceParam();
+      this.seekTo(0);
+      this.renderMeasuresList();
+      this.renderQuickMeasureStrip();
+      this.updateHUD(0);
+      if (this.renderer) {
+        this.renderer.resize();
+        this.renderer.render(0);
+      }
+    }
+
+    this.renderBossaManagerCards();
+    this.initPresetsDropdown();
+    this.showToast(`Modelo '${preset.name || 'Item'}' removido do repertório!`, '🗑️');
+  }
+
+  // Limpa/oculta todos os modelos de exemplo de uma só vez
+  handleClearAllPresets() {
+    const confirmMsg = 'Deseja limpar todos os modelos de exemplo do seu repertório?\n\nSuas próprias peças e bossas continuarão salvas normalmente, e você poderá restaurar os modelos a qualquer momento.';
+    if (!window.confirm(confirmMsg)) return;
+
+    if (this.activePreviewBossaId && PRESETS.some(p => p.id === this.activePreviewBossaId)) {
+      this.stopBossaPreview();
+    }
+
+    const allPresetIds = PRESETS.map(p => p.id);
+    this.setHiddenPresetIds(allPresetIds);
+
+    // Se estiver com qualquer preset aberto no palco, inicia uma peça limpa
+    if (PRESETS.some(p => p.id === state.id)) {
+      state.createNewPiece("Nova Peça", 120);
+      collab.cleanupUrlPieceParam();
+      this.seekTo(0);
+      this.renderMeasuresList();
+      this.renderQuickMeasureStrip();
+      this.updateHUD(0);
+      if (this.renderer) {
+        this.renderer.resize();
+        this.renderer.render(0);
+      }
+    }
+
+    this.renderBossaManagerCards();
+    this.initPresetsDropdown();
+    this.showToast('Todos os modelos de exemplo foram removidos do seu repertório! 🧹', '✨');
+  }
+
+  // Restaura todos os modelos originais
+  handleRestorePresets() {
+    try {
+      localStorage.removeItem('sergio_hidden_presets');
+    } catch (_) {}
+
+    this.renderBossaManagerCards();
+    this.initPresetsDropdown();
+    this.showToast('Modelos de exemplo restaurados com sucesso! ⭐', '↺');
+  }
+
   renderBossaManagerCards() {
     const container = this.dom.bossaMgrCardsContainer;
     if (!container) return;
@@ -4339,7 +4471,16 @@ class SergioApp {
     const myBossas = localLibrary.filter(p => isItemBossa(p));
     const allUserItems = [...localLibrary];
     const cloudItems = allUserItems.filter(p => Boolean(p.ownerId));
-    const presetItems = PRESETS;
+    const presetItems = this.getActivePresets();
+    const hiddenPresetIds = this.getHiddenPresetIds();
+
+    // Visibilidade dos botões de controle de modelos
+    if (this.dom.btnClearAllPresets) {
+      this.dom.btnClearAllPresets.style.display = presetItems.length > 0 ? 'inline-flex' : 'none';
+    }
+    if (this.dom.btnRestorePresets) {
+      this.dom.btnRestorePresets.style.display = hiddenPresetIds.length > 0 ? 'inline-flex' : 'none';
+    }
 
     // Atualiza contadores dos filtros
     const totalCount = allUserItems.length + presetItems.length;
@@ -4392,13 +4533,26 @@ class SergioApp {
     container.innerHTML = '';
 
     if (items.length === 0) {
+      const isPresetTab = this.currentMgrFilter === 'presets';
+      const hasHiddenPresets = hiddenPresetIds.length > 0;
       container.innerHTML = `
         <div class="bossa-empty-state">
-          <span class="bossa-empty-icon">🗂️</span>
-          <h4>Nenhum item encontrado</h4>
-          <p>Você pode criar novas peças ou bossas usando o botão "+ Nova Peça em Branco" ou importar um arquivo .json.</p>
+          <span class="bossa-empty-icon">${isPresetTab ? '⭐' : '🗂️'}</span>
+          <h4>${isPresetTab ? 'Nenhum modelo de exemplo' : 'Nenhum item encontrado'}</h4>
+          <p>${isPresetTab 
+            ? (hasHiddenPresets ? 'Você removeu os modelos do seu repertório.' : 'Não há modelos disponíveis.')
+            : 'Você pode criar novas peças ou bossas usando o botão "+ Nova Peça em Branco" ou importar um arquivo .json.'}
+          </p>
+          ${isPresetTab && hasHiddenPresets ? `
+            <button type="button" class="btn-card-action insert btn-empty-restore" style="margin-top:12px;">
+              <span class="btn-icon">↺</span> Restaurar Modelos Padrão
+            </button>
+          ` : ''}
         </div>
       `;
+      container.querySelector('.btn-empty-restore')?.addEventListener('click', () => {
+        this.handleRestorePresets();
+      });
       return;
     }
 
@@ -4493,11 +4647,9 @@ class SergioApp {
             <button type="button" class="btn-card-action icon-only" data-action="export" data-id="${item.id}" title="Exportar como JSON">
               💾
             </button>
-            ${!isPreset ? `
-              <button type="button" class="btn-card-action icon-only danger" data-action="delete" data-id="${item.id}" title="Apagar definitivamente da biblioteca e da nuvem">
-                🗑️
-              </button>
-            ` : ''}
+            <button type="button" class="btn-card-action icon-only danger" data-action="delete" data-id="${item.id}" title="${isPreset ? 'Remover este modelo do repertório' : 'Apagar definitivamente da biblioteca e da nuvem'}">
+              🗑️
+            </button>
           </div>
         </div>
       `;
@@ -4666,6 +4818,9 @@ class SergioApp {
 
   async handleDeletePieceOrBossa(item) {
     if (!item) return;
+    if (PRESETS.some(p => p.id === item.id)) {
+      return this.handleDeletePreset(item);
+    }
     const isBossa = Boolean(item.isBossa || item.id?.startsWith('piece-bossa-') || item.id?.startsWith('bossa-'));
     const typeLabel = isBossa ? 'a bossa' : 'a peça';
     const confirmMsg = `Deseja realmente apagar ${typeLabel} "${item.name || 'Sem Título'}"?\n\nEsta ação removerá o item da biblioteca local e da nuvem.`;

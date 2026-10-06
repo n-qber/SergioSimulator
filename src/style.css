@@ -5808,6 +5808,69 @@ kbd {
   box-shadow: 0 2px 8px rgba(139, 92, 246, 0.35);
 }
 
+.bossa-presets-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-clear-presets {
+  font-size: 0.76rem;
+  font-weight: 700;
+  padding: 6px 12px;
+  border-radius: 20px;
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.28);
+  color: #fca5a5;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.18s ease;
+}
+
+.btn-clear-presets:hover {
+  background: rgba(239, 68, 68, 0.24);
+  color: #ffffff;
+  border-color: rgba(239, 68, 68, 0.45);
+  transform: translateY(-1px);
+}
+
+.btn-clear-presets.btn-restore-presets {
+  background: rgba(59, 130, 246, 0.14);
+  border-color: rgba(59, 130, 246, 0.32);
+  color: #93c5fd;
+}
+
+.btn-clear-presets.btn-restore-presets:hover {
+  background: rgba(59, 130, 246, 0.28);
+  color: #ffffff;
+  border-color: rgba(59, 130, 246, 0.55);
+  transform: translateY(-1px);
+}
+
+[data-theme="light"] .btn-clear-presets {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #dc2626;
+}
+
+[data-theme="light"] .btn-clear-presets:hover {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+[data-theme="light"] .btn-clear-presets.btn-restore-presets {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  color: #2563eb;
+}
+
+[data-theme="light"] .btn-clear-presets.btn-restore-presets:hover {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
 /* Grade de Bossas (Página Dedicada) */
 .bossa-page-grid {
   display: grid;
