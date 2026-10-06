@@ -236,7 +236,7 @@ class PieceState {
     const target = this.measures[index];
     this.addMeasure(index + 1, {
       ...target,
-      nickname: target.nickname ? `${target.nickname} (cópia)` : "",
+      nickname: target.nickname || "",
       repeat: target.repeat || 1
     });
   }
@@ -423,7 +423,7 @@ class PieceState {
       const target = this.measures[idx];
       return {
         id: `m-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-        nickname: target.nickname ? `${target.nickname} (cópia)` : "",
+        nickname: target.nickname || "",
         beats: target.beats,
         beatUnit: target.beatUnit,
         tempoMode: target.tempoMode,
@@ -665,7 +665,7 @@ class PieceState {
 
     const newId = `piece-${Date.now()}`;
     this.id = newId;
-    this.name = customName || `${this.name} (Cópia)`;
+    this.name = customName || this.name;
     this.ownerId = null;
     this.access = 'edit_link';
 
