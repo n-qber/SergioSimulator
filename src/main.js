@@ -10,6 +10,16 @@ import { DJRunnerRenderer } from './renderer.js';
 import { collab, DEFAULT_AVATAR_COLORS } from './collab.js';
 import { authService } from './auth.js';
 
+function escapeHtml(str) {
+  if (typeof str !== 'string') return '';
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 class SergioApp {
   constructor() {
     this.playbackTime = 0;
@@ -47,11 +57,14 @@ class SergioApp {
     this.selectedMeasureIndices = new Set();
     this.lastSelectedMeasureIdx = null;
 
-    // Gestão de Bossas Embutidas
+    // Gestão de Bossas Embutidas & Gerenciador
     this.selectedBossaPiece = null;
     this.currentBossaTab = 'library';
     this.bossaTargetIndex = null;
     this._saveBossaIndices = [];
+    this.currentMgrFilter = 'all';
+    this.mgrSearchQuery = '';
+    this.activePreviewBossaId = null;
 
     this.dom = {};
   }
@@ -78,6 +91,13 @@ class SergioApp {
     this.setupMobileNav();
     this.renderQuickMeasureStrip();
     this.setupPwa();
+
+    // Sincroniza bossas com a nuvem na inicialização se o usuário já estiver conectado
+    if (this.authService && this.authService.isLoggedIn()) {
+      collab.syncUserLibraryWithCloud(state).then(() => {
+        this.initPresetsDropdown();
+      }).catch(() => {});
+    }
 
     // Pré-gera a peça toda na memória RAM (~5ms)
     this.preparePieceAudio();
@@ -187,6 +207,7 @@ class SergioApp {
       userMenuName: document.getElementById('userMenuName'),
       userMenuEmail: document.getElementById('userMenuEmail'),
       btnUserCloudPieces: document.getElementById('btnUserCloudPieces'),
+      btnUserManageBossas: document.getElementById('btnUserManageBossas'),
       btnUserLogout: document.getElementById('btnUserLogout'),
 
       // Modo Leitura / Ouvinte
@@ -382,6 +403,9 @@ class SergioApp {
       btnToolbarInsertBossa: document.getElementById('btnToolbarInsertBossa'),
       btnToolbarSaveAsBossa: document.getElementById('btnToolbarSaveAsBossa'),
       btnMenuInsertBossa: document.getElementById('btnMenuInsertBossa'),
+      btnMenuManageBossas: document.getElementById('btnMenuManageBossas'),
+      btnOpenBossaManager: document.getElementById('btnOpenBossaManager'),
+      btnOpenManagerFromInsert: document.getElementById('btnOpenManagerFromInsert'),
       modalInsertBossa: document.getElementById('modalInsertBossa'),
       btnInsertBossaClose: document.getElementById('btnInsertBossaClose'),
       btnCancelInsertBossa: document.getElementById('btnCancelInsertBossa'),
@@ -399,7 +423,30 @@ class SergioApp {
       btnCancelSaveAsBossa: document.getElementById('btnCancelSaveAsBossa'),
       btnConfirmSaveAsBossa: document.getElementById('btnConfirmSaveAsBossa'),
       saveAsBossaCount: document.getElementById('saveAsBossaCount'),
-      inputBossaName: document.getElementById('inputBossaName')
+      inputBossaName: document.getElementById('inputBossaName'),
+      modalBossaManager: document.getElementById('modalBossaManager'),
+      btnBossaManagerClose: document.getElementById('btnBossaManagerClose'),
+      btnBossaManagerDone: document.getElementById('btnBossaManagerDone'),
+      btnSyncBossasNow: document.getElementById('btnSyncBossasNow'),
+      bossaSyncDot: document.getElementById('bossaSyncDot'),
+      bossaMgrSyncText: document.getElementById('bossaMgrSyncText'),
+      btnMgrNewBossaFromCurrent: document.getElementById('btnMgrNewBossaFromCurrent'),
+      fileImportBossa: document.getElementById('fileImportBossa'),
+      inputSearchBossas: document.getElementById('inputSearchBossas'),
+      btnClearSearchBossas: document.getElementById('btnClearSearchBossas'),
+      bossaMgrCardsContainer: document.getElementById('bossaMgrCardsContainer'),
+      bossaMgrStats: document.getElementById('bossaMgrStats'),
+      countFilterAll: document.getElementById('countFilterAll'),
+      countFilterMy: document.getElementById('countFilterMy'),
+      countFilterCloud: document.getElementById('countFilterCloud'),
+      countFilterPresets: document.getElementById('countFilterPresets'),
+      modalRenameBossa: document.getElementById('modalRenameBossa'),
+      btnRenameBossaClose: document.getElementById('btnRenameBossaClose'),
+      btnCancelRenameBossa: document.getElementById('btnCancelRenameBossa'),
+      btnConfirmRenameBossa: document.getElementById('btnConfirmRenameBossa'),
+      formRenameBossa: document.getElementById('formRenameBossa'),
+      renameBossaId: document.getElementById('renameBossaId'),
+      inputRenameBossaName: document.getElementById('inputRenameBossaName')
     };
   }
 
@@ -1271,6 +1318,14 @@ class SergioApp {
       }
 
       if (e.key === 'Escape') {
+        if (this.dom.modalRenameBossa && this.dom.modalRenameBossa.style.display === 'flex') {
+          this.closeRenameBossaModal();
+          return;
+        }
+        if (this.dom.modalBossaManager && this.dom.modalBossaManager.style.display === 'flex') {
+          this.closeBossaManager();
+          return;
+        }
         if (this.dom.modalInsertBossa && this.dom.modalInsertBossa.style.display === 'flex') {
           this.closeInsertBossaModal();
           return;
@@ -2791,6 +2846,18 @@ class SergioApp {
       this.updateAuthUi(user, isLoggedIn);
       this.initPresetsDropdown();
 
+      // Sincroniza biblioteca e bossas com a nuvem automaticamente ao autenticar
+      if (isLoggedIn) {
+        collab.syncUserLibraryWithCloud(state).then(() => {
+          this.initPresetsDropdown();
+          if (this.dom.modalBossaManager && this.dom.modalBossaManager.style.display === 'flex') {
+            this.renderBossaManagerCards();
+          }
+        }).catch(err => {
+          console.warn("Erro ao sincronizar bossas com a nuvem:", err);
+        });
+      }
+
       // Se havia uma peça privada que foi negada antes e o usuário acabou de logar, tenta reconectar
       if (isLoggedIn && this.pendingDeniedPieceId) {
         const retryId = this.pendingDeniedPieceId;
@@ -2857,6 +2924,12 @@ class SergioApp {
     this.dom.btnExport?.addEventListener('click', closeAppMenu);
     this.dom.fileImport?.addEventListener('change', closeAppMenu);
     this.dom.selectPreset?.addEventListener('change', closeAppMenu);
+
+    // Botão de Gerenciar Bossas no menu de usuário
+    this.dom.btnUserManageBossas?.addEventListener('click', () => {
+      if (this.dom.userMenuDropdown) this.dom.userMenuDropdown.style.display = 'none';
+      this.openBossaManager();
+    });
 
     // Botão de Logout
     this.dom.btnUserLogout?.addEventListener('click', async () => {
@@ -3607,6 +3680,84 @@ class SergioApp {
       this.openSaveAsBossaModal(indices);
     });
 
+    // Abrir o Gerenciador de Bossas
+    this.dom.btnOpenBossaManager?.addEventListener('click', () => {
+      this.openBossaManager();
+    });
+
+    this.dom.btnMenuManageBossas?.addEventListener('click', () => {
+      this.openBossaManager();
+    });
+
+    this.dom.btnOpenManagerFromInsert?.addEventListener('click', () => {
+      this.closeInsertBossaModal();
+      this.openBossaManager();
+    });
+
+    // Fechar Gerenciador de Bossas
+    this.dom.btnBossaManagerClose?.addEventListener('click', () => this.closeBossaManager());
+    this.dom.btnBossaManagerDone?.addEventListener('click', () => this.closeBossaManager());
+    this.dom.modalBossaManager?.addEventListener('click', (e) => {
+      if (e.target === this.dom.modalBossaManager) this.closeBossaManager();
+    });
+
+    // Sincronizar Bossas na Nuvem
+    this.dom.btnSyncBossasNow?.addEventListener('click', () => {
+      this.handleSyncBossas(true);
+    });
+
+    // Ações Rápidas do Gerenciador
+    this.dom.btnMgrNewBossaFromCurrent?.addEventListener('click', () => {
+      this.handleCreateBossaFromCurrent();
+    });
+
+    this.dom.fileImportBossa?.addEventListener('change', (e) => {
+      const file = e.target.files?.[0];
+      if (file) {
+        this.handleImportBossaFile(file);
+        e.target.value = '';
+      }
+    });
+
+    // Busca e Filtros no Gerenciador
+    this.dom.inputSearchBossas?.addEventListener('input', (e) => {
+      this.mgrSearchQuery = e.target.value;
+      if (this.dom.btnClearSearchBossas) {
+        this.dom.btnClearSearchBossas.style.display = this.mgrSearchQuery ? 'block' : 'none';
+      }
+      this.renderBossaManagerCards();
+    });
+
+    this.dom.btnClearSearchBossas?.addEventListener('click', () => {
+      if (this.dom.inputSearchBossas) this.dom.inputSearchBossas.value = '';
+      this.mgrSearchQuery = '';
+      this.dom.btnClearSearchBossas.style.display = 'none';
+      this.renderBossaManagerCards();
+      this.dom.inputSearchBossas?.focus();
+    });
+
+    // Filtros de abas / pílulas no Gerenciador
+    const filterPills = this.dom.modalBossaManager?.querySelectorAll('.bossa-filter-pill');
+    filterPills?.forEach(pill => {
+      pill.addEventListener('click', () => {
+        filterPills.forEach(p => p.classList.remove('active'));
+        pill.classList.add('active');
+        this.currentMgrFilter = pill.dataset.filter || 'all';
+        this.renderBossaManagerCards();
+      });
+    });
+
+    // Modal de Renomear Bossa
+    this.dom.btnRenameBossaClose?.addEventListener('click', () => this.closeRenameBossaModal());
+    this.dom.btnCancelRenameBossa?.addEventListener('click', () => this.closeRenameBossaModal());
+    this.dom.modalRenameBossa?.addEventListener('click', (e) => {
+      if (e.target === this.dom.modalRenameBossa) this.closeRenameBossaModal();
+    });
+    this.dom.formRenameBossa?.addEventListener('submit', (e) => {
+      e.preventDefault();
+      this.handleConfirmRenameBossa();
+    });
+
     // 2. Fechar modal de inserção de bossa
     this.dom.btnInsertBossaClose?.addEventListener('click', () => this.closeInsertBossaModal());
     this.dom.btnCancelInsertBossa?.addEventListener('click', () => this.closeInsertBossaModal());
@@ -3751,17 +3902,19 @@ class SergioApp {
 
       const measureCount = Array.isArray(p.measures) ? p.measures.length : 0;
       const bpm = p.presentationBpm || p.baseBpm || 120;
-      const isPresetBossa = p.id?.startsWith('bossa-');
+      const isPresetBossa = p.id?.startsWith('bossa-') || Boolean(p.isBossa && PRESETS.some(pr => pr.id === p.id));
+      const isCloudBossa = Boolean(p.ownerId);
+      const badgeText = isPresetBossa ? '🥁 Modelo Pronto' : (p.isBossa ? (isCloudBossa ? '🥁 Bossa ☁️' : '🥁 Bossa 💾') : '🎵 Peça');
 
       card.innerHTML = `
         <div class="bossa-card-item-top">
           <div class="bossa-card-title-wrap">
-            <span class="bossa-card-badge">${isPresetBossa ? '🥁 Bossa' : '🎵 Peça'}</span>
-            <span class="bossa-card-title">${p.name || 'Sem título'}</span>
+            <span class="bossa-card-badge">${badgeText}</span>
+            <span class="bossa-card-title">${escapeHtml(p.name || 'Sem título')}</span>
           </div>
           <span class="bossa-card-meta">${measureCount} comp. • ${bpm} BPM</span>
         </div>
-        ${p.description ? `<p class="bossa-card-desc">${p.description}</p>` : ''}
+        ${p.description ? `<p class="bossa-card-desc">${escapeHtml(p.description)}</p>` : ''}
       `;
 
       card.addEventListener('click', () => {
@@ -3857,8 +4010,474 @@ class SergioApp {
     this.closeSaveAsBossaModal();
 
     if (newBossa) {
-      this.showToast(`Bossa '${name}' salva na sua biblioteca! Você pode inseri-la em outras peças.`, '💾');
+      if (this.authService && this.authService.isLoggedIn()) {
+        collab.saveBossaToCloud(newBossa).then(() => {
+          this.showToast(`Bossa '${name}' salva e sincronizada na nuvem! ☁️`, '💾');
+        }).catch(err => {
+          console.warn("Erro ao salvar bossa na nuvem:", err);
+          this.showToast(`Bossa '${name}' salva na sua biblioteca local!`, '💾');
+        });
+      } else {
+        this.showToast(`Bossa '${name}' salva localmente! Conecte-se para sincronizar.`, '💾');
+      }
+      this.initPresetsDropdown();
+      if (this.dom.modalBossaManager && this.dom.modalBossaManager.style.display === 'flex') {
+        this.renderBossaManagerCards();
+      }
     }
+  }
+
+  /* =========================================================================
+     GERENCIADOR DE BOSSAS & REPERTÓRIO (PAINEL DEDICADO, PRÉVIA & NUVEM)
+     ========================================================================= */
+
+  openBossaManager() {
+    if (!this.dom.modalBossaManager) return;
+    if (this.dom.appMenuDropdown) this.dom.appMenuDropdown.style.display = 'none';
+    if (this.dom.userMenuDropdown) this.dom.userMenuDropdown.style.display = 'none';
+
+    this.dom.modalBossaManager.style.display = 'flex';
+    this.updateBossaManagerSyncIndicator();
+    this.renderBossaManagerCards();
+
+    // Sincroniza em segundo plano ao abrir o gerenciador
+    if (this.authService && this.authService.isLoggedIn()) {
+      this.handleSyncBossas(false);
+    }
+  }
+
+  closeBossaManager() {
+    this.stopBossaPreview();
+    if (this.dom.modalBossaManager) {
+      this.dom.modalBossaManager.style.display = 'none';
+    }
+  }
+
+  updateBossaManagerSyncIndicator(status = 'idle', message = null) {
+    const dot = this.dom.bossaSyncDot;
+    const text = this.dom.bossaMgrSyncText;
+    const btn = this.dom.btnSyncBossasNow;
+    if (!dot || !text) return;
+
+    if (status === 'syncing') {
+      dot.className = 'sync-dot syncing';
+      text.textContent = message || 'Sincronizando com a Nuvem...';
+      if (btn) btn.classList.add('spinning');
+      return;
+    }
+
+    if (btn) btn.classList.remove('spinning');
+
+    if (this.authService && this.authService.isLoggedIn()) {
+      dot.className = 'sync-dot';
+      const name = this.authService.getDisplayName() || 'Conectado';
+      text.textContent = message || `Nuvem Pronta (${name})`;
+    } else {
+      dot.className = 'sync-dot offline';
+      text.textContent = message || 'Apenas Local (Conecte-se para Nuvem)';
+    }
+  }
+
+  async handleSyncBossas(showToastNotice = true) {
+    if (!this.authService || !this.authService.isLoggedIn()) {
+      if (showToastNotice) {
+        this.openAuthModal('login');
+        this.showToast('Faça login para sincronizar suas bossas na nuvem!', '☁️');
+      }
+      return;
+    }
+
+    this.updateBossaManagerSyncIndicator('syncing');
+
+    try {
+      await collab.syncUserLibraryWithCloud(state);
+      this.updateBossaManagerSyncIndicator('idle', 'Sincronizado com Sucesso!');
+      this.renderBossaManagerCards();
+      this.initPresetsDropdown();
+      if (showToastNotice) {
+        this.showToast('Bossas sincronizadas com sua conta na nuvem!', '☁️');
+      }
+    } catch (err) {
+      console.warn("Erro ao sincronizar bossas:", err);
+      this.updateBossaManagerSyncIndicator('idle', 'Erro na sincronização');
+      if (showToastNotice) {
+        this.showToast('Não foi possível sincronizar no momento.', '⚠️');
+      }
+    }
+  }
+
+  renderBossaManagerCards() {
+    const container = this.dom.bossaMgrCardsContainer;
+    if (!container) return;
+
+    const localLibrary = state.getLibraryPieces ? state.getLibraryPieces() : [];
+    const myBossas = localLibrary.filter(p => Boolean(p.isBossa || p.id?.startsWith('piece-bossa-') || p.id?.startsWith('bossa-')));
+    const cloudBossas = myBossas.filter(p => Boolean(p.ownerId));
+    const presetBossas = PRESETS.filter(p => Boolean(p.isBossa || p.id?.startsWith('bossa-')));
+
+    // Atualiza contadores dos filtros
+    if (this.dom.countFilterAll) this.dom.countFilterAll.textContent = myBossas.length + presetBossas.length;
+    if (this.dom.countFilterMy) this.dom.countFilterMy.textContent = myBossas.length;
+    if (this.dom.countFilterCloud) this.dom.countFilterCloud.textContent = cloudBossas.length;
+    if (this.dom.countFilterPresets) this.dom.countFilterPresets.textContent = presetBossas.length;
+
+    // Seleção de itens conforme filtro ativo
+    let items = [];
+    if (this.currentMgrFilter === 'my') {
+      items = [...myBossas];
+    } else if (this.currentMgrFilter === 'cloud') {
+      items = [...cloudBossas];
+    } else if (this.currentMgrFilter === 'presets') {
+      items = [...presetBossas];
+    } else {
+      items = [...myBossas, ...presetBossas];
+    }
+
+    // Busca textual
+    const query = (this.mgrSearchQuery || '').trim().toLowerCase();
+    if (query) {
+      items = items.filter(item => {
+        const nameMatch = (item.name || '').toLowerCase().includes(query);
+        const descMatch = (item.description || '').toLowerCase().includes(query);
+        const bpmMatch = String(item.presentationBpm || item.baseBpm || '').includes(query);
+        return nameMatch || descMatch || bpmMatch;
+      });
+    }
+
+    // Atualiza estatísticas do rodapé
+    if (this.dom.bossaMgrStats) {
+      this.dom.bossaMgrStats.textContent = `Exibindo ${items.length} de ${myBossas.length + presetBossas.length} bossas cadastradas`;
+    }
+
+    container.innerHTML = '';
+
+    if (items.length === 0) {
+      container.innerHTML = `
+        <div class="bossa-empty-state">
+          <span class="bossa-empty-icon">🥁</span>
+          <h4>Nenhuma bossa encontrada</h4>
+          <p>Você pode criar uma nova bossa a partir dos compassos da sua peça atual usando o botão "+ Criar Bossa da Peça" ou importar um arquivo .json.</p>
+        </div>
+      `;
+      return;
+    }
+
+    items.forEach(bossa => {
+      const isPreset = PRESETS.some(p => p.id === bossa.id);
+      const isCloud = Boolean(bossa.ownerId);
+      const isPlaying = this.activePreviewBossaId === bossa.id;
+      const measures = Array.isArray(bossa.measures) ? bossa.measures : [];
+      const bpm = bossa.presentationBpm || bossa.baseBpm || 120;
+
+      // Fita compacta de compassos
+      let ribbonHtml = '';
+      const previewLimit = Math.min(measures.length, 8);
+      for (let i = 0; i < previewLimit; i++) {
+        const m = measures[i];
+        const isRatio = m.tempoMode === 'ratio' && (m.ratioNum !== 1 || m.ratioDen !== 1);
+        const ratioText = isRatio ? ` (${m.ratioNum}/${m.ratioDen})` : '';
+        ribbonHtml += `
+          <span class="ribbon-measure-tag ${isRatio ? 'ratio' : ''}" title="${m.nickname || `Compasso ${i + 1}`} - ${m.beats}/${m.beatUnit || 4}${ratioText}">
+            c.${i + 1}: <strong>${m.beats}/${m.beatUnit || 4}</strong>${ratioText}
+          </span>
+        `;
+      }
+      if (measures.length > 8) {
+        ribbonHtml += `<span class="ribbon-measure-tag">+${measures.length - 8}</span>`;
+      }
+
+      const card = document.createElement('div');
+      card.className = `bossa-mgr-card ${isPlaying ? 'is-playing' : ''}`;
+      card.dataset.bossaId = bossa.id;
+
+      card.innerHTML = `
+        <div class="bossa-mgr-card-header">
+          <div class="bossa-mgr-card-title-group">
+            <h4 class="bossa-mgr-card-title">${escapeHtml(bossa.name || 'Bossa Sem Título')}</h4>
+            ${isPreset 
+              ? `<span class="bossa-origin-badge preset">⭐ Modelo</span>`
+              : (isCloud ? `<span class="bossa-origin-badge cloud">☁️ Na Nuvem</span>` : `<span class="bossa-origin-badge local">💾 Local</span>`)}
+          </div>
+          <div class="bossa-mgr-card-meta">
+            <span><strong>${measures.length}</strong> compassos</span>
+            <span>•</span>
+            <span><strong>${bpm}</strong> BPM</span>
+          </div>
+        </div>
+
+        <div class="bossa-measures-ribbon">
+          ${ribbonHtml}
+        </div>
+
+        ${bossa.description ? `<p class="bossa-card-desc">${escapeHtml(bossa.description)}</p>` : ''}
+
+        <div class="bossa-card-actions">
+          <div class="bossa-actions-left">
+            <button type="button" class="btn-card-action preview ${isPlaying ? 'playing' : ''}" data-action="preview" data-id="${bossa.id}">
+              <span class="btn-icon">${isPlaying ? '⏹' : '▶'}</span> ${isPlaying ? 'Parar' : 'Ouvir Prévia'}
+            </button>
+            <button type="button" class="btn-card-action insert" data-action="insert" data-id="${bossa.id}">
+              <span class="btn-icon">🔗</span> Inserir na Peça
+            </button>
+            <button type="button" class="btn-card-action open" data-action="open" data-id="${bossa.id}">
+              <span class="btn-icon">📂</span> Abrir Peça
+            </button>
+          </div>
+          <div class="bossa-actions-right">
+            ${!isPreset ? `
+              <button type="button" class="btn-card-action icon-only" data-action="rename" data-id="${bossa.id}" title="Renomear Bossa">
+                ✏️
+              </button>
+            ` : ''}
+            <button type="button" class="btn-card-action icon-only" data-action="export" data-id="${bossa.id}" title="Exportar como JSON">
+              💾
+            </button>
+            ${!isPreset ? `
+              <button type="button" class="btn-card-action icon-only danger" data-action="delete" data-id="${bossa.id}" title="Excluir Bossa">
+                🗑️
+              </button>
+            ` : ''}
+          </div>
+        </div>
+      `;
+
+      card.querySelectorAll('button[data-action]').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const action = btn.dataset.action;
+          if (action === 'preview') this.playBossaPreview(bossa);
+          else if (action === 'insert') this.handleInsertBossaFromManager(bossa);
+          else if (action === 'open') this.handleOpenBossaAsPiece(bossa);
+          else if (action === 'rename') this.handleOpenRenameBossaModal(bossa);
+          else if (action === 'export') this.handleExportBossa(bossa);
+          else if (action === 'delete') this.handleDeleteBossa(bossa);
+        });
+      });
+
+      container.appendChild(card);
+    });
+  }
+
+  async playBossaPreview(bossa) {
+    if (this.activePreviewBossaId === bossa.id) {
+      this.stopBossaPreview();
+      return;
+    }
+
+    this.stopBossaPreview();
+    if (!bossa || !Array.isArray(bossa.measures) || bossa.measures.length === 0) return;
+
+    try {
+      this.activePreviewBossaId = bossa.id;
+      this.updateBossaCardPlayingState(bossa.id, true);
+
+      const baseBpm = bossa.presentationBpm || bossa.baseBpm || 120;
+      const { timings, totalDuration } = state.calculateTimingsForMeasures(bossa.measures, baseBpm);
+
+      await this.audio.init();
+      const buffer = await this.audio.renderPieceBuffer(timings, totalDuration);
+
+      if (!buffer || this.activePreviewBossaId !== bossa.id) return;
+
+      this.audio.play(
+        buffer,
+        0,
+        1.0,
+        false,
+        totalDuration,
+        () => {
+          if (this.activePreviewBossaId === bossa.id) {
+            this.stopBossaPreview();
+          }
+        }
+      );
+    } catch (err) {
+      console.warn("Erro ao reproduzir prévia da bossa:", err);
+      this.stopBossaPreview();
+    }
+  }
+
+  stopBossaPreview() {
+    if (this.activePreviewBossaId) {
+      this.updateBossaCardPlayingState(this.activePreviewBossaId, false);
+      this.activePreviewBossaId = null;
+      this.audio.stop();
+    }
+  }
+
+  updateBossaCardPlayingState(bossaId, isPlaying) {
+    const card = this.dom.bossaMgrCardsContainer?.querySelector(`.bossa-mgr-card[data-bossa-id="${bossaId}"]`);
+    if (card) {
+      card.classList.toggle('is-playing', isPlaying);
+      const btn = card.querySelector('button[data-action="preview"]');
+      if (btn) {
+        btn.classList.toggle('playing', isPlaying);
+        btn.innerHTML = `<span class="btn-icon">${isPlaying ? '⏹' : '▶'}</span> ${isPlaying ? 'Parar' : 'Ouvir Prévia'}`;
+      }
+    }
+  }
+
+  handleInsertBossaFromManager(bossa) {
+    if (!bossa || !bossa.measures) return;
+    this.closeBossaManager();
+
+    const targetIdx = (this.renderer?.selectedMeasureIndex !== null && this.renderer?.selectedMeasureIndex !== undefined)
+      ? this.renderer.selectedMeasureIndex
+      : (this.selectedMeasureIndices.size > 0 ? Math.max(...this.selectedMeasureIndices) : null);
+
+    state.insertBossaBlock(bossa, targetIdx, true);
+    this.closeMeasureToolbar();
+    this.showToast(`Bossa '${bossa.name}' inserida na partitura!`, '🔗');
+  }
+
+  handleOpenBossaAsPiece(bossa) {
+    if (!bossa || !bossa.measures) return;
+    this.closeBossaManager();
+    this.pausePlayback();
+
+    // Salva a peça atual na biblioteca antes de alternar
+    if (state.measures && state.measures.length > 0) {
+      state.saveCurrentPieceToLibrary();
+    }
+
+    state.loadPieceData(JSON.parse(JSON.stringify(bossa)));
+    collab.connectToPiece(state.id, state);
+    this.seekTo(0);
+    this.closeMeasureToolbar();
+    this.initPresetsDropdown();
+    this.showToast(`Bossa '${bossa.name}' aberta para edição!`, '📂');
+  }
+
+  handleOpenRenameBossaModal(bossa) {
+    if (!this.dom.modalRenameBossa) return;
+    if (this.dom.renameBossaId) this.dom.renameBossaId.value = bossa.id;
+    if (this.dom.inputRenameBossaName) this.dom.inputRenameBossaName.value = bossa.name || '';
+    this.dom.modalRenameBossa.style.display = 'flex';
+    setTimeout(() => {
+      this.dom.inputRenameBossaName?.focus();
+      this.dom.inputRenameBossaName?.select();
+    }, 50);
+  }
+
+  closeRenameBossaModal() {
+    if (this.dom.modalRenameBossa) {
+      this.dom.modalRenameBossa.style.display = 'none';
+    }
+  }
+
+  handleConfirmRenameBossa() {
+    const id = this.dom.renameBossaId?.value;
+    const newName = (this.dom.inputRenameBossaName?.value || '').trim();
+    if (!id || !newName) return;
+
+    state.renameBossa(id, newName);
+
+    // Se estiver logado, atualiza também na nuvem
+    if (this.authService && this.authService.isLoggedIn()) {
+      collab.updateBossaInCloud(id, { name: newName }).catch(err => {
+        console.warn("Erro ao renomear bossa na nuvem:", err);
+      });
+    }
+
+    this.closeRenameBossaModal();
+    this.renderBossaManagerCards();
+    this.initPresetsDropdown();
+    this.showToast(`Bossa renomeada para '${newName}'!`, '✏️');
+  }
+
+  handleExportBossa(bossa) {
+    if (!bossa) return;
+    const jsonStr = JSON.stringify(bossa, null, 2);
+    const blob = new Blob([jsonStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const safeName = (bossa.name || 'bossa').toLowerCase().replace(/[^a-z0-9_-]/g, '_');
+    a.href = url;
+    a.download = `bossa-${safeName}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    this.showToast(`Bossa '${bossa.name}' exportada em JSON!`, '💾');
+  }
+
+  async handleDeleteBossa(bossa) {
+    if (!bossa) return;
+    const confirmMsg = `Deseja realmente excluir a bossa "${bossa.name}"? Ela será removida da sua biblioteca local e da nuvem.`;
+    if (!window.confirm(confirmMsg)) return;
+
+    if (this.activePreviewBossaId === bossa.id) {
+      this.stopBossaPreview();
+    }
+
+    state.deletePieceFromLibrary(bossa.id);
+
+    if (this.authService && this.authService.isLoggedIn()) {
+      await collab.deleteBossaFromCloud(bossa.id).catch(err => {
+        console.warn("Erro ao excluir bossa da nuvem:", err);
+      });
+    }
+
+    this.renderBossaManagerCards();
+    this.initPresetsDropdown();
+    this.showToast(`Bossa '${bossa.name}' excluída.`, '🗑️');
+  }
+
+  handleCreateBossaFromCurrent() {
+    let indices = this.selectedMeasureIndices.size > 0
+      ? Array.from(this.selectedMeasureIndices)
+      : (this.renderer?.selectedMeasureIndex !== null ? [this.renderer.selectedMeasureIndex] : []);
+
+    if (indices.length === 0 && state.measures && state.measures.length > 0) {
+      indices = state.measures.map((_, i) => i);
+    }
+
+    if (indices.length === 0) {
+      this.showToast('Nenhum compasso na peça para criar bossa.', '⚠️');
+      return;
+    }
+
+    this.closeBossaManager();
+    this.openSaveAsBossaModal(indices);
+  }
+
+  handleImportBossaFile(file) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const parsed = JSON.parse(e.target.result);
+        const bossaData = parsed.piece || parsed;
+        if (!bossaData || !Array.isArray(bossaData.measures) || bossaData.measures.length === 0) {
+          throw new Error('Arquivo não contém uma estrutura de compassos válida.');
+        }
+
+        const newId = `piece-bossa-${Date.now()}`;
+        const importedBossa = {
+          ...bossaData,
+          id: newId,
+          name: bossaData.name || 'Bossa Importada',
+          isBossa: true,
+          updatedAt: Date.now(),
+          createdAt: Date.now()
+        };
+
+        const library = state.getLibraryPieces();
+        library.unshift(importedBossa);
+        state.setLibraryPieces(library);
+
+        if (this.authService && this.authService.isLoggedIn()) {
+          await collab.saveBossaToCloud(importedBossa);
+        }
+
+        this.renderBossaManagerCards();
+        this.initPresetsDropdown();
+        this.showToast(`Bossa '${importedBossa.name}' importada com sucesso!`, '📥');
+      } catch (err) {
+        alert(`Erro ao importar arquivo de bossa: ${err.message}`);
+      }
+    };
+    reader.readAsText(file);
   }
 }
 

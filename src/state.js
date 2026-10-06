@@ -454,7 +454,45 @@ class PieceState {
     return false;
   }
 
-  // Remove uma peça da biblioteca
+  // Define a lista de peças na biblioteca local e salva no localStorage
+  setLibraryPieces(library) {
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined') return;
+    try {
+      if (!Array.isArray(library)) return;
+      if (library.length > 100) library = library.slice(0, 100);
+      localStorage.setItem(LIBRARY_KEY, JSON.stringify(library));
+      this.notify('Biblioteca de peças e bossas atualizada');
+    } catch (e) {
+      console.warn("Erro ao atualizar biblioteca local:", e);
+    }
+  }
+
+  // Retorna apenas as bossas salvas na biblioteca local
+  getBossaPieces() {
+    const all = this.getLibraryPieces();
+    return all.filter(p => Boolean(p.isBossa || p.id?.startsWith('piece-bossa-') || p.id?.startsWith('bossa-')));
+  }
+
+  // Renomeia uma bossa na biblioteca local
+  renameBossa(bossaId, newName) {
+    const cleanName = (newName || '').trim();
+    if (!cleanName) return false;
+    const library = this.getLibraryPieces();
+    const item = library.find(p => p.id === bossaId);
+    if (item) {
+      item.name = cleanName;
+      item.updatedAt = Date.now();
+      if (Array.isArray(item.groups) && item.groups[0]) {
+        item.groups[0].name = cleanName;
+      }
+      this.setLibraryPieces(library);
+      this.notify(`Bossa renomeada para '${cleanName}'`);
+      return true;
+    }
+    return false;
+  }
+
+  // Remove uma peça ou bossa da biblioteca
   deletePieceFromLibrary(pieceId) {
     if (typeof window === 'undefined' || typeof localStorage === 'undefined') return;
     try {
@@ -463,6 +501,7 @@ class PieceState {
       if (!Array.isArray(library)) return;
       library = library.filter(p => p.id !== pieceId);
       localStorage.setItem(LIBRARY_KEY, JSON.stringify(library));
+      this.notify('Item removido da biblioteca');
     } catch (_) {}
   }
 
@@ -950,6 +989,7 @@ class PieceState {
       description: `Bossa extraída da apresentação '${this.name}'`,
       presentationBpm: this.presentationBpm,
       baseBpm: this.baseBpm,
+      isBossa: true,
       measures: bossaMeasures,
       groups: [
         {
@@ -961,13 +1001,14 @@ class PieceState {
           isBossaBlock: true
         }
       ],
-      updatedAt: new Date().toISOString()
+      updatedAt: Date.now(),
+      createdAt: Date.now()
     };
 
     // Salva na biblioteca local
     let library = this.getLibraryPieces();
     library.unshift(bossaData);
-    if (library.length > 50) library = library.slice(0, 50);
+    if (library.length > 100) library = library.slice(0, 100);
     if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
       try {
         localStorage.setItem(LIBRARY_KEY, JSON.stringify(library));
@@ -978,6 +1019,47 @@ class PieceState {
 
     this.notify(`Criou e salvou nova bossa '${name}'`);
     return bossaData;
+  }
+
+  // Calcula timings detalhados para qualquer lista de compassos (usado em prévias de áudio)
+  calculateTimingsForMeasures(measures, baseBpm = 120) {
+    if (!Array.isArray(measures) || measures.length === 0) {
+      return { timings: [], totalDuration: 0 };
+    }
+    let accumulatedTime = 0;
+    const timings = [];
+    let globalTimingIndex = 0;
+
+    measures.forEach((m, idx) => {
+      const repeat = Math.max(1, Math.min(999, parseInt(m.repeat, 10) || 1));
+      let effectiveBpm = baseBpm;
+      if (m.tempoMode === "ratio") {
+        effectiveBpm = baseBpm * ((m.ratioNum || 1) / (m.ratioDen || 1));
+      } else {
+        effectiveBpm = m.customBpm || baseBpm;
+      }
+      const beatDuration = 60 / effectiveBpm;
+      const measureDuration = (m.beats || 4) * beatDuration;
+
+      for (let r = 0; r < repeat; r++) {
+        timings.push({
+          timingIndex: globalTimingIndex++,
+          measureIndex: idx,
+          repeatIteration: r,
+          repeatCount: repeat,
+          startTime: accumulatedTime,
+          endTime: accumulatedTime + measureDuration,
+          duration: measureDuration,
+          effectiveBpm: effectiveBpm,
+          beatDuration: beatDuration,
+          beats: m.beats || 4,
+          beatUnit: m.beatUnit || 4
+        });
+        accumulatedTime += measureDuration;
+      }
+    });
+
+    return { timings, totalDuration: accumulatedTime };
   }
 
   // Retorna o grupo ao qual pertence o compasso, se houver

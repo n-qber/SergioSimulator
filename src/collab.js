@@ -531,6 +531,163 @@ class CollabService {
     }
   }
 
+  // Busca especificamente as Bossas salvas na nuvem do usuário logado
+  async getUserCloudBossas(uid = authService.getUid()) {
+    if (!db || !uid) return [];
+    try {
+      const allPieces = await this.getUserCloudPieces(uid);
+      return allPieces.filter(p => Boolean(p.isBossa || p.id?.startsWith('piece-bossa-') || p.id?.startsWith('bossa-')));
+    } catch (err) {
+      console.warn("Erro ao buscar bossas da nuvem:", err);
+      return [];
+    }
+  }
+
+  // Salva ou atualiza uma Bossa na nuvem (Firestore) vinculada à conta do usuário
+  async saveBossaToCloud(bossaData) {
+    const currentUid = authService.getUid();
+    if (!db || !currentUid || !bossaData) return false;
+    try {
+      const bossaRef = doc(db, 'pieces', bossaData.id);
+      const payload = {
+        id: bossaData.id,
+        name: (bossaData.name || 'Nova Bossa').trim(),
+        description: bossaData.description || '',
+        baseBpm: bossaData.baseBpm || 120,
+        presentationBpm: bossaData.presentationBpm || bossaData.baseBpm || 120,
+        measures: Array.isArray(bossaData.measures) ? bossaData.measures : [],
+        groups: Array.isArray(bossaData.groups) ? bossaData.groups : [],
+        isBossa: true,
+        ownerId: currentUid,
+        ownerName: authService.getDisplayName() || 'Músico',
+        access: bossaData.access || 'private',
+        updatedAt: Date.now(),
+        createdAt: bossaData.createdAt || Date.now()
+      };
+      await setDoc(bossaRef, payload, { merge: true });
+      return true;
+    } catch (err) {
+      console.error("Erro ao salvar bossa na nuvem:", err);
+      return false;
+    }
+  }
+
+  // Exclui uma Bossa da nuvem
+  async deleteBossaFromCloud(bossaId) {
+    const currentUid = authService.getUid();
+    if (!db || !currentUid || !bossaId) return false;
+    try {
+      const bossaRef = doc(db, 'pieces', bossaId);
+      await deleteDoc(bossaRef);
+      return true;
+    } catch (err) {
+      console.error("Erro ao excluir bossa da nuvem:", err);
+      return false;
+    }
+  }
+
+  // Atualiza campos de uma Bossa na nuvem (ex: renomear)
+  async updateBossaInCloud(bossaId, updates = {}) {
+    const currentUid = authService.getUid();
+    if (!db || !currentUid || !bossaId) return false;
+    try {
+      const bossaRef = doc(db, 'pieces', bossaId);
+      await setDoc(bossaRef, {
+        ...updates,
+        updatedAt: Date.now()
+      }, { merge: true });
+      return true;
+    } catch (err) {
+      console.error("Erro ao atualizar bossa na nuvem:", err);
+      return false;
+    }
+  }
+
+  // Sincroniza bidirecionalmente a biblioteca local com a nuvem
+  // (Migra bossas criadas no celular para a conta do usuário e baixa no desktop)
+  async syncUserLibraryWithCloud(stateInstance) {
+    const uid = authService.getUid();
+    if (!db || !uid || !stateInstance) {
+      return stateInstance ? stateInstance.getLibraryPieces() : [];
+    }
+
+    try {
+      // 1. Busca todas as peças e bossas do usuário no Firestore
+      const cloudPieces = await this.getUserCloudPieces(uid);
+      const cloudMap = new Map();
+      cloudPieces.forEach(p => {
+        if (p && p.id) cloudMap.set(p.id, p);
+      });
+
+      // 2. Obtém a biblioteca local atual
+      let localLibrary = stateInstance.getLibraryPieces();
+      let hasLocalChanges = false;
+
+      // 3. Sincroniza bossas criadas localmente (ex: celular) que ainda não foram enviadas à nuvem
+      for (const item of localLibrary) {
+        if (!item || !item.id) continue;
+        const isBossa = Boolean(item.isBossa || item.id.startsWith('piece-bossa-') || item.id.startsWith('bossa-'));
+
+        // Se for bossa do usuário ou bossa local sem dono explícito
+        if (isBossa && (!item.ownerId || item.ownerId === uid)) {
+          if (!cloudMap.has(item.id)) {
+            try {
+              const uploadPayload = {
+                ...item,
+                isBossa: true,
+                ownerId: uid,
+                ownerName: authService.getDisplayName() || 'Músico',
+                access: item.access || 'private',
+                updatedAt: typeof item.updatedAt === 'number' ? item.updatedAt : Date.now(),
+                createdAt: item.createdAt || Date.now()
+              };
+              await setDoc(doc(db, 'pieces', item.id), uploadPayload, { merge: true });
+              cloudMap.set(item.id, uploadPayload);
+              item.ownerId = uid;
+              item.isBossa = true;
+              hasLocalChanges = true;
+            } catch (upErr) {
+              console.warn("Erro ao sincronizar bossa local para a nuvem:", item.name, upErr);
+            }
+          }
+        }
+      }
+
+      // 4. Traz itens da nuvem para a biblioteca local (desktop recebe bossas criadas no celular)
+      cloudPieces.forEach(cloudPiece => {
+        const localIndex = localLibrary.findIndex(lp => lp.id === cloudPiece.id);
+        if (localIndex === -1) {
+          // Novo item vindo da nuvem
+          localLibrary.unshift(cloudPiece);
+          hasLocalChanges = true;
+        } else {
+          // Já existe localmente: atualiza se a versão na nuvem for mais recente
+          const localUpdated = typeof localLibrary[localIndex].updatedAt === 'number'
+            ? localLibrary[localIndex].updatedAt
+            : new Date(localLibrary[localIndex].updatedAt || 0).getTime();
+          const cloudUpdated = typeof cloudPiece.updatedAt === 'number'
+            ? cloudPiece.updatedAt
+            : new Date(cloudPiece.updatedAt || 0).getTime();
+
+          if (cloudUpdated > localUpdated) {
+            localLibrary[localIndex] = { ...localLibrary[localIndex], ...cloudPiece };
+            hasLocalChanges = true;
+          }
+        }
+      });
+
+      // 5. Salva na biblioteca local se houve mesclagem
+      if (hasLocalChanges && typeof stateInstance.setLibraryPieces === 'function') {
+        stateInstance.setLibraryPieces(localLibrary);
+      }
+
+      return localLibrary;
+    } catch (err) {
+      console.warn("Erro durante sincronização de bossas com a nuvem:", err);
+      return stateInstance.getLibraryPieces();
+    }
+  }
+
   // Registra nova versão no histórico (grava na nuvem e atualiza localmente sem gastar leituras)
   async addHistoryEntry(pieceId, action, payload) {
     if (!db) return;

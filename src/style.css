@@ -5303,3 +5303,620 @@ kbd {
   -webkit-backdrop-filter: blur(24px) !important;
   z-index: 9999 !important;
 }
+
+/* ==========================================================================
+   GERENCIADOR DE BOSSAS & REPERTÓRIO (PAINEL DEDICADO & SINCRONIZAÇÃO EM NUVEM)
+   ========================================================================== */
+
+/* Botão de Destaque no Topo dos Compassos */
+.btn-mgr-accent {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.22), rgba(124, 58, 237, 0.15));
+  border-color: rgba(139, 92, 246, 0.5);
+  color: #c4b5fd;
+  font-weight: 800;
+}
+
+.btn-mgr-accent:hover {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.38), rgba(124, 58, 237, 0.28));
+  border-color: #a78bfa;
+  color: #ffffff;
+  box-shadow: 0 2px 10px rgba(139, 92, 246, 0.25);
+}
+
+/* Janela Principal do Gerenciador de Bossas */
+.modal-bossa-manager-window {
+  max-width: 860px;
+  width: 95%;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.bossa-mgr-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.bossa-mgr-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.tag-bossa-mgr {
+  background: rgba(139, 92, 246, 0.18);
+  color: #c4b5fd;
+  border: 1px solid rgba(139, 92, 246, 0.35);
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+
+/* Indicador de Sincronização na Nuvem */
+.bossa-mgr-sync-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-medium);
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  color: var(--white-muted);
+}
+
+.sync-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 6px #10b981;
+  transition: all 0.3s ease;
+}
+
+.sync-dot.syncing {
+  background: #f59e0b;
+  box-shadow: 0 0 8px #f59e0b;
+  animation: pulse-sync 1s infinite alternate;
+}
+
+.sync-dot.offline {
+  background: #94a3b8;
+  box-shadow: none;
+}
+
+@keyframes pulse-sync {
+  from { opacity: 0.4; transform: scale(0.85); }
+  to { opacity: 1; transform: scale(1.15); }
+}
+
+.btn-sync-bossas {
+  background: transparent;
+  border: none;
+  color: #a78bfa;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+}
+
+.btn-sync-bossas:hover {
+  background: rgba(139, 92, 246, 0.15);
+  color: #ffffff;
+}
+
+.btn-sync-bossas.spinning .sync-icon {
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Corpo do Gerenciador */
+.bossa-mgr-body {
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow-y: auto;
+  max-height: calc(90vh - 140px);
+}
+
+.bossa-mgr-intro {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  background: rgba(139, 92, 246, 0.06);
+  border: 1px solid rgba(139, 92, 246, 0.2);
+  border-radius: 10px;
+  padding: 12px 16px;
+  flex-wrap: wrap;
+}
+
+.bossa-mgr-desc {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--white-muted);
+  line-height: 1.45;
+  flex: 1;
+  min-width: 240px;
+}
+
+.bossa-mgr-quick-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.btn-mgr-action {
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+}
+
+/* Barra de Filtro e Busca */
+.bossa-mgr-filter-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.bossa-search-box {
+  position: relative;
+  width: 100%;
+  display: flex;
+  align-items: center;
+}
+
+.bossa-search-icon {
+  position: absolute;
+  left: 12px;
+  font-size: 0.85rem;
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.bossa-search-input {
+  width: 100%;
+  padding: 9px 36px 9px 36px;
+  font-size: 0.85rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border-medium);
+  border-radius: 8px;
+  color: var(--white-pure);
+  transition: all 0.2s ease;
+}
+
+.bossa-search-input:focus {
+  border-color: #8b5cf6;
+  box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.25);
+  outline: none;
+}
+
+.btn-clear-search {
+  position: absolute;
+  right: 10px;
+  background: transparent;
+  border: none;
+  color: var(--white-muted);
+  font-size: 1.1rem;
+  cursor: pointer;
+  line-height: 1;
+  padding: 2px 6px;
+}
+
+.btn-clear-search:hover {
+  color: var(--white-pure);
+}
+
+.bossa-filter-tabs {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.bossa-filter-pill {
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  color: var(--white-muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 5px 12px;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.bossa-filter-pill:hover {
+  background: rgba(139, 92, 246, 0.1);
+  color: var(--white-pure);
+  border-color: rgba(139, 92, 246, 0.3);
+}
+
+.bossa-filter-pill.active {
+  background: #8b5cf6;
+  border-color: #8b5cf6;
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(139, 92, 246, 0.35);
+}
+
+/* Grade de Cartões de Bossas */
+.bossa-mgr-cards-container {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 180px;
+}
+
+.bossa-mgr-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-medium);
+  border-radius: 12px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.bossa-mgr-card:hover {
+  border-color: rgba(139, 92, 246, 0.45);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+  transform: translateY(-1px);
+}
+
+.bossa-mgr-card.is-playing {
+  border-color: #8b5cf6;
+  background: rgba(139, 92, 246, 0.08);
+  box-shadow: 0 0 16px rgba(139, 92, 246, 0.3);
+}
+
+.bossa-mgr-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.bossa-mgr-card-title-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.bossa-mgr-card-title {
+  font-size: 0.96rem;
+  font-weight: 800;
+  color: var(--white-pure);
+  margin: 0;
+}
+
+.bossa-origin-badge {
+  font-size: 0.68rem;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.bossa-origin-badge.cloud {
+  background: rgba(59, 130, 246, 0.15);
+  color: #93c5fd;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.bossa-origin-badge.local {
+  background: rgba(16, 185, 129, 0.15);
+  color: #6ee7b7;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.bossa-origin-badge.preset {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fcd34d;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.bossa-mgr-card-meta {
+  font-size: 0.76rem;
+  color: var(--white-muted);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-family: var(--font-mono);
+}
+
+/* Fita de Pré-visualização dos Compassos */
+.bossa-measures-ribbon {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 4px 0;
+  scrollbar-width: thin;
+}
+
+.ribbon-measure-tag {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-light);
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 0.72rem;
+  font-family: var(--font-mono);
+  color: var(--white-muted);
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ribbon-measure-tag strong {
+  color: var(--white-pure);
+}
+
+.ribbon-measure-tag.ratio {
+  color: #a78bfa;
+  border-color: rgba(139, 92, 246, 0.25);
+}
+
+/* Barra de Ações do Cartão */
+.bossa-card-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding-top: 6px;
+  border-top: 1px solid var(--border-light);
+}
+
+.bossa-actions-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.bossa-actions-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-card-action {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 5px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.18s ease;
+  border: 1px solid transparent;
+}
+
+.btn-card-action.preview {
+  background: rgba(139, 92, 246, 0.15);
+  border-color: rgba(139, 92, 246, 0.35);
+  color: #c4b5fd;
+}
+
+.btn-card-action.preview:hover {
+  background: rgba(139, 92, 246, 0.3);
+  color: #ffffff;
+}
+
+.btn-card-action.preview.playing {
+  background: #8b5cf6;
+  border-color: #8b5cf6;
+  color: #ffffff;
+  animation: pulse-sync 0.8s infinite alternate;
+}
+
+.btn-card-action.insert {
+  background: rgba(59, 130, 246, 0.15);
+  border-color: rgba(59, 130, 246, 0.35);
+  color: #93c5fd;
+}
+
+.btn-card-action.insert:hover {
+  background: rgba(59, 130, 246, 0.3);
+  color: #ffffff;
+}
+
+.btn-card-action.open {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: var(--border-light);
+  color: var(--white-pure);
+}
+
+.btn-card-action.open:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: var(--border-medium);
+}
+
+.btn-card-action.icon-only {
+  padding: 5px 8px;
+  font-size: 0.85rem;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--white-muted);
+}
+
+.btn-card-action.icon-only:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--white-pure);
+  border-color: var(--border-light);
+}
+
+.btn-card-action.danger:hover {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+/* Rodapé do Gerenciador */
+.bossa-mgr-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--border-light);
+}
+
+.bossa-mgr-stats {
+  font-size: 0.78rem;
+  color: var(--white-muted);
+  font-family: var(--font-mono);
+}
+
+/* Aba e Link no Modal de Inserção */
+.bossa-source-tabs-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border-bottom: 1px solid var(--border-light);
+  padding-bottom: 4px;
+  margin-top: 4px;
+}
+
+.bossa-source-tabs-row .bossa-source-tabs {
+  border-bottom: none;
+  padding-bottom: 0;
+  margin-top: 0;
+}
+
+.btn-mgr-link {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #a78bfa;
+  padding: 4px 8px;
+  border-radius: 4px;
+  text-decoration: none;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.btn-mgr-link:hover {
+  background: rgba(139, 92, 246, 0.15);
+  color: #ffffff;
+}
+
+/* Suporte ao Tema Claro no Gerenciador de Bossas */
+[data-theme="light"] .bossa-mgr-intro {
+  background: rgba(139, 92, 246, 0.05);
+  border-color: rgba(139, 92, 246, 0.2);
+}
+
+[data-theme="light"] .bossa-search-input {
+  background: #ffffff;
+  border-color: #cbd5e1;
+  color: #0f172a;
+}
+
+[data-theme="light"] .bossa-mgr-card {
+  background: #ffffff;
+  border-color: #e2e8f0;
+}
+
+[data-theme="light"] .bossa-mgr-card:hover {
+  border-color: #a78bfa;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+}
+
+[data-theme="light"] .bossa-mgr-card.is-playing {
+  background: rgba(139, 92, 246, 0.05);
+  border-color: #8b5cf6;
+}
+
+[data-theme="light"] .bossa-mgr-card-title {
+  color: #0f172a;
+}
+
+[data-theme="light"] .ribbon-measure-tag {
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+  color: #475569;
+}
+
+[data-theme="light"] .ribbon-measure-tag strong {
+  color: #0f172a;
+}
+
+/* Responsividade Mobile do Gerenciador de Bossas */
+@media (max-width: 768px) {
+  .modal-bossa-manager-window {
+    width: 98%;
+    max-height: 94vh;
+  }
+
+  .bossa-mgr-top {
+    padding: 12px 14px;
+  }
+
+  .bossa-mgr-body {
+    padding: 12px 14px;
+    max-height: calc(94vh - 120px);
+  }
+
+  .bossa-mgr-intro {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .bossa-mgr-quick-actions {
+    width: 100%;
+  }
+
+  .bossa-mgr-quick-actions .btn-mgr-action {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .bossa-card-actions {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .bossa-actions-left,
+  .bossa-actions-right {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .bossa-actions-left .btn-card-action {
+    flex: 1;
+    justify-content: center;
+  }
+}
+
