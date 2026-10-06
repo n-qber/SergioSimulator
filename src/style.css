@@ -2501,6 +2501,93 @@ button {
   color: var(--white-pure);
 }
 
+/* Card Adicionar Compasso ao final da grade */
+.measure-card.measure-card-add {
+  min-height: 154px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed rgba(244, 63, 94, 0.4);
+  background: rgba(244, 63, 94, 0.03);
+  text-align: center;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+  padding: 16px;
+  cursor: pointer;
+}
+
+.measure-card.measure-card-add:hover {
+  background: rgba(244, 63, 94, 0.09);
+  border-color: var(--red-primary);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(244, 63, 94, 0.22);
+}
+
+.measure-card.measure-card-add:active {
+  transform: scale(0.98);
+}
+
+.measure-card.measure-card-add:focus-visible {
+  outline: 2px solid var(--red-primary);
+  outline-offset: 2px;
+}
+
+.card-add-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  pointer-events: none;
+  width: 100%;
+}
+
+.card-add-icon {
+  font-size: 2.2rem;
+  line-height: 1;
+  font-weight: 700;
+  color: var(--red-primary);
+  transition: transform 0.2s ease;
+  display: inline-block;
+}
+
+.measure-card.measure-card-add:hover .card-add-icon {
+  transform: scale(1.22);
+}
+
+.card-add-label {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--white-pure);
+  letter-spacing: -0.01em;
+}
+
+.card-add-sub {
+  font-size: 0.74rem;
+  color: var(--white-muted);
+  font-weight: 500;
+}
+
+[data-theme="light"] .measure-card.measure-card-add {
+  border-color: rgba(225, 29, 72, 0.35);
+  background: rgba(225, 29, 72, 0.03);
+}
+
+[data-theme="light"] .measure-card.measure-card-add:hover {
+  background: rgba(225, 29, 72, 0.09);
+  border-color: var(--red-primary);
+  box-shadow: 0 6px 20px rgba(225, 29, 72, 0.16);
+}
+
+[data-theme="light"] .measure-card.measure-card-add .card-add-label {
+  color: var(--text-heading);
+}
+
+[data-theme="light"] .measure-card.measure-card-add .card-add-sub {
+  color: var(--text-muted);
+}
+
 /* ==========================================================================
    MODAIS (MINIMALISTAS, AREJADOS & SUAVES)
    ========================================================================== */

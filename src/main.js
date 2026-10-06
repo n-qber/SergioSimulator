@@ -2273,6 +2273,65 @@ class SergioApp {
       grid.appendChild(card);
       this.cachedCards.push(card);
     });
+
+    if (measures.length > 0) {
+      const addCard = document.createElement('div');
+      addCard.className = 'measure-card measure-card-add';
+      addCard.setAttribute('role', 'button');
+      addCard.setAttribute('tabindex', '0');
+      addCard.setAttribute('aria-label', 'Adicionar compasso de 4T e 1 repetição');
+      addCard.title = 'Adicionar compasso (4T, 1 repetição)';
+      addCard.innerHTML = `
+        <div class="card-add-inner">
+          <span class="card-add-icon" aria-hidden="true">+</span>
+          <span class="card-add-label">Adicionar Compasso</span>
+          <span class="card-add-sub">4T • 1 repetição</span>
+        </div>
+      `;
+
+      const handleAdd = () => {
+        state.addMeasure(-1, {
+          beats: 4,
+          beatUnit: 4,
+          tempoMode: 'ratio',
+          ratioNum: 1,
+          ratioDen: 1,
+          repeat: 1,
+          nickname: ''
+        });
+        const newIdx = state.measures.length - 1;
+        this.handleMeasureSelected(newIdx);
+      };
+
+      addCard.addEventListener('click', handleAdd);
+      addCard.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          handleAdd();
+        }
+      });
+
+      addCard.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        addCard.classList.add('is-drag-target');
+      });
+
+      addCard.addEventListener('dragleave', () => {
+        addCard.classList.remove('is-drag-target');
+      });
+
+      addCard.addEventListener('drop', (e) => {
+        e.preventDefault();
+        addCard.classList.remove('is-drag-target');
+        const fromIdx = parseInt(e.dataTransfer.getData('text/plain'), 10);
+        if (!isNaN(fromIdx) && fromIdx < state.measures.length - 1) {
+          state.moveMeasure(fromIdx, state.measures.length - 1);
+          this.handleMeasureSelected(state.measures.length - 1);
+        }
+      });
+
+      grid.appendChild(addCard);
+    }
   }
 
   // =========================================================================
