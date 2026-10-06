@@ -119,76 +119,21 @@
           <span id="themeIcon">☀️</span>
         </button>
 
-        <!-- Menu Hamburguinho de Configurações & Arquivo (☰) -->
+        <!-- Menu de Configurações & Opções (⚙️) -->
         <div class="app-menu-wrapper" id="appMenuWrapper">
-          <button type="button" id="btnAppMenu" class="btn-icon-action btn-app-menu" title="Menu e Configurações (Arquivo, Peças, Som, Histórico)" aria-label="Menu Principal">
-            <span class="menu-hamburger-icon">☰</span>
+          <button type="button" id="btnAppMenu" class="btn-icon-action btn-app-menu" title="Mais Opções e Configurações (Apagar Peça, Instalar App)" aria-label="Menu de Configurações">
+            <span class="menu-hamburger-icon">⚙️</span>
           </button>
 
           <div id="appMenuDropdown" class="app-menu-dropdown" style="display:none">
-            <!-- Seção: Arquivo & Peça -->
-            <div class="app-menu-section-header">📁 Peça & Arquivo</div>
-            
-            <button type="button" id="btnNewPiece" class="app-menu-item" title="Iniciar Nova Peça em Branco (Ctrl+N)">
-              <span class="menu-item-icon">📄</span> Nova Peça
-            </button>
-
-            <button type="button" id="btnSavePieceToLibrary" class="app-menu-item" title="Salvar a peça atual no seu Repertório (Local & Nuvem)">
-              <span class="menu-item-icon">💾</span> Salvar Peça no Repertório
-            </button>
-
-            <button type="button" id="btnMenuInsertBossa" class="app-menu-item" title="Inserir outra apresentação ou bossa por referência nesta peça">
-              <span class="menu-item-icon">🔗</span> Inserir Bossa / Peça Externa
-            </button>
-
-            <button type="button" id="btnMenuManageBossas" class="app-menu-item" title="Gerenciar todas as suas peças e bossas, ouvir prévias e sincronizar">
-              <span class="menu-item-icon">🗂️</span> Biblioteca de Repertório
-            </button>
-
-            <div class="app-menu-select-wrap">
-              <label for="selectPreset" class="app-menu-label">🎼 Modelos & Peças:</label>
-              <select id="selectPreset" class="app-menu-select" title="Carregar Exemplo ou Modelo">
-                <option value="" disabled selected>Peças de Exemplo...</option>
-              </select>
-            </div>
-
-            <button type="button" id="btnOpenHistory" class="app-menu-item" title="Histórico de Versões na Nuvem">
-              <span class="menu-item-icon">🕒</span> Histórico de Versões
-              <span id="historyBadgeCount" class="history-badge">0</span>
-            </button>
+            <div class="app-menu-section-header">⚙️ Mais Opções</div>
 
             <button type="button" id="btnDeleteCurrentPiece" class="app-menu-item app-menu-danger" title="Apagar a peça atual da biblioteca e da nuvem">
               <span class="menu-item-icon">🗑️</span> Apagar Esta Peça...
             </button>
 
-            <div class="app-menu-row-buttons">
-              <button type="button" id="btnExport" class="app-menu-item-half" title="Exportar arquivo .json da peça">
-                <span class="menu-item-icon">💾</span> Exportar (.json)
-              </button>
-              <label class="app-menu-item-half file-btn" title="Importar arquivo .json de peça">
-                <span class="menu-item-icon">📂</span> Importar
-                <input type="file" id="fileImport" accept=".json" style="display:none">
-              </label>
-            </div>
-
             <div class="app-menu-divider"></div>
 
-            <!-- Seção: Áudio & Timbre -->
-            <div class="app-menu-section-header">🔊 Áudio & Som</div>
-            <div class="app-menu-audio-row">
-              <button type="button" id="btnMute" class="btn-icon-mute active" title="Mudo (M)">
-                <span id="muteIcon">🔊</span>
-              </button>
-              <select id="selectSoundType" class="app-menu-select flex-grow" title="Timbre de Percussão">
-                <option value="woodblock">Bloco de Madeira</option>
-                <option value="clave">Clave / Rimshot</option>
-                <option value="click">Click Digital</option>
-                <option value="beep">Bip</option>
-              </select>
-            </div>
-
-            <!-- Seção: Aplicativo (PWA) -->
-            <div class="app-menu-divider"></div>
             <button type="button" id="btnInstallPwa" class="app-menu-item app-menu-install" title="Instalar aplicativo para uso offline">
               <span class="menu-item-icon">📲</span> Instalar Aplicativo
             </button>
@@ -196,6 +141,79 @@
         </div>
       </div>
     </header>
+
+    <!-- BARRA DE FERRAMENTAS DE AÇÃO (ACTION TOOLBAR) -->
+    <nav class="app-action-toolbar" id="appActionToolbar" aria-label="Barra de Ferramentas de Ação">
+      <div class="toolbar-inner">
+        <!-- Grupo 1: Gestão de Peça & Repertório -->
+        <div class="toolbar-group">
+          <button type="button" id="btnNewPiece" class="toolbar-btn" title="Iniciar Nova Peça em Branco (Ctrl+N)">
+            <span class="toolbar-btn-icon">📄</span>
+            <span class="toolbar-btn-text">Nova Peça</span>
+          </button>
+          <button type="button" id="btnSavePieceToLibrary" class="toolbar-btn primary" title="Salvar a peça atual no seu Repertório (Local & Nuvem)">
+            <span class="toolbar-btn-icon">💾</span>
+            <span class="toolbar-btn-text">Salvar Peça</span>
+          </button>
+          <button type="button" id="btnMenuManageBossas" class="toolbar-btn" title="Abrir biblioteca de repertório de peças e bossas">
+            <span class="toolbar-btn-icon">🗂️</span>
+            <span class="toolbar-btn-text">Repertório</span>
+          </button>
+          <button type="button" id="btnMenuInsertBossa" class="toolbar-btn" title="Inserir outra apresentação ou bossa por referência nesta peça">
+            <span class="toolbar-btn-icon">🔗</span>
+            <span class="toolbar-btn-text">Inserir Bossa</span>
+          </button>
+        </div>
+
+        <div class="toolbar-divider"></div>
+
+        <!-- Grupo 2: Carregar Modelos & Peças -->
+        <div class="toolbar-group toolbar-select-group">
+          <label for="selectPreset" class="toolbar-label">
+            <span class="toolbar-label-icon">🎼</span>
+            <span class="toolbar-label-text">Modelos & Peças:</span>
+          </label>
+          <select id="selectPreset" class="toolbar-select" title="Carregar Exemplo, Modelo ou Peça Salva">
+            <option value="" disabled selected>Carregar Peça / Modelo...</option>
+          </select>
+        </div>
+
+        <div class="toolbar-divider"></div>
+
+        <!-- Grupo 3: Histórico & Arquivo -->
+        <div class="toolbar-group">
+          <button type="button" id="btnOpenHistory" class="toolbar-btn" title="Histórico de Versões na Nuvem">
+            <span class="toolbar-btn-icon">🕒</span>
+            <span class="toolbar-btn-text">Histórico</span>
+            <span id="historyBadgeCount" class="history-badge">0</span>
+          </button>
+          <button type="button" id="btnExport" class="toolbar-btn" title="Exportar arquivo .json da peça">
+            <span class="toolbar-btn-icon">⬇️</span>
+            <span class="toolbar-btn-text">Exportar</span>
+          </button>
+          <label class="toolbar-btn file-btn" title="Importar arquivo .json de peça">
+            <span class="toolbar-btn-icon">⬆️</span>
+            <span class="toolbar-btn-text">Importar</span>
+            <input type="file" id="fileImport" accept=".json" style="display:none">
+          </label>
+        </div>
+
+        <div class="toolbar-divider"></div>
+
+        <!-- Grupo 4: Áudio & Timbre -->
+        <div class="toolbar-group toolbar-audio-group">
+          <button type="button" id="btnMute" class="btn-icon-mute active" title="Mudo (M)">
+            <span id="muteIcon">🔊</span>
+          </button>
+          <select id="selectSoundType" class="toolbar-select sound-select" title="Timbre de Percussão">
+            <option value="woodblock">Bloco de Madeira</option>
+            <option value="clave">Clave / Rimshot</option>
+            <option value="click">Click Digital</option>
+            <option value="beep">Bip</option>
+          </select>
+        </div>
+      </div>
+    </nav>
 
     <!-- BANNER DE MODO LEITURA / OUVINTE -->
     <div id="readOnlyBanner" class="readonly-banner" style="display:none">

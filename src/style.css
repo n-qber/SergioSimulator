@@ -739,6 +739,202 @@ button {
 }
 
 /* ==========================================================================
+   BARRA DE FERRAMENTAS DE AÇÃO (ACTION TOOLBAR)
+   ========================================================================== */
+
+.app-action-toolbar {
+  width: 100%;
+  background: var(--bg-header);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--border-light);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+  position: sticky;
+  top: 58px;
+  z-index: 45;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 20px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  transition: background-color 0.25s ease, border-color 0.25s ease;
+}
+
+.app-action-toolbar::-webkit-scrollbar {
+  display: none;
+}
+
+.toolbar-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  max-width: 1260px;
+  gap: 12px;
+  min-width: max-content;
+}
+
+.toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.toolbar-divider {
+  width: 1px;
+  height: 20px;
+  background: var(--border-medium);
+  margin: 0 4px;
+  flex-shrink: 0;
+  opacity: 0.6;
+}
+
+.toolbar-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border-light);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--white-pure);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  white-space: nowrap;
+  user-select: none;
+  font-family: var(--font-ui);
+  text-decoration: none;
+}
+
+.toolbar-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+.toolbar-btn:active {
+  transform: translateY(0);
+}
+
+.toolbar-btn.primary {
+  background: rgba(225, 29, 72, 0.15);
+  border-color: rgba(225, 29, 72, 0.35);
+  color: #fda4af;
+}
+
+.toolbar-btn.primary:hover {
+  background: rgba(225, 29, 72, 0.28);
+  border-color: rgba(225, 29, 72, 0.55);
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(225, 29, 72, 0.3);
+}
+
+.toolbar-btn-icon {
+  font-size: 0.85rem;
+  line-height: 1;
+}
+
+.toolbar-btn .history-badge {
+  background: #3b82f6;
+  color: #ffffff;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-family: var(--font-mono);
+  margin-left: 2px;
+}
+
+.toolbar-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--white-muted);
+  white-space: nowrap;
+}
+
+.toolbar-label-icon {
+  font-size: 0.85rem;
+}
+
+.toolbar-select {
+  background: var(--bg-stage);
+  border: 1px solid var(--border-medium);
+  border-radius: 6px;
+  color: var(--white-pure);
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 5px 10px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: var(--font-ui);
+  max-width: 260px;
+}
+
+.toolbar-select:hover,
+.toolbar-select:focus {
+  border-color: var(--border-focus);
+  outline: none;
+}
+
+.toolbar-select.sound-select {
+  max-width: 140px;
+}
+
+.toolbar-audio-group .btn-icon-mute {
+  width: 28px;
+  height: 28px;
+}
+
+/* Tema Claro */
+[data-theme="light"] .app-action-toolbar {
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+[data-theme="light"] .toolbar-btn {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  color: var(--text-pure);
+}
+
+[data-theme="light"] .toolbar-btn:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+  color: #0f172a;
+}
+
+[data-theme="light"] .toolbar-btn.primary {
+  background: #fff1f2;
+  border-color: #fecdd3;
+  color: #be123c;
+}
+
+[data-theme="light"] .toolbar-btn.primary:hover {
+  background: #ffe4e6;
+  border-color: #fda4af;
+  color: #9f1239;
+}
+
+[data-theme="light"] .toolbar-select {
+  background: #ffffff;
+  border-color: #cbd5e1;
+  color: var(--text-pure);
+}
+
+[data-theme="light"] .toolbar-divider {
+  background: #e2e8f0;
+}
+
+/* ==========================================================================
    PALCO PRINCIPAL (CENTRALIZADO & ESPAÇOSO)
    ========================================================================== */
 
@@ -2832,6 +3028,19 @@ kbd {
     gap: 8px;
     background: var(--bg-header);
     border-bottom: 1px solid var(--border-light);
+  }
+
+  /* BARRA DE FERRAMENTAS MOBILE COM SCROLL SUAVE */
+  .app-action-toolbar {
+    position: static;
+    top: auto;
+    padding: 6px 12px;
+    justify-content: flex-start;
+  }
+
+  .toolbar-inner {
+    justify-content: flex-start;
+    gap: 8px;
   }
 
   .header-left {
