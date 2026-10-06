@@ -5851,6 +5851,46 @@ kbd {
   cursor: grabbing;
 }
 
+/* Membros do bloco de bossa na grade */
+.measure-card.is-bossa-member {
+  border-color: rgba(139, 92, 246, 0.35);
+  background: linear-gradient(180deg, rgba(139, 92, 246, 0.08) 0%, var(--bg-card) 50%);
+}
+
+.measure-card.is-bossa-member:hover {
+  border-color: rgba(139, 92, 246, 0.65);
+}
+
+[data-theme="light"] .measure-card.is-bossa-member {
+  border-color: rgba(139, 92, 246, 0.35);
+  background: linear-gradient(180deg, rgba(139, 92, 246, 0.1) 0%, #ffffff 50%);
+}
+
+/* Quebra de linha após bloco de bossa na grade de compassos */
+.bossa-block-break {
+  grid-column: 1 / -1;
+  height: 4px;
+  margin: 6px 0 10px 0;
+  border-top: 1px dashed rgba(139, 92, 246, 0.28);
+  position: relative;
+  transition: all 0.2s ease;
+  pointer-events: auto;
+}
+
+.bossa-block-break.between-bossas {
+  height: 2px;
+  margin: 2px 0;
+  border-top: none;
+}
+
+.bossa-block-break.is-drag-target {
+  height: 22px;
+  margin: 6px 0;
+  border-top: 2px dashed #8b5cf6;
+  background: rgba(139, 92, 246, 0.18);
+  border-radius: 6px;
+}
+
 .bossa-block-header-info {
   display: flex;
   align-items: center;

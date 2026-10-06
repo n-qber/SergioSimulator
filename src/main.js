@@ -2166,6 +2166,10 @@ class SergioApp {
       if (this.renderer?.selectedMeasureIndex === idx) {
         card.classList.add('is-selected');
       }
+      if (grp && grp.isBossaBlock) {
+        card.classList.add('is-bossa-member');
+        card.style.setProperty('--card-bossa-color', grp.color || '#8b5cf6');
+      }
       card.dataset.index = idx;
       card.draggable = true;
 
@@ -2450,6 +2454,55 @@ class SergioApp {
 
       grid.appendChild(card);
       this.cachedCards.push(card);
+
+      // Se for o último compasso de um bloco de bossa, insere uma quebra de linha na grade
+      // para evitar que compassos fora da bossa (ou o botão de adicionar) fiquem na mesma linha/região
+      if (grp && grp.isBossaBlock && grp.endMeasure === idx) {
+        const nextGrp = (idx < measures.length - 1) ? state.getGroupByMeasureIndex(idx + 1) : null;
+        const nextIsBossa = nextGrp && nextGrp.isBossaBlock && nextGrp.startMeasure === (idx + 1);
+
+        const breakEl = document.createElement('div');
+        breakEl.className = 'bossa-block-break' + (nextIsBossa ? ' between-bossas' : '');
+        breakEl.setAttribute('data-after-measure', idx);
+
+        breakEl.addEventListener('dragover', (e) => {
+          e.preventDefault();
+          breakEl.classList.add('is-drag-target');
+        });
+
+        breakEl.addEventListener('dragleave', () => {
+          breakEl.classList.remove('is-drag-target');
+        });
+
+        breakEl.addEventListener('drop', (e) => {
+          e.preventDefault();
+          breakEl.classList.remove('is-drag-target');
+          document.querySelectorAll('.is-bossa-dragging').forEach(el => el.classList.remove('is-bossa-dragging'));
+
+          const bossaGroupId = e.dataTransfer.getData('text/bossa-group-id');
+          const rawText = e.dataTransfer.getData('text/plain');
+
+          const targetInsert = idx + 1;
+          if (bossaGroupId || rawText?.startsWith('bossa:')) {
+            const gid = bossaGroupId || rawText.replace('bossa:', '');
+            const targetGrp = state.groups.find(g => g.id === gid);
+            const moved = state.moveGroup(gid, targetInsert);
+            if (moved) {
+              this.renderMeasuresList();
+              this.showToast(`Bossa '${targetGrp?.name || ''}' movida para depois de '${grp.name}'!`, '📦');
+            }
+            return;
+          }
+
+          const fromIdx = parseInt(rawText, 10);
+          if (!isNaN(fromIdx) && fromIdx !== targetInsert) {
+            state.moveMeasure(fromIdx, targetInsert);
+            this.handleMeasureSelected(targetInsert);
+          }
+        });
+
+        grid.appendChild(breakEl);
+      }
     });
 
     if (measures.length > 0) {
