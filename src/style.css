@@ -1475,18 +1475,52 @@ button {
 }
 
 .btn-loop-clean {
-  font-size: 0.75rem;
-  font-weight: 600;
+  font-size: 0.95rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
   color: var(--white-dim);
   background: var(--bg-card);
   border: 1px solid var(--border-light);
-  padding: 5px 10px;
-  border-radius: 5px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.btn-loop-clean:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--border-medium);
+  transform: translateY(-1px);
 }
 
 .btn-loop-clean.active {
   border-color: var(--red-primary);
-  color: var(--white-pure);
+  background: rgba(225, 29, 72, 0.15);
+  color: #ffffff;
+  box-shadow: 0 0 8px rgba(225, 29, 72, 0.3);
+}
+
+[data-theme="light"] .btn-loop-clean {
+  background: #ffffff;
+  border-color: #cbd5e1;
+  color: #475569;
+}
+
+[data-theme="light"] .btn-loop-clean:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+}
+
+[data-theme="light"] .btn-loop-clean.active {
+  background: #fff1f2;
+  border-color: #fecdd3;
+  color: var(--red-primary);
+  box-shadow: 0 0 8px rgba(225, 29, 72, 0.2);
 }
 
 .quick-add-actions {
@@ -3453,8 +3487,11 @@ kbd {
   }
 
   .clean-transport-bar .btn-loop-clean {
-    padding: 7px 14px;
-    font-size: 0.8rem;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    font-size: 1.1rem;
+    flex-shrink: 0;
   }
 
   .clean-transport-bar .quick-add-actions {
