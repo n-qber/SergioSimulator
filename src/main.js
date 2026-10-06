@@ -2127,13 +2127,18 @@ class SergioApp {
         </div>
 
         <div class="measure-card-actions">
-          <button type="button" class="btn-card-icon btn-card-move-left" title="Mover Compasso para Trás (←)" ${idx === 0 ? 'disabled style="opacity:0.3;pointer-events:none"' : ''}>◀</button>
-          <button type="button" class="btn-card-icon btn-card-move-right" title="Mover Compasso para Frente (→)" ${idx === measures.length - 1 ? 'disabled style="opacity:0.3;pointer-events:none"' : ''}>▶</button>
-          <button type="button" class="btn-card-icon btn-card-dup" title="Duplicar Compasso">⧉</button>
-          ${m.sourcePieceId && m.isLinked ? '<button type="button" class="btn-card-icon btn-card-unlink-m" title="Desvincular compasso para edição local">🔓</button>' : ''}
-          ${m.sourcePieceId && m.isLocallyModified ? '<button type="button" class="btn-card-icon btn-card-restore-m" title="Restaurar compasso da versão original da bossa">↺</button>' : ''}
-          <button type="button" class="btn-card-icon btn-card-del" title="Excluir Compasso">✕</button>
-          <button type="button" class="btn-card-edit">Configurar</button>
+          <div class="card-actions-secondary">
+            <button type="button" class="btn-card-icon btn-card-move-left" title="Mover Compasso para Trás (←)" ${idx === 0 ? 'disabled style="opacity:0.3;pointer-events:none"' : ''}>◀</button>
+            <button type="button" class="btn-card-icon btn-card-move-right" title="Mover Compasso para Frente (→)" ${idx === measures.length - 1 ? 'disabled style="opacity:0.3;pointer-events:none"' : ''}>▶</button>
+            <button type="button" class="btn-card-icon btn-card-dup" title="Duplicar Compasso">⧉</button>
+            ${m.sourcePieceId && m.isLinked ? '<button type="button" class="btn-card-icon btn-card-unlink-m" title="Desvincular compasso para edição local">🔓</button>' : ''}
+            ${m.sourcePieceId && m.isLocallyModified ? '<button type="button" class="btn-card-icon btn-card-restore-m" title="Restaurar compasso da versão original da bossa">↺</button>' : ''}
+            <button type="button" class="btn-card-icon btn-card-del" title="Excluir Compasso">✕</button>
+          </div>
+          <button type="button" class="btn-card-edit" title="Configurar compasso c. ${idx + 1} (métrica, andamento, apelido)">
+            <span class="btn-card-edit-icon" aria-hidden="true">⚙️</span>
+            <span class="btn-card-edit-text">Configurar</span>
+          </button>
         </div>
       `;
 

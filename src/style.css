@@ -2489,34 +2489,83 @@ button {
 .measure-card-actions {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  gap: 4px;
+  justify-content: space-between;
+  gap: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border-light);
+  margin-top: 2px;
+}
+
+.card-actions-secondary {
+  display: flex;
+  align-items: center;
+  gap: 3px;
 }
 
 .btn-card-icon {
-  font-size: 0.72rem;
-  padding: 3px 6px;
-  border-radius: 3px;
+  font-size: 0.74rem;
+  padding: 4px 6px;
+  border-radius: 4px;
   color: var(--white-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  transition: all 0.15s ease;
+  line-height: 1;
 }
 
 .btn-card-icon:hover {
   color: var(--white-pure);
   background: var(--white-faint);
+  border-color: var(--border-light);
 }
 
 .btn-card-edit {
-  background: rgba(255, 42, 77, 0.12);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  background: rgba(244, 63, 94, 0.14);
   color: var(--red-primary);
-  font-weight: 600;
-  font-size: 0.7rem;
-  padding: 3px 8px;
-  border-radius: 3px;
+  font-weight: 700;
+  font-size: 0.78rem;
+  padding: 5px 11px;
+  border-radius: 6px;
+  border: 1.5px solid rgba(244, 63, 94, 0.38);
+  box-shadow: 0 1px 4px rgba(244, 63, 94, 0.12);
+  transition: all 0.18s ease;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn-card-edit-icon {
+  font-size: 0.85rem;
+  line-height: 1;
 }
 
 .btn-card-edit:hover {
   background: var(--red-primary);
-  color: var(--white-pure);
+  color: #ffffff;
+  border-color: var(--red-primary);
+  box-shadow: 0 2px 10px rgba(244, 63, 94, 0.35);
+  transform: translateY(-1px);
+}
+
+.btn-card-edit:active {
+  transform: scale(0.97);
+}
+
+[data-theme="light"] .btn-card-edit {
+  background: rgba(225, 29, 72, 0.08);
+  border-color: rgba(225, 29, 72, 0.35);
+  color: var(--red-primary);
+  box-shadow: 0 1px 3px rgba(225, 29, 72, 0.08);
+}
+
+[data-theme="light"] .btn-card-edit:hover {
+  background: var(--red-primary);
+  color: #ffffff;
+  border-color: var(--red-primary);
+  box-shadow: 0 2px 10px rgba(225, 29, 72, 0.25);
 }
 
 /* Card Adicionar Compasso ao final da grade */
@@ -3660,7 +3709,80 @@ kbd {
   }
 
   .measure-card {
-    padding: 12px;
+    padding: 13px;
+    gap: 10px;
+  }
+
+  .measure-card-actions {
+    flex-direction: column-reverse;
+    gap: 8px;
+    align-items: stretch;
+    padding-top: 8px;
+    margin-top: 4px;
+  }
+
+  .btn-card-edit {
+    width: 100%;
+    min-height: 42px;
+    font-size: 0.92rem;
+    font-weight: 700;
+    border-radius: 8px;
+    background: linear-gradient(135deg, rgba(244, 63, 94, 0.22), rgba(244, 63, 94, 0.12));
+    border: 1.5px solid var(--red-primary);
+    color: var(--white-pure);
+    box-shadow: 0 2px 10px rgba(244, 63, 94, 0.22);
+    letter-spacing: 0.01em;
+  }
+
+  .btn-card-edit .btn-card-edit-icon {
+    font-size: 1.05rem;
+  }
+
+  .btn-card-edit:active {
+    background: var(--red-primary);
+    color: #ffffff;
+    transform: scale(0.98);
+  }
+
+  .card-actions-secondary {
+    display: flex;
+    justify-content: space-between;
+    gap: 6px;
+    width: 100%;
+  }
+
+  .card-actions-secondary .btn-card-icon {
+    flex: 1;
+    min-height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.88rem;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-light);
+    border-radius: 6px;
+  }
+
+  .card-actions-secondary .btn-card-icon:active {
+    background: rgba(255, 255, 255, 0.15);
+  }
+
+  [data-theme="light"] .btn-card-edit {
+    background: linear-gradient(135deg, rgba(225, 29, 72, 0.12), rgba(225, 29, 72, 0.06));
+    border-color: var(--red-primary);
+    color: var(--red-primary);
+    box-shadow: 0 2px 8px rgba(225, 29, 72, 0.15);
+  }
+
+  [data-theme="light"] .btn-card-edit:active {
+    background: var(--red-primary);
+    color: #ffffff;
+  }
+
+  [data-theme="light"] .card-actions-secondary .btn-card-icon {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+    color: #334155;
   }
 
   /* ABA DE PEÇA & NUVEM NO MOBILE */
