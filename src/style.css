@@ -5337,6 +5337,88 @@ kbd {
   width: 100%;
 }
 
+#viewSimulator {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100dvh;
+  flex: 1;
+}
+
+#viewSimulator:not(.active) {
+  display: none !important;
+}
+
+#viewSimulator.active {
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+/* Navegação Superior na Esquerda (Simulador vs Repertório) */
+.header-left-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-light);
+  padding: 3px;
+  border-radius: 9px;
+  margin-left: 6px;
+}
+
+.header-nav-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  color: var(--white-muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 5px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  white-space: nowrap;
+}
+
+.header-nav-pill:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--white-pure);
+}
+
+.header-nav-pill.active {
+  background: var(--red-primary, #ff334b);
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(255, 51, 75, 0.35);
+}
+
+.bossa-page-view .header-nav-pill.active {
+  background: #8b5cf6;
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(139, 92, 246, 0.35);
+}
+
+.bossa-page-view .bossa-left-nav .header-nav-pill:not(.active):hover {
+  background: rgba(139, 92, 246, 0.2);
+  color: #ffffff;
+}
+
+[data-theme="light"] .header-left-nav {
+  background: rgba(0, 0, 0, 0.04);
+  border-color: rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="light"] .header-nav-pill {
+  color: #64748b;
+}
+
+[data-theme="light"] .header-nav-pill:hover {
+  background: rgba(0, 0, 0, 0.06);
+  color: #0f172a;
+}
+
 /* PÁGINA DEDICADA DO GERENCIADOR DE BOSSAS */
 .bossa-page-view {
   width: 100%;

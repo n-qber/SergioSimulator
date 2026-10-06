@@ -33,6 +33,18 @@
           <span class="brand-title">SÉRGIO SIMULATOR</span>
         </div>
 
+        <!-- Navegação de Páginas no Topo Esquerdo -->
+        <nav class="header-left-nav" id="headerLeftNav" aria-label="Navegação Principal">
+          <button type="button" id="btnNavSimulator" class="header-nav-pill active" title="Palco do Simulador (Esc)">
+            <span class="nav-pill-icon">🥁</span>
+            <span class="nav-pill-label">Simulador</span>
+          </button>
+          <button type="button" id="btnNavRepertoire" class="header-nav-pill" title="Biblioteca de Peças & Bossas">
+            <span class="nav-pill-icon">🗂️</span>
+            <span class="nav-pill-label">Repertório</span>
+          </button>
+        </nav>
+
         <!-- Seletor de Base BPM Limpo -->
         <div class="base-bpm-bar" id="baseBpmBar" title="Andamento Base da Peça">
           <span class="bpm-title">BASE BPM</span>
@@ -262,8 +274,8 @@
           <div class="toolbar-actions">
             <button type="button" id="btnMoveMeasureLeft" class="btn-toolbar-opt" title="Mover Compasso para Trás (Alt + ←)">◀ Mover</button>
             <button type="button" id="btnMoveMeasureRight" class="btn-toolbar-opt" title="Mover Compasso para Frente (Alt + →)">Mover ▶</button>
-            <button type="button" id="btnToolbarInsertBossa" class="btn-toolbar-opt" title="Inserir uma Bossa ou Apresentação por referência logo após este compasso">🔗 Inserir Bossa</button>
-            <button type="button" id="btnToolbarSaveAsBossa" class="btn-toolbar-opt" title="Salvar compasso(s) selecionado(s) como nova bossa independente na biblioteca">💾 Criar Bossa</button>
+            <button type="button" id="btnToolbarInsertBossa" class="btn-toolbar-opt" title="Inserir uma Peça ou Bossa como bloco após este compasso">🔗 Inserir Bloco</button>
+            <button type="button" id="btnToolbarSaveAsBossa" class="btn-toolbar-opt" title="Salvar compasso(s) selecionado(s) no repertório">💾 Salvar Seleção</button>
             <button type="button" id="btnGroupSelectedMeasures" class="btn-toolbar-opt" style="display:none" title="Criar grupo com os compassos selecionados">📁 Agrupar</button>
             <button type="button" id="btnConfigureSelectedMeasure" class="btn-toolbar-opt primary" title="Configurar Métrica e Andamento">⚙ Configurar</button>
             <button type="button" id="btnDuplicateSelectedMeasure" class="btn-toolbar-opt" title="Duplicar Compasso(s)">⧉ Duplicar</button>
@@ -317,8 +329,8 @@
           </div>
           <div class="section-top-buttons">
             <button type="button" id="btnClearAllMeasures" class="btn-ghost-sm" title="Remover todos os compassos da peça">Limpar Peça</button>
-            <button type="button" id="btnOpenBossaManager" class="btn-bossa-sm btn-mgr-accent" title="Gerenciar todas as suas bossas, ouvir prévias e sincronizar na nuvem">🥁 Gerenciar Bossas</button>
-            <button type="button" id="btnOpenInsertBossaModal" class="btn-bossa-sm" title="Inserir outra apresentação ou bossa por referência nesta peça">🔗 Inserir Bossa</button>
+            <button type="button" id="btnOpenBossaManager" class="btn-bossa-sm btn-mgr-accent" title="Abrir biblioteca de peças e bossas, ouvir prévias e sincronizar">🗂️ Ver Repertório</button>
+            <button type="button" id="btnOpenInsertBossaModal" class="btn-bossa-sm" title="Inserir outra peça ou bossa por referência nesta peça">🔗 Inserir Bloco</button>
             <button type="button" id="btnOpenGroupModal" class="btn-ghost-sm">Novo Grupo</button>
             <button type="button" id="btnAddMeasureBottom" class="btn-red-sm">+ Compasso</button>
           </div>
@@ -342,14 +354,22 @@
       <!-- Topo da Página de Bossas -->
       <header class="bossa-page-topbar">
         <div class="bossa-topbar-left">
-          <button type="button" id="btnBackToSimulator" class="btn-back-simulator" title="Voltar ao Simulador Principal (Esc)">
-            <span class="back-icon">←</span>
-            <span class="back-text">Voltar ao Simulador</span>
-          </button>
           <div class="brand bossa-page-brand">
             <div class="brand-icon">🥁</div>
             <span class="brand-title">SÉRGIO SIMULATOR</span>
           </div>
+
+          <!-- Navegação na Esquerda da Página de Repertório -->
+          <nav class="header-left-nav bossa-left-nav" aria-label="Navegação Principal">
+            <button type="button" id="btnBackToSimulator" class="header-nav-pill" title="Voltar ao Simulador Principal (Esc)">
+              <span class="nav-pill-icon">← 🥁</span>
+              <span class="nav-pill-label">Simulador</span>
+            </button>
+            <button type="button" class="header-nav-pill active" title="Repertório de Peças & Bossas">
+              <span class="nav-pill-icon">🗂️</span>
+              <span class="nav-pill-label">Repertório</span>
+            </button>
+          </nav>
         </div>
 
         <div class="bossa-topbar-center">

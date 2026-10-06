@@ -66,6 +66,7 @@ class SergioApp {
     this.mgrSearchQuery = '';
     this.activePreviewBossaId = null;
     this.currentView = 'simulator'; // 'simulator' | 'bossas'
+    this.previousMobileTab = 'stage';
 
     this.dom = {};
   }
@@ -436,6 +437,8 @@ class SergioApp {
       viewSimulator: document.getElementById('viewSimulator'),
       viewBossaManager: document.getElementById('viewBossaManager'),
       modalBossaManager: document.getElementById('viewBossaManager'), // fallback compatível
+      btnNavSimulator: document.getElementById('btnNavSimulator'),
+      btnNavRepertoire: document.getElementById('btnNavRepertoire'),
       btnBackToSimulator: document.getElementById('btnBackToSimulator'),
       btnBackToSimulatorBottom: document.getElementById('btnBackToSimulatorBottom'),
       btnThemeToggleBossaMgr: document.getElementById('btnThemeToggleBossaMgr'),
@@ -910,6 +913,7 @@ class SergioApp {
     }
 
     this.activeMobileTab = tab;
+    this.previousMobileTab = tab;
     document.body.setAttribute('data-mobile-tab', tab);
 
     this.dom.tabNavStage?.classList.toggle('active', tab === 'stage');
@@ -3763,6 +3767,15 @@ class SergioApp {
       this.openBossaManager(true);
     });
 
+    // Navegação Direta no Topo Esquerdo (Simulador vs Repertório)
+    this.dom.btnNavSimulator?.addEventListener('click', () => {
+      if (this.currentView === 'bossas') this.closeBossaManager(true);
+    });
+
+    this.dom.btnNavRepertoire?.addEventListener('click', () => {
+      if (this.currentView !== 'bossas') this.openBossaManager(true);
+    });
+
     // Fechar Gerenciador de Bossas / Voltar ao Simulador
     this.dom.btnBackToSimulator?.addEventListener('click', () => this.closeBossaManager(true));
     this.dom.btnBackToSimulatorBottom?.addEventListener('click', () => this.closeBossaManager(true));
@@ -4102,6 +4115,11 @@ class SergioApp {
     if (this.dom.appMenuDropdown) this.dom.appMenuDropdown.style.display = 'none';
     if (this.dom.userMenuDropdown) this.dom.userMenuDropdown.style.display = 'none';
 
+    // Salva qual aba mobile estava ativa antes de ir pro repertório
+    if (this.activeMobileTab && this.activeMobileTab !== 'bossas') {
+      this.previousMobileTab = this.activeMobileTab;
+    }
+
     this.currentView = 'bossas';
     if (this.dom.viewSimulator) {
       this.dom.viewSimulator.style.display = 'none';
@@ -4109,6 +4127,10 @@ class SergioApp {
     }
     this.dom.viewBossaManager.style.display = 'flex';
     this.dom.viewBossaManager.classList.add('active');
+
+    // Atualiza navegadores no topo esquerdo
+    this.dom.btnNavSimulator?.classList.remove('active');
+    this.dom.btnNavRepertoire?.classList.add('active');
 
     // Atualiza tab do rodapé mobile
     this.dom.tabNavStage?.classList.remove('active');
@@ -4142,20 +4164,31 @@ class SergioApp {
     }
     if (this.dom.viewSimulator) {
       this.dom.viewSimulator.style.display = 'flex';
+      this.dom.viewSimulator.style.flexDirection = 'column';
       this.dom.viewSimulator.classList.add('active');
     }
 
+    // Atualiza navegadores no topo esquerdo
+    this.dom.btnNavRepertoire?.classList.remove('active');
+    this.dom.btnNavSimulator?.classList.add('active');
+
     this.dom.tabNavBossas?.classList.remove('active');
     document.body.removeAttribute('data-view');
-    this.setMobileTab(this.activeMobileTab === 'bossas' ? 'stage' : this.activeMobileTab);
+
+    // Restaura a aba mobile correta
+    const targetMobileTab = this.previousMobileTab || 'stage';
+    this.setMobileTab(targetMobileTab);
 
     if (updateHash && (window.location.hash === '#bossas' || window.location.hash === '#/bossas')) {
       history.pushState({ view: 'simulator' }, '', '#/');
     }
 
-    setTimeout(() => {
+    requestAnimationFrame(() => {
       this.renderer?.resize();
-    }, 60);
+      this.renderMeasuresList();
+      this.renderQuickMeasureStrip();
+      this.updateHUD(this.playbackTime || 0);
+    });
   }
 
   updateBossaManagerSyncIndicator(status = 'idle', message = null) {
