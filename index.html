@@ -309,6 +309,9 @@
             <button type="button" id="btnToolbarSaveAsBossa" class="btn-toolbar-opt" title="Salvar compasso(s) selecionado(s) no repertório">💾 Salvar Seleção</button>
             <button type="button" id="btnGroupSelectedMeasures" class="btn-toolbar-opt" style="display:none" title="Criar grupo com os compassos selecionados">📁 Agrupar</button>
             <button type="button" id="btnConfigureSelectedMeasure" class="btn-toolbar-opt primary" title="Configurar Métrica e Andamento">⚙ Configurar</button>
+            <button type="button" id="btnCopySelectedMeasure" class="btn-toolbar-opt" title="Copiar Compasso(s) Selecionado(s) (Ctrl+C)">📋 Copiar</button>
+            <button type="button" id="btnCutSelectedMeasure" class="btn-toolbar-opt" title="Recortar Compasso(s) Selecionado(s) (Ctrl+X)">✂ Recortar</button>
+            <button type="button" id="btnPasteSelectedMeasure" class="btn-toolbar-opt" title="Colar Compasso(s) após a seleção (Ctrl+V)">📥 Colar</button>
             <button type="button" id="btnDuplicateSelectedMeasure" class="btn-toolbar-opt" title="Duplicar Compasso(s)">⧉ Duplicar</button>
             <button type="button" id="btnDeleteSelectedMeasure" class="btn-toolbar-opt danger" title="Excluir Compasso(s) Selecionado(s) (Del)">✕ Excluir</button>
             <button type="button" id="btnCloseToolbar" class="btn-toolbar-close" title="Desmarcar (Esc)">✕</button>
@@ -1184,6 +1187,10 @@
       <button type="button" class="ctx-item" id="ctxEdit">⚙ Configurar Compasso</button>
       <button type="button" class="ctx-item" id="ctxMoveLeft">◀ Mover para a Esquerda</button>
       <button type="button" class="ctx-item" id="ctxMoveRight">▶ Mover para a Direita</button>
+      <div class="ctx-divider"></div>
+      <button type="button" class="ctx-item" id="ctxCopy">📋 Copiar (Ctrl+C)</button>
+      <button type="button" class="ctx-item" id="ctxCut">✂ Recortar (Ctrl+X)</button>
+      <button type="button" class="ctx-item" id="ctxPaste">📥 Colar após (Ctrl+V)</button>
       <button type="button" class="ctx-item" id="ctxDuplicate">⧉ Duplicar</button>
       <div class="ctx-divider"></div>
       <button type="button" class="ctx-item danger" id="ctxDelete">✕ Excluir Compasso</button>
@@ -1192,7 +1199,7 @@
     <!-- RODAPÉ COMPACTO -->
     <footer class="app-footer">
       <span>🥁 Sérgio Simulator — Simulador Rítmico de Modulação Métrica para Percussão</span>
-      <span class="shortcuts-hint"><kbd>Espaço</kbd> Play/Pause &nbsp; <kbd>R</kbd> Início &nbsp; <kbd>←</kbd> <kbd>→</kbd> Navegar &nbsp; <kbd>Alt</kbd>+<kbd>←</kbd>/<kbd>→</kbd> Mover Compasso</span>
+      <span class="shortcuts-hint"><kbd>Espaço</kbd> Play/Pause &nbsp; <kbd>R</kbd> Início &nbsp; <kbd>←</kbd> <kbd>→</kbd> Navegar &nbsp; <kbd>Alt</kbd>+<kbd>←</kbd>/<kbd>→</kbd> Mover &nbsp; <kbd>Ctrl</kbd>+<kbd>C</kbd>/<kbd>X</kbd>/<kbd>V</kbd> Copiar/Recortar/Colar</span>
     </footer>
 
   </div>

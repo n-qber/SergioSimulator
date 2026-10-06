@@ -1303,6 +1303,13 @@ button {
   background: rgba(255, 42, 77, 0.15);
 }
 
+.btn-toolbar-opt:disabled,
+.ctx-item:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
 .btn-toolbar-close {
   background: transparent;
   border: none;

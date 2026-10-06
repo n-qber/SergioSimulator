@@ -57,6 +57,16 @@ class SergioApp {
     this.selectedMeasureIndices = new Set();
     this.lastSelectedMeasureIdx = null;
 
+    // Área de transferência de compassos (Ctrl+C, Ctrl+X, Ctrl+V)
+    this.clipboardMeasures = [];
+    try {
+      const savedClip = localStorage.getItem('sergio_clipboard_measures');
+      if (savedClip) {
+        const parsed = JSON.parse(savedClip);
+        if (Array.isArray(parsed)) this.clipboardMeasures = parsed;
+      }
+    } catch (_) {}
+
     // Gestão de Bossas Embutidas & Gerenciador
     this.selectedBossaPiece = null;
     this.currentBossaTab = 'library';
@@ -439,6 +449,9 @@ class SergioApp {
       btnMoveMeasureRight: document.getElementById('btnMoveMeasureRight'),
       btnGroupSelectedMeasures: document.getElementById('btnGroupSelectedMeasures'),
       btnConfigureSelectedMeasure: document.getElementById('btnConfigureSelectedMeasure'),
+      btnCopySelectedMeasure: document.getElementById('btnCopySelectedMeasure'),
+      btnCutSelectedMeasure: document.getElementById('btnCutSelectedMeasure'),
+      btnPasteSelectedMeasure: document.getElementById('btnPasteSelectedMeasure'),
       btnDuplicateSelectedMeasure: document.getElementById('btnDuplicateSelectedMeasure'),
       btnDeleteSelectedMeasure: document.getElementById('btnDeleteSelectedMeasure'),
       btnCloseToolbar: document.getElementById('btnCloseToolbar'),
@@ -450,6 +463,9 @@ class SergioApp {
       ctxEdit: document.getElementById('ctxEdit'),
       ctxMoveLeft: document.getElementById('ctxMoveLeft'),
       ctxMoveRight: document.getElementById('ctxMoveRight'),
+      ctxCopy: document.getElementById('ctxCopy'),
+      ctxCut: document.getElementById('ctxCut'),
+      ctxPaste: document.getElementById('ctxPaste'),
       ctxDuplicate: document.getElementById('ctxDuplicate'),
       ctxDelete: document.getElementById('ctxDelete'),
 
@@ -1509,6 +1525,37 @@ class SergioApp {
           return;
         }
 
+        // Atalho Ctrl+C / Cmd+C: Copiar compasso(s) selecionado(s)
+        if (key === 'c') {
+          const sel = window.getSelection ? window.getSelection().toString() : '';
+          if (sel && sel.trim().length > 0) return; // Permite cópia nativa de texto selecionado
+          const isModalOpen = Array.from(document.querySelectorAll('.modal-overlay')).some(m => m.style.display && m.style.display !== 'none');
+          if (isModalOpen) return;
+          e.preventDefault();
+          this.copySelectedMeasures();
+          return;
+        }
+
+        // Atalho Ctrl+X / Cmd+X: Recortar compasso(s) selecionado(s)
+        if (key === 'x') {
+          const sel = window.getSelection ? window.getSelection().toString() : '';
+          if (sel && sel.trim().length > 0) return; // Permite recorte nativo de texto selecionado
+          const isModalOpen = Array.from(document.querySelectorAll('.modal-overlay')).some(m => m.style.display && m.style.display !== 'none');
+          if (isModalOpen) return;
+          e.preventDefault();
+          this.cutSelectedMeasures();
+          return;
+        }
+
+        // Atalho Ctrl+V / Cmd+V: Colar compasso(s)
+        if (key === 'v') {
+          const isModalOpen = Array.from(document.querySelectorAll('.modal-overlay')).some(m => m.style.display && m.style.display !== 'none');
+          if (isModalOpen) return;
+          e.preventDefault();
+          this.pasteMeasures();
+          return;
+        }
+
         // Deixar qualquer outro atalho com Ctrl/Cmd seguir pro navegador (Ctrl+R, Ctrl+Shift+R, etc.)
         return;
       }
@@ -1708,6 +1755,18 @@ class SergioApp {
       }
     });
 
+    this.dom.btnCopySelectedMeasure?.addEventListener('click', () => {
+      this.copySelectedMeasures();
+    });
+
+    this.dom.btnCutSelectedMeasure?.addEventListener('click', () => {
+      this.cutSelectedMeasures();
+    });
+
+    this.dom.btnPasteSelectedMeasure?.addEventListener('click', () => {
+      this.pasteMeasures();
+    });
+
     this.dom.btnDuplicateSelectedMeasure?.addEventListener('click', () => {
       this.duplicateSelectedMeasures();
     });
@@ -1740,6 +1799,41 @@ class SergioApp {
       if (this._contextMeasureIdx !== undefined && this._contextMeasureIdx < state.measures.length - 1) {
         state.moveMeasure(this._contextMeasureIdx, this._contextMeasureIdx + 1);
         this.handleMeasureSelected(this._contextMeasureIdx + 1);
+      }
+      this.closeContextMenu();
+    });
+
+    this.dom.ctxCopy?.addEventListener('click', () => {
+      if (this._contextMeasureIdx !== undefined) {
+        if (!this.selectedMeasureIndices.has(this._contextMeasureIdx)) {
+          this.selectedMeasureIndices.clear();
+          this.selectedMeasureIndices.add(this._contextMeasureIdx);
+          this.lastSelectedMeasureIdx = this._contextMeasureIdx;
+          this.syncSelectionUI();
+        }
+        this.copySelectedMeasures();
+      }
+      this.closeContextMenu();
+    });
+
+    this.dom.ctxCut?.addEventListener('click', () => {
+      if (this._contextMeasureIdx !== undefined) {
+        if (!this.selectedMeasureIndices.has(this._contextMeasureIdx)) {
+          this.selectedMeasureIndices.clear();
+          this.selectedMeasureIndices.add(this._contextMeasureIdx);
+          this.lastSelectedMeasureIdx = this._contextMeasureIdx;
+          this.syncSelectionUI();
+        }
+        this.cutSelectedMeasures();
+      }
+      this.closeContextMenu();
+    });
+
+    this.dom.ctxPaste?.addEventListener('click', () => {
+      if (this._contextMeasureIdx !== undefined) {
+        this.pasteMeasures(this._contextMeasureIdx + 1);
+      } else {
+        this.pasteMeasures();
       }
       this.closeContextMenu();
     });
@@ -1828,6 +1922,20 @@ class SergioApp {
     if (this.dom.runnerMeasureToolbar) {
       this.dom.runnerMeasureToolbar.style.display = 'flex';
 
+      const hasClipboard = (this.clipboardMeasures && this.clipboardMeasures.length > 0) ||
+        (() => {
+          try {
+            const raw = localStorage.getItem('sergio_clipboard_measures');
+            return raw && JSON.parse(raw).length > 0;
+          } catch (_) { return false; }
+        })();
+
+      if (this.dom.btnPasteSelectedMeasure) {
+        this.dom.btnPasteSelectedMeasure.textContent = '📥 Colar';
+        this.dom.btnPasteSelectedMeasure.style.display = 'inline-flex';
+        this.dom.btnPasteSelectedMeasure.disabled = !hasClipboard;
+      }
+
       if (count > 1) {
         const minIdx = indices[0] + 1;
         const maxIdx = indices[indices.length - 1] + 1;
@@ -1838,6 +1946,14 @@ class SergioApp {
         if (this.dom.btnMoveMeasureRight) this.dom.btnMoveMeasureRight.style.display = 'none';
         if (this.dom.btnConfigureSelectedMeasure) this.dom.btnConfigureSelectedMeasure.style.display = 'none';
         if (this.dom.btnGroupSelectedMeasures) this.dom.btnGroupSelectedMeasures.style.display = 'inline-flex';
+        if (this.dom.btnCopySelectedMeasure) {
+          this.dom.btnCopySelectedMeasure.textContent = `📋 Copiar (${count})`;
+          this.dom.btnCopySelectedMeasure.style.display = 'inline-flex';
+        }
+        if (this.dom.btnCutSelectedMeasure) {
+          this.dom.btnCutSelectedMeasure.textContent = `✂ Recortar (${count})`;
+          this.dom.btnCutSelectedMeasure.style.display = 'inline-flex';
+        }
         if (this.dom.btnDuplicateSelectedMeasure) {
           this.dom.btnDuplicateSelectedMeasure.textContent = `⧉ Duplicar (${count})`;
           this.dom.btnDuplicateSelectedMeasure.style.display = 'inline-flex';
@@ -1867,6 +1983,14 @@ class SergioApp {
         }
         if (this.dom.btnConfigureSelectedMeasure) this.dom.btnConfigureSelectedMeasure.style.display = 'inline-flex';
         if (this.dom.btnGroupSelectedMeasures) this.dom.btnGroupSelectedMeasures.style.display = 'none';
+        if (this.dom.btnCopySelectedMeasure) {
+          this.dom.btnCopySelectedMeasure.textContent = '📋 Copiar';
+          this.dom.btnCopySelectedMeasure.style.display = 'inline-flex';
+        }
+        if (this.dom.btnCutSelectedMeasure) {
+          this.dom.btnCutSelectedMeasure.textContent = '✂ Recortar';
+          this.dom.btnCutSelectedMeasure.style.display = 'inline-flex';
+        }
         if (this.dom.btnToolbarSaveAsBossa) {
           this.dom.btnToolbarSaveAsBossa.textContent = '💾 Salvar Bossa';
           this.dom.btnToolbarSaveAsBossa.style.display = 'inline-flex';
@@ -1938,6 +2062,176 @@ class SergioApp {
     }
   }
 
+  getSelectedMeasureIndicesList() {
+    if (this.selectedMeasureIndices && this.selectedMeasureIndices.size > 0) {
+      return Array.from(this.selectedMeasureIndices)
+        .filter(idx => typeof idx === 'number' && idx >= 0 && idx < state.measures.length)
+        .sort((a, b) => a - b);
+    }
+    if (this.renderer?.selectedMeasureIndex !== null && this.renderer?.selectedMeasureIndex !== undefined) {
+      const idx = this.renderer.selectedMeasureIndex;
+      if (idx >= 0 && idx < state.measures.length) {
+        return [idx];
+      }
+    }
+    if (this._contextMeasureIdx !== null && this._contextMeasureIdx !== undefined) {
+      const idx = this._contextMeasureIdx;
+      if (idx >= 0 && idx < state.measures.length) {
+        return [idx];
+      }
+    }
+    return [];
+  }
+
+  copySelectedMeasures() {
+    const indices = this.getSelectedMeasureIndicesList();
+    if (indices.length === 0) {
+      this.showToast('Selecione ao menos um compasso para copiar', 'ℹ️');
+      return;
+    }
+
+    const measuresToCopy = indices.map(idx => {
+      const m = state.measures[idx];
+      return {
+        nickname: m.nickname || "",
+        beats: m.beats,
+        beatUnit: m.beatUnit,
+        tempoMode: m.tempoMode,
+        ratioNum: m.ratioNum,
+        ratioDen: m.ratioDen,
+        customBpm: m.customBpm,
+        color: m.color,
+        repeat: m.repeat || 1
+      };
+    });
+
+    this.clipboardMeasures = measuresToCopy;
+    try {
+      localStorage.setItem('sergio_clipboard_measures', JSON.stringify(measuresToCopy));
+    } catch (_) {}
+
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(JSON.stringify({
+          type: 'sergio-simulator-measures',
+          version: 1,
+          measures: measuresToCopy
+        })).catch(() => {});
+      }
+    } catch (_) {}
+
+    const count = measuresToCopy.length;
+    this.syncSelectionUI();
+    this.showToast(`${count} compasso${count > 1 ? 's' : ''} copiado${count > 1 ? 's' : ''}! (Ctrl+V para colar)`, '📋');
+  }
+
+  cutSelectedMeasures() {
+    const indices = this.getSelectedMeasureIndicesList();
+    if (indices.length === 0) {
+      this.showToast('Selecione ao menos um compasso para recortar', 'ℹ️');
+      return;
+    }
+
+    const measuresToCopy = indices.map(idx => {
+      const m = state.measures[idx];
+      return {
+        nickname: m.nickname || "",
+        beats: m.beats,
+        beatUnit: m.beatUnit,
+        tempoMode: m.tempoMode,
+        ratioNum: m.ratioNum,
+        ratioDen: m.ratioDen,
+        customBpm: m.customBpm,
+        color: m.color,
+        repeat: m.repeat || 1
+      };
+    });
+
+    this.clipboardMeasures = measuresToCopy;
+    try {
+      localStorage.setItem('sergio_clipboard_measures', JSON.stringify(measuresToCopy));
+    } catch (_) {}
+
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(JSON.stringify({
+          type: 'sergio-simulator-measures',
+          version: 1,
+          measures: measuresToCopy
+        })).catch(() => {});
+      }
+    } catch (_) {}
+
+    const count = indices.length;
+    const firstDeletedIdx = indices[0];
+    state.removeMeasures(indices);
+
+    if (state.measures.length > 0) {
+      const nextIdx = Math.min(firstDeletedIdx, state.measures.length - 1);
+      this.selectedMeasureIndices.clear();
+      this.selectedMeasureIndices.add(nextIdx);
+      this.lastSelectedMeasureIdx = nextIdx;
+      this.syncSelectionUI();
+      const t = state.getFirstTimingForMeasure(nextIdx);
+      if (t) this.seekTo(t.startTime);
+    } else {
+      this.closeMeasureToolbar();
+    }
+
+    this.showToast(`${count} compasso${count > 1 ? 's' : ''} recortado${count > 1 ? 's' : ''}!`, '✂️');
+  }
+
+  pasteMeasures(explicitTargetIndex = null) {
+    let list = this.clipboardMeasures;
+    if (!list || list.length === 0) {
+      try {
+        const raw = localStorage.getItem('sergio_clipboard_measures');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            list = parsed;
+            this.clipboardMeasures = parsed;
+          }
+        }
+      } catch (_) {}
+    }
+
+    if (!list || list.length === 0) {
+      this.showToast('Área de transferência vazia. Copie compassos com Ctrl+C primeiro.', 'ℹ️');
+      return;
+    }
+
+    let targetIndex = explicitTargetIndex;
+    if (targetIndex === null || targetIndex === undefined) {
+      if (this.selectedMeasureIndices && this.selectedMeasureIndices.size > 0) {
+        const maxIdx = Math.max(...this.selectedMeasureIndices);
+        targetIndex = maxIdx + 1;
+      } else if (this.renderer?.selectedMeasureIndex !== null && this.renderer?.selectedMeasureIndex !== undefined) {
+        targetIndex = this.renderer.selectedMeasureIndex + 1;
+      } else if (this._contextMeasureIdx !== null && this._contextMeasureIdx !== undefined) {
+        targetIndex = this._contextMeasureIdx + 1;
+      } else {
+        targetIndex = state.measures.length;
+      }
+    }
+
+    const res = state.insertMeasures(targetIndex, list);
+    if (res) {
+      this.selectedMeasureIndices.clear();
+      for (let i = res.start; i <= res.end; i++) {
+        this.selectedMeasureIndices.add(i);
+      }
+      this.lastSelectedMeasureIdx = res.end;
+      this.syncSelectionUI();
+
+      const t = state.getFirstTimingForMeasure(res.start);
+      if (t) this.seekTo(t.startTime);
+
+      const count = list.length;
+      this.showToast(`${count} compasso${count > 1 ? 's' : ''} colado${count > 1 ? 's' : ''}!`, '📋');
+    }
+  }
+
   openGroupModalWithRange(start, end) {
     const modal = this.dom.modalGroupManage;
     if (!modal) return;
@@ -1976,12 +2270,24 @@ class SergioApp {
     const title = m?.nickname ? `c. ${idx + 1} (${m.nickname})` : `Compasso ${idx + 1}`;
     this.dom.ctxMenuHeader.textContent = title;
 
-    this.dom.ctxMoveLeft.disabled = (idx === 0);
-    this.dom.ctxMoveRight.disabled = (idx === state.measures.length - 1);
+    if (this.dom.ctxMoveLeft) this.dom.ctxMoveLeft.disabled = (idx === 0);
+    if (this.dom.ctxMoveRight) this.dom.ctxMoveRight.disabled = (idx === state.measures.length - 1);
+
+    const hasClipboard = (this.clipboardMeasures && this.clipboardMeasures.length > 0) ||
+      (() => {
+        try {
+          const raw = localStorage.getItem('sergio_clipboard_measures');
+          return raw && JSON.parse(raw).length > 0;
+        } catch (_) { return false; }
+      })();
+
+    if (this.dom.ctxPaste) {
+      this.dom.ctxPaste.disabled = !hasClipboard;
+    }
 
     menu.style.display = 'flex';
-    menu.style.left = `${Math.min(window.innerWidth - 200, clientX)}px`;
-    menu.style.top = `${Math.min(window.innerHeight - 200, clientY)}px`;
+    menu.style.left = `${Math.min(window.innerWidth - 220, clientX)}px`;
+    menu.style.top = `${Math.min(window.innerHeight - 320, clientY)}px`;
   }
 
   closeContextMenu() {
@@ -2439,6 +2745,13 @@ class SergioApp {
           return;
         }
         this.openMeasureModal(idx);
+      });
+
+      // Menu de contexto com clique com o botão direito no cartão
+      card.addEventListener('contextmenu', (e) => {
+        if (e.target.closest('input, textarea, select')) return;
+        e.preventDefault();
+        this.openContextMenu(idx, e.clientX, e.clientY);
       });
 
       // Arrastar e soltar cartões para reordenar

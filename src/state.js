@@ -449,6 +449,45 @@ class PieceState {
     return { start: insertIndex, end: insertIndex + count - 1 };
   }
 
+  // Inserir múltiplos compassos (ex: colar da área de transferência com Ctrl+V)
+  insertMeasures(targetIndex, measuresList) {
+    if (!measuresList || measuresList.length === 0) return null;
+
+    let insertIdx = (targetIndex === -1 || targetIndex === undefined || targetIndex === null || targetIndex > this.measures.length)
+      ? this.measures.length
+      : Math.max(0, targetIndex);
+
+    const copies = measuresList.map((target, i) => ({
+      id: `m-${Date.now()}-${i}-${Math.random().toString(36).substr(2, 5)}`,
+      nickname: target.nickname ? target.nickname.trim() : "",
+      beats: parseInt(target.beats, 10) || 4,
+      beatUnit: parseInt(target.beatUnit, 10) || 4,
+      tempoMode: target.tempoMode || "ratio",
+      ratioNum: parseInt(target.ratioNum, 10) || 1,
+      ratioDen: parseInt(target.ratioDen, 10) || 1,
+      customBpm: target.customBpm ? parseFloat(target.customBpm) : this.baseBpm,
+      color: target.color || "#ff334b",
+      repeat: Math.max(1, Math.min(999, parseInt(target.repeat, 10) || 1))
+    }));
+
+    this.measures.splice(insertIdx, 0, ...copies);
+
+    // Ajusta grupos após inserção em bloco
+    const count = copies.length;
+    this.groups.forEach(g => {
+      if (g.startMeasure >= insertIdx) {
+        g.startMeasure += count;
+        g.endMeasure += count;
+      } else if (g.endMeasure >= insertIdx) {
+        g.endMeasure += count;
+      }
+    });
+
+    this.recalculateTimings();
+    this.notify(`Colou ${copies.length} compasso${copies.length > 1 ? 's' : ''}`);
+    return { start: insertIdx, end: insertIdx + count - 1 };
+  }
+
   // Esvazia todos os compassos da peça
   clearAllMeasures() {
     this.measures = [];
