@@ -536,28 +536,29 @@ class CollabService {
     if (!db || !uid) return [];
     try {
       const allPieces = await this.getUserCloudPieces(uid);
-      return allPieces.filter(p => Boolean(p.isBossa || p.id?.startsWith('piece-bossa-') || p.id?.startsWith('bossa-')));
+      return allPieces.filter(p => p.isBossa !== undefined ? Boolean(p.isBossa) : Boolean(p.id?.startsWith('piece-bossa-') || p.id?.startsWith('bossa-')));
     } catch (err) {
       console.warn("Erro ao buscar bossas da nuvem:", err);
       return [];
     }
   }
 
-  // Salva ou atualiza uma Bossa na nuvem (Firestore) vinculada à conta do usuário
+  // Salva ou atualiza uma Peça ou Bossa na nuvem (Firestore) vinculada à conta do usuário
   async saveBossaToCloud(bossaData) {
     const currentUid = authService.getUid();
     if (!db || !currentUid || !bossaData) return false;
     try {
+      const isBossaVal = bossaData.isBossa !== undefined ? Boolean(bossaData.isBossa) : Boolean(bossaData.id?.startsWith('piece-bossa-') || bossaData.id?.startsWith('bossa-'));
       const bossaRef = doc(db, 'pieces', bossaData.id);
       const payload = {
         id: bossaData.id,
-        name: (bossaData.name || 'Nova Bossa').trim(),
+        name: (bossaData.name || (isBossaVal ? 'Nova Bossa' : 'Nova Peça')).trim(),
         description: bossaData.description || '',
         baseBpm: bossaData.baseBpm || 120,
         presentationBpm: bossaData.presentationBpm || bossaData.baseBpm || 120,
         measures: Array.isArray(bossaData.measures) ? bossaData.measures : [],
         groups: Array.isArray(bossaData.groups) ? bossaData.groups : [],
-        isBossa: true,
+        isBossa: isBossaVal,
         ownerId: currentUid,
         ownerName: authService.getDisplayName() || 'Músico',
         access: bossaData.access || 'private',
@@ -570,6 +571,11 @@ class CollabService {
       console.error("Erro ao salvar bossa na nuvem:", err);
       return false;
     }
+  }
+
+  // Salva ou atualiza uma Peça na nuvem
+  async savePieceToCloud(pieceData) {
+    return this.saveBossaToCloud(pieceData);
   }
 
   // Exclui uma Bossa da nuvem
@@ -591,7 +597,7 @@ class CollabService {
     return this.deleteBossaFromCloud(pieceId);
   }
 
-  // Atualiza campos de uma Bossa na nuvem (ex: renomear)
+  // Atualiza campos de uma Bossa na nuvem (ex: renomear ou trocar tipo)
   async updateBossaInCloud(bossaId, updates = {}) {
     const currentUid = authService.getUid();
     if (!db || !currentUid || !bossaId) return false;
@@ -606,6 +612,11 @@ class CollabService {
       console.error("Erro ao atualizar bossa na nuvem:", err);
       return false;
     }
+  }
+
+  // Atualiza campos de uma Peça na nuvem (alias)
+  async updatePieceInCloud(pieceId, updates = {}) {
+    return this.updateBossaInCloud(pieceId, updates);
   }
 
   // Sincroniza bidirecionalmente a biblioteca local com a nuvem
@@ -631,7 +642,7 @@ class CollabService {
       // 3. Sincroniza peças e bossas criadas localmente (ex: celular) que ainda não foram enviadas à nuvem
       for (const item of localLibrary) {
         if (!item || !item.id) continue;
-        const isBossa = Boolean(item.isBossa || item.id.startsWith('piece-bossa-') || item.id.startsWith('bossa-'));
+        const isBossa = item.isBossa !== undefined ? Boolean(item.isBossa) : Boolean(item.id.startsWith('piece-bossa-') || item.id.startsWith('bossa-'));
 
         // Se for peça/bossa do usuário ou item local sem dono explícito
         if (!item.ownerId || item.ownerId === uid) {

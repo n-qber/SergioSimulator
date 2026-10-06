@@ -185,6 +185,7 @@ class SergioApp {
       btnExport: document.getElementById('btnExport'),
       fileImport: document.getElementById('fileImport') || document.getElementById('inputImport'),
       btnNewPiece: document.getElementById('btnNewPiece'),
+      btnSavePieceToLibrary: document.getElementById('btnSavePieceToLibrary'),
       btnUndo: document.getElementById('btnUndo'),
       btnRedo: document.getElementById('btnRedo'),
       btnThemeToggle: document.getElementById('btnThemeToggle'),
@@ -362,6 +363,7 @@ class SergioApp {
       btnConfirmNewClose: document.getElementById('btnConfirmNewClose'),
       btnCancelNewPiece: document.getElementById('btnCancelNewPiece'),
       btnExecuteNewPiece: document.getElementById('btnExecuteNewPiece'),
+      inputNewPieceName: document.getElementById('inputNewPieceName'),
 
       // Redimensionamento e Barra de Ferramentas da Visão Corrida
       runnerViewport: document.getElementById('runnerViewport'),
@@ -433,6 +435,11 @@ class SergioApp {
       btnConfirmSaveAsBossa: document.getElementById('btnConfirmSaveAsBossa'),
       saveAsBossaCount: document.getElementById('saveAsBossaCount'),
       inputBossaName: document.getElementById('inputBossaName'),
+      radioSaveTypeBossa: document.getElementById('radioSaveTypeBossa'),
+      radioSaveTypePiece: document.getElementById('radioSaveTypePiece'),
+      labelSaveItemName: document.getElementById('labelSaveItemName'),
+      modalSaveAsBossaHeading: document.getElementById('modalSaveAsBossaHeading'),
+      btnConfirmSaveAsBossaText: document.getElementById('btnConfirmSaveAsBossaText'),
       // Página Dedicada do Gerenciador de Bossas (SPA)
       viewSimulator: document.getElementById('viewSimulator'),
       viewBossaManager: document.getElementById('viewBossaManager'),
@@ -452,6 +459,8 @@ class SergioApp {
       btnSyncBossasNow: document.getElementById('btnSyncBossasNow'),
       bossaSyncDot: document.getElementById('bossaSyncDot'),
       bossaMgrSyncText: document.getElementById('bossaMgrSyncText'),
+      btnMgrCreateNewBlankPiece: document.getElementById('btnMgrCreateNewBlankPiece'),
+      btnMgrSaveCurrentPiece: document.getElementById('btnMgrSaveCurrentPiece'),
       btnMgrNewBossaFromCurrent: document.getElementById('btnMgrNewBossaFromCurrent'),
       fileImportBossa: document.getElementById('fileImportBossa'),
       inputSearchBossas: document.getElementById('inputSearchBossas'),
@@ -1249,6 +1258,17 @@ class SergioApp {
       this.openConfirmNewModal();
     });
 
+    // Botão Salvar Peça no Repertório (Menu Peça)
+    this.dom.btnSavePieceToLibrary?.addEventListener('click', () => {
+      if (this.dom.appMenuDropdown) this.dom.appMenuDropdown.style.display = 'none';
+      this.handleExplicitSaveCurrentPiece();
+    });
+
+    // Clique no Pill de Salvamento no topo central
+    this.dom.syncStatusPill?.addEventListener('click', () => {
+      this.handleExplicitSaveCurrentPiece();
+    });
+
     // Botão de Apagar Peça Aberta (Menu Peça)
     this.dom.btnDeleteCurrentPiece?.addEventListener('click', () => {
       if (this.dom.appMenuDropdown) this.dom.appMenuDropdown.style.display = 'none';
@@ -1276,6 +1296,13 @@ class SergioApp {
 
     this.dom.btnExecuteNewPiece?.addEventListener('click', () => {
       this.executeCreateNewPiece();
+    });
+
+    this.dom.inputNewPieceName?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        this.executeCreateNewPiece();
+      }
     });
 
     this.dom.modalConfirmNewPiece?.addEventListener('click', (e) => {
@@ -2215,8 +2242,14 @@ class SergioApp {
 
   openConfirmNewModal() {
     if (this.dom.modalConfirmNewPiece) {
+      if (this.dom.inputNewPieceName) {
+        this.dom.inputNewPieceName.value = 'Nova Peça';
+      }
       this.dom.modalConfirmNewPiece.style.display = 'flex';
-      this.dom.btnExecuteNewPiece?.focus();
+      setTimeout(() => {
+        this.dom.inputNewPieceName?.focus();
+        this.dom.inputNewPieceName?.select();
+      }, 50);
     }
   }
 
@@ -2240,7 +2273,8 @@ class SergioApp {
       }
     }
 
-    state.createNewPiece("Nova Peça", 120);
+    const pieceName = (this.dom.inputNewPieceName?.value || '').trim() || 'Nova Peça';
+    state.createNewPiece(pieceName, 120);
 
     // Reconecta à nova peça no Firebase Collab com seu ID exclusivo
     collab.connectToPiece(state.id, state);
@@ -2249,7 +2283,10 @@ class SergioApp {
     if (this.dom.inputBaseBpm) this.dom.inputBaseBpm.value = state.baseBpm;
     this.initPresetsDropdown();
     this.closeConfirmNewModal();
-    this.showToast("Nova peça criada! A peça anterior foi salva em 'Minhas Peças'.", "✨");
+    this.seekTo(0);
+    this.renderMeasuresList();
+    this.updateHUD();
+    this.showToast(`Nova peça '${pieceName}' criada! A peça anterior foi salva no repertório.`, "✨");
   }
 
   // =========================================================================
@@ -2594,14 +2631,16 @@ class SergioApp {
     const libraryPieces = state.getLibraryPieces ? state.getLibraryPieces() : [];
     if (libraryPieces.length > 0) {
       const libraryGroup = document.createElement('optgroup');
-      libraryGroup.label = '📁 Minhas Peças Salvas';
+      libraryGroup.label = '📁 Minhas Peças & Bossas (Local)';
 
       libraryPieces.forEach(p => {
         const opt = document.createElement('option');
         opt.value = `lib_${p.id}`;
         const isCurrent = p.id === state.id;
         const count = p.measures?.length || 0;
-        opt.textContent = `${isCurrent ? '▶ ' : ''}${p.name || 'Sem Nome'} (${count} comp.)`;
+        const isBossa = p.isBossa !== undefined ? Boolean(p.isBossa) : Boolean(p.id?.startsWith('piece-bossa-') || p.id?.startsWith('bossa-'));
+        const typeIcon = isBossa ? '🥁 ' : '📜 ';
+        opt.textContent = `${isCurrent ? '▶ ' : ''}${typeIcon}${p.name || (isBossa ? 'Bossa Sem Nome' : 'Peça Sem Nome')} (${count} comp.)`;
         if (isCurrent) opt.selected = true;
         libraryGroup.appendChild(opt);
       });
@@ -2617,7 +2656,7 @@ class SergioApp {
         let cloudGroup = select.querySelector('optgroup[data-type="cloud"]');
         if (!cloudGroup) {
           cloudGroup = document.createElement('optgroup');
-          cloudGroup.label = '☁️ Minhas Peças na Nuvem';
+          cloudGroup.label = '☁️ Minhas Peças & Bossas na Nuvem';
           cloudGroup.dataset.type = 'cloud';
           select.insertBefore(cloudGroup, presetsGroup);
         } else {
@@ -2629,8 +2668,10 @@ class SergioApp {
           opt.value = `cloud_${p.id}`;
           const isCurrent = p.id === state.id;
           const count = p.measures?.length || 0;
+          const isBossa = p.isBossa !== undefined ? Boolean(p.isBossa) : Boolean(p.id?.startsWith('piece-bossa-') || p.id?.startsWith('bossa-'));
+          const typeIcon = isBossa ? '🥁 ' : '📜 ';
           const lockIcon = p.access === 'private' ? '🔒 ' : (p.access === 'view_link' ? '🎧 ' : '✏️ ');
-          opt.textContent = `${isCurrent ? '▶ ' : ''}${lockIcon}${p.name || 'Sem Nome'} (${count} comp.)`;
+          opt.textContent = `${isCurrent ? '▶ ' : ''}${typeIcon}${lockIcon}${p.name || (isBossa ? 'Bossa Sem Nome' : 'Peça Sem Nome')} (${count} comp.)`;
           if (isCurrent) opt.selected = true;
           cloudGroup.appendChild(opt);
         });
@@ -3786,6 +3827,15 @@ class SergioApp {
     });
 
     // Ações Rápidas do Gerenciador
+    this.dom.btnMgrCreateNewBlankPiece?.addEventListener('click', () => {
+      this.closeBossaManager(true);
+      this.openConfirmNewModal();
+    });
+
+    this.dom.btnMgrSaveCurrentPiece?.addEventListener('click', () => {
+      this.handleExplicitSaveCurrentPiece();
+    });
+
     this.dom.btnMgrNewBossaFromCurrent?.addEventListener('click', () => {
       this.handleCreateBossaFromCurrent();
     });
@@ -3873,6 +3923,14 @@ class SergioApp {
 
     this.dom.btnConfirmSaveAsBossa?.addEventListener('click', () => {
       this.handleConfirmSaveAsBossa();
+    });
+
+    this.dom.radioSaveTypeBossa?.addEventListener('change', () => {
+      this.updateSaveAsItemModalUI();
+    });
+
+    this.dom.radioSaveTypePiece?.addEventListener('change', () => {
+      this.updateSaveAsItemModalUI();
     });
 
     this.dom.inputBossaName?.addEventListener('keydown', (e) => {
@@ -4041,14 +4099,14 @@ class SergioApp {
     }
   }
 
-  openSaveAsBossaModal(indices = []) {
+  openSaveAsBossaModal(indices = [], defaultType = 'bossa') {
     if (!this.dom.modalSaveAsBossa) return;
 
     if (!indices || indices.length === 0) {
       if (this.renderer?.selectedMeasureIndex !== null && this.renderer?.selectedMeasureIndex !== undefined) {
         indices = [this.renderer.selectedMeasureIndex];
       } else {
-        this.showToast('Selecione ao menos um compasso na partitura para salvar como Bossa.', '⚠️');
+        this.showToast('Selecione ao menos um compasso na partitura para salvar.', '⚠️');
         return;
       }
     }
@@ -4060,18 +4118,40 @@ class SergioApp {
       this.dom.saveAsBossaCount.textContent = `${count} ${count === 1 ? 'compasso selecionado' : 'compassos selecionados'}`;
     }
 
+    const isBossa = defaultType === 'bossa';
+    if (this.dom.radioSaveTypeBossa) this.dom.radioSaveTypeBossa.checked = isBossa;
+    if (this.dom.radioSaveTypePiece) this.dom.radioSaveTypePiece.checked = !isBossa;
+
+    const minNum = this._saveBossaIndices[0] + 1;
+    const maxNum = this._saveBossaIndices[count - 1] + 1;
+    const rangeStr = count === 1 ? `c. ${minNum}` : `c. ${minNum}-${maxNum}`;
+
     if (this.dom.inputBossaName) {
-      const minNum = this._saveBossaIndices[0] + 1;
-      const maxNum = this._saveBossaIndices[count - 1] + 1;
-      const rangeStr = count === 1 ? `c. ${minNum}` : `c. ${minNum}-${maxNum}`;
-      this.dom.inputBossaName.value = `Bossa - ${state.name} (${rangeStr})`;
+      this.dom.inputBossaName.value = isBossa
+        ? `Bossa - ${state.name} (${rangeStr})`
+        : `${state.name} (Trecho ${rangeStr})`;
     }
+
+    this.updateSaveAsItemModalUI();
 
     this.dom.modalSaveAsBossa.style.display = 'flex';
     setTimeout(() => {
       this.dom.inputBossaName?.focus();
       this.dom.inputBossaName?.select();
     }, 50);
+  }
+
+  updateSaveAsItemModalUI() {
+    const isPiece = this.dom.radioSaveTypePiece?.checked;
+    if (this.dom.modalSaveAsBossaHeading) {
+      this.dom.modalSaveAsBossaHeading.textContent = isPiece ? 'Salvar como Peça Completa' : 'Salvar como Bossa / Paradinha';
+    }
+    if (this.dom.labelSaveItemName) {
+      this.dom.labelSaveItemName.textContent = isPiece ? 'Nome da Peça:' : 'Nome da Bossa:';
+    }
+    if (this.dom.btnConfirmSaveAsBossaText) {
+      this.dom.btnConfirmSaveAsBossaText.textContent = isPiece ? 'Salvar Peça no Repertório' : 'Salvar Bossa na Biblioteca';
+    }
   }
 
   closeSaveAsBossaModal() {
@@ -4083,21 +4163,25 @@ class SergioApp {
   handleConfirmSaveAsBossa() {
     if (!this._saveBossaIndices || this._saveBossaIndices.length === 0) return;
 
-    const name = (this.dom.inputBossaName?.value || '').trim() || 'Nova Bossa';
-    const newBossa = state.saveMeasuresAsBossa(this._saveBossaIndices, name);
+    const isBossa = !this.dom.radioSaveTypePiece?.checked;
+    const typeLabel = isBossa ? 'Bossa' : 'Peça';
+    const defaultName = isBossa ? 'Nova Bossa' : 'Nova Peça';
+    const name = (this.dom.inputBossaName?.value || '').trim() || defaultName;
+
+    const newItem = state.saveMeasuresAsItem(this._saveBossaIndices, name, isBossa);
 
     this.closeSaveAsBossaModal();
 
-    if (newBossa) {
+    if (newItem) {
       if (this.authService && this.authService.isLoggedIn()) {
-        collab.saveBossaToCloud(newBossa).then(() => {
-          this.showToast(`Bossa '${name}' salva e sincronizada na nuvem! ☁️`, '💾');
+        collab.saveBossaToCloud(newItem).then(() => {
+          this.showToast(`${typeLabel} '${name}' salva e sincronizada na nuvem! ☁️`, '💾');
         }).catch(err => {
-          console.warn("Erro ao salvar bossa na nuvem:", err);
-          this.showToast(`Bossa '${name}' salva na sua biblioteca local!`, '💾');
+          console.warn(`Erro ao salvar ${typeLabel} na nuvem:`, err);
+          this.showToast(`${typeLabel} '${name}' salva na sua biblioteca local!`, '💾');
         });
       } else {
-        this.showToast(`Bossa '${name}' salva localmente! Conecte-se para sincronizar.`, '💾');
+        this.showToast(`${typeLabel} '${name}' salva localmente! Conecte-se para sincronizar.`, '💾');
       }
       this.initPresetsDropdown();
       if (this.currentView === 'bossas' || (this.dom.viewBossaManager && this.dom.viewBossaManager.style.display === 'flex')) {
@@ -4248,9 +4332,11 @@ class SergioApp {
     const container = this.dom.bossaMgrCardsContainer;
     if (!container) return;
 
+    const isItemBossa = (p) => p.isBossa !== undefined ? Boolean(p.isBossa) : Boolean(p.id?.startsWith('piece-bossa-') || p.id?.startsWith('bossa-'));
+
     const localLibrary = state.getLibraryPieces ? state.getLibraryPieces() : [];
-    const myPieces = localLibrary.filter(p => !p.isBossa && !p.id?.startsWith('piece-bossa-') && !p.id?.startsWith('bossa-'));
-    const myBossas = localLibrary.filter(p => Boolean(p.isBossa || p.id?.startsWith('piece-bossa-') || p.id?.startsWith('bossa-')));
+    const myPieces = localLibrary.filter(p => !isItemBossa(p));
+    const myBossas = localLibrary.filter(p => isItemBossa(p));
     const allUserItems = [...localLibrary];
     const cloudItems = allUserItems.filter(p => Boolean(p.ownerId));
     const presetItems = PRESETS;
@@ -4310,7 +4396,7 @@ class SergioApp {
         <div class="bossa-empty-state">
           <span class="bossa-empty-icon">🗂️</span>
           <h4>Nenhum item encontrado</h4>
-          <p>Você pode criar novas peças ou bossas usando o botão "+ Salvar da Peça" ou importar um arquivo .json.</p>
+          <p>Você pode criar novas peças ou bossas usando o botão "+ Nova Peça em Branco" ou importar um arquivo .json.</p>
         </div>
       `;
       return;
@@ -4319,7 +4405,7 @@ class SergioApp {
     items.forEach(item => {
       const isPreset = PRESETS.some(p => p.id === item.id);
       const isCloud = Boolean(item.ownerId);
-      const isBossa = Boolean(item.isBossa || item.id?.startsWith('piece-bossa-') || item.id?.startsWith('bossa-'));
+      const isBossa = isItemBossa(item);
       const isPlaying = this.activePreviewBossaId === item.id;
       const isCurrentOpen = state.id === item.id;
       const measures = Array.isArray(item.measures) ? item.measures : [];
@@ -4391,12 +4477,15 @@ class SergioApp {
             <button type="button" class="btn-card-action insert" data-action="insert" data-id="${item.id}" title="Inserir estes compassos na peça atual">
               <span class="btn-icon">🔗</span> Inserir na Peça
             </button>
-            <button type="button" class="btn-card-action open" data-action="open" data-id="${item.id}" title="Abrir esta peça no simulador">
-              <span class="btn-icon">📂</span> Abrir Peça
+            <button type="button" class="btn-card-action open" data-action="open" data-id="${item.id}" title="Abrir no simulador para tocar ou editar">
+              <span class="btn-icon">📂</span> Abrir ${isBossa ? 'Bossa' : 'Peça'}
             </button>
           </div>
           <div class="bossa-actions-right">
             ${!isPreset ? `
+              <button type="button" class="btn-card-action toggle-type" data-action="toggle-type" data-id="${item.id}" title="${isBossa ? 'Transformar em Peça Completa (mover para Minhas Peças)' : 'Transformar em Bossa / Paradinha (mover para Minhas Bossas)'}">
+                <span class="btn-icon">🔄</span> ${isBossa ? 'Virar Peça' : 'Virar Bossa'}
+              </button>
               <button type="button" class="btn-card-action icon-only" data-action="rename" data-id="${item.id}" title="Renomear">
                 ✏️
               </button>
@@ -4420,6 +4509,7 @@ class SergioApp {
           if (action === 'preview') this.playBossaPreview(item);
           else if (action === 'insert') this.handleInsertBossaFromManager(item);
           else if (action === 'open') this.handleOpenBossaAsPiece(item);
+          else if (action === 'toggle-type') this.handleToggleItemType(item);
           else if (action === 'rename') this.handleOpenRenameBossaModal(item);
           else if (action === 'export') this.handleExportBossa(item);
           else if (action === 'delete') this.handleDeletePieceOrBossa(item);
@@ -4504,7 +4594,7 @@ class SergioApp {
 
   handleOpenBossaAsPiece(bossa) {
     if (!bossa || !bossa.measures) return;
-    this.closeBossaManager();
+    this.closeBossaManager(true);
     this.pausePlayback();
 
     // Salva a peça atual na biblioteca antes de alternar
@@ -4517,7 +4607,8 @@ class SergioApp {
     this.seekTo(0);
     this.closeMeasureToolbar();
     this.initPresetsDropdown();
-    this.showToast(`Bossa '${bossa.name}' aberta para edição!`, '📂');
+    const isBossa = bossa.isBossa !== undefined ? Boolean(bossa.isBossa) : Boolean(bossa.id?.startsWith('piece-bossa-') || bossa.id?.startsWith('bossa-'));
+    this.showToast(`${isBossa ? 'Bossa' : 'Peça'} '${bossa.name}' aberta para edição!`, '📂');
   }
 
   handleOpenRenameBossaModal(bossa) {
@@ -4616,22 +4707,95 @@ class SergioApp {
     return this.handleDeletePieceOrBossa(bossa);
   }
 
+  // Alterna o tipo do item entre Bossa / Paradinha e Peça Completa
+  async handleToggleItemType(item) {
+    if (!item || !item.id) return;
+
+    const isBossa = item.isBossa !== undefined ? Boolean(item.isBossa) : Boolean(item.id.startsWith('piece-bossa-') || item.id.startsWith('bossa-'));
+    const newIsBossa = !isBossa;
+    const targetTypeLabel = newIsBossa ? 'Bossa / Paradinha' : 'Peça Completa';
+
+    // 1. Atualiza na biblioteca local
+    const localLibrary = state.getLibraryPieces ? state.getLibraryPieces() : [];
+    const found = localLibrary.find(p => p.id === item.id);
+    if (found) {
+      found.isBossa = newIsBossa;
+      found.updatedAt = Date.now();
+      state.setLibraryPieces(localLibrary);
+    }
+
+    // 2. Se for a peça aberta atualmente no simulador, sincroniza state
+    if (state.id === item.id) {
+      state.isBossa = newIsBossa;
+    }
+
+    // 3. Se estiver na nuvem ou logado, atualiza no Firestore
+    if (item.ownerId || (this.authService && this.authService.isLoggedIn())) {
+      try {
+        await collab.updateBossaInCloud(item.id, { isBossa: newIsBossa });
+      } catch (err) {
+        console.warn("Aviso ao atualizar tipo de item na nuvem:", err);
+      }
+    }
+
+    // 4. Re-renderiza cartões e atualiza dropdowns
+    this.renderBossaManagerCards();
+    this.initPresetsDropdown();
+
+    const toastEmoji = newIsBossa ? '🥁' : '📜';
+    this.showToast(`"${item.name || 'Item'}" agora é uma ${targetTypeLabel}!`, toastEmoji);
+  }
+
+  // Salva explicitamente a peça atualmente aberta no repertório (local & nuvem)
+  async handleExplicitSaveCurrentPiece() {
+    if (!state.measures || state.measures.length === 0) {
+      this.showToast('A peça está vazia. Adicione ao menos um compasso.', '⚠️');
+      return;
+    }
+
+    // Atualiza nome da peça se editado no input
+    if (this.dom.inputPieceName) {
+      const cleanName = this.dom.inputPieceName.value.trim();
+      if (cleanName) state.name = cleanName;
+    }
+
+    const saved = state.saveCurrentPieceToLibrary();
+
+    if (saved && this.authService && this.authService.isLoggedIn()) {
+      try {
+        await collab.savePieceToCloud(saved);
+        this.updateSyncStatus('synced', 'Salvo na Nuvem');
+        this.showToast(`Peça '${state.name}' salva e sincronizada na nuvem! ☁️`, '💾');
+      } catch (err) {
+        console.warn("Aviso ao salvar peça na nuvem:", err);
+        this.showToast(`Peça '${state.name}' salva no repertório local!`, '💾');
+      }
+    } else {
+      this.showToast(`Peça '${state.name}' salva no repertório local!`, '💾');
+    }
+
+    this.initPresetsDropdown();
+    if (this.currentView === 'bossas' || (this.dom.viewBossaManager && this.dom.viewBossaManager.style.display === 'flex')) {
+      this.renderBossaManagerCards();
+    }
+  }
+
   handleCreateBossaFromCurrent() {
     let indices = this.selectedMeasureIndices.size > 0
       ? Array.from(this.selectedMeasureIndices)
-      : (this.renderer?.selectedMeasureIndex !== null ? [this.renderer.selectedMeasureIndex] : []);
+      : (this.renderer?.selectedMeasureIndex !== null && this.renderer?.selectedMeasureIndex !== undefined ? [this.renderer.selectedMeasureIndex] : []);
 
     if (indices.length === 0 && state.measures && state.measures.length > 0) {
       indices = state.measures.map((_, i) => i);
     }
 
     if (indices.length === 0) {
-      this.showToast('Nenhum compasso na peça para criar bossa.', '⚠️');
+      this.showToast('Nenhum compasso na peça para extrair.', '⚠️');
       return;
     }
 
-    this.closeBossaManager();
-    this.openSaveAsBossaModal(indices);
+    this.closeBossaManager(true);
+    this.openSaveAsBossaModal(indices, 'bossa');
   }
 
   handleImportBossaFile(file) {

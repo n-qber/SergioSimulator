@@ -6030,6 +6030,112 @@ kbd {
   border-color: rgba(239, 68, 68, 0.3);
 }
 
+.btn-card-action.toggle-type {
+  background: rgba(245, 158, 11, 0.12);
+  border-color: rgba(245, 158, 11, 0.3);
+  color: #fbbf24;
+}
+
+.btn-card-action.toggle-type:hover {
+  background: rgba(245, 158, 11, 0.25);
+  color: #fef3c7;
+  border-color: rgba(245, 158, 11, 0.5);
+  transform: translateY(-1px);
+}
+
+/* Seletor de Tipo de Item (Peça vs Bossa) nos Modais */
+.save-type-selector {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+@media (max-width: 480px) {
+  .save-type-selector {
+    grid-template-columns: 1fr;
+  }
+}
+
+.save-type-option {
+  position: relative;
+  cursor: pointer;
+  display: block;
+}
+
+.save-type-option input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.save-type-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-medium);
+  transition: all 0.18s ease;
+  user-select: none;
+}
+
+.save-type-card:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--border-light);
+}
+
+.save-type-option input:checked + .save-type-card {
+  background: rgba(16, 185, 129, 0.14);
+  border-color: #10b981;
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.22);
+}
+
+.save-type-icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+
+.save-type-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.save-type-info strong {
+  font-size: 0.84rem;
+  color: var(--white-pure);
+}
+
+.save-type-info small {
+  font-size: 0.72rem;
+  color: var(--white-muted);
+  line-height: 1.25;
+}
+
+[data-theme="light"] .save-type-card {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+[data-theme="light"] .save-type-card:hover {
+  background: #e2e8f0;
+}
+
+[data-theme="light"] .save-type-option input:checked + .save-type-card {
+  background: #ecfdf5;
+  border-color: #10b981;
+}
+
+[data-theme="light"] .save-type-info strong {
+  color: #0f172a;
+}
+
+[data-theme="light"] .save-type-info small {
+  color: #64748b;
+}
+
 /* Rodapé da Página */
 .bossa-page-bottom-info {
   display: flex;

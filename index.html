@@ -133,6 +133,10 @@
               <span class="menu-item-icon">📄</span> Nova Peça
             </button>
 
+            <button type="button" id="btnSavePieceToLibrary" class="app-menu-item" title="Salvar a peça atual no seu Repertório (Local & Nuvem)">
+              <span class="menu-item-icon">💾</span> Salvar Peça no Repertório
+            </button>
+
             <button type="button" id="btnMenuInsertBossa" class="app-menu-item" title="Inserir outra apresentação ou bossa por referência nesta peça">
               <span class="menu-item-icon">🔗</span> Inserir Bossa / Peça Externa
             </button>
@@ -410,8 +414,14 @@
               </p>
             </div>
             <div class="bossa-hero-actions">
-              <button type="button" id="btnMgrNewBossaFromCurrent" class="btn-bossa-hero-primary" title="Salvar compassos da peça aberta como nova bossa/peça">
-                <span class="btn-icon">➕</span> Salvar da Peça
+              <button type="button" id="btnMgrCreateNewBlankPiece" class="btn-bossa-hero-primary" title="Iniciar uma nova peça em branco para compor">
+                <span class="btn-icon">✨</span> Nova Peça em Branco
+              </button>
+              <button type="button" id="btnMgrSaveCurrentPiece" class="btn-bossa-hero-secondary" title="Salvar a peça atualmente aberta no repertório">
+                <span class="btn-icon">💾</span> Salvar Peça Atual
+              </button>
+              <button type="button" id="btnMgrNewBossaFromCurrent" class="btn-bossa-hero-secondary" title="Extrair compassos da peça aberta como nova bossa ou peça">
+                <span class="btn-icon">✂️</span> Extrair Trecho
               </button>
               <label class="btn-bossa-hero-secondary file-btn" title="Importar arquivo JSON de peça ou bossa">
                 <span class="btn-icon">📂</span> Importar JSON
@@ -784,29 +794,56 @@
       </div>
     </div>
 
-    <!-- MODAL DE SALVAR TRECHO COMO NOVA BOSSA -->
+    <!-- MODAL DE SALVAR NO REPERTÓRIO (BOSSA OU PEÇA) -->
     <div id="modalSaveAsBossa" class="modal-overlay" style="display:none">
       <div class="modal-window modal-confirm-window">
         <div class="modal-top">
           <span class="modal-measure-tag" style="background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3);">Exportar Repertório</span>
-          <h3 class="modal-heading">Salvar como Nova Bossa</h3>
+          <h3 class="modal-heading" id="modalSaveAsBossaHeading">Salvar no Repertório</h3>
           <button type="button" class="modal-x" id="btnSaveAsBossaClose">&times;</button>
         </div>
 
         <div class="modal-body-clean confirm-body">
           <p class="confirm-desc">
-            Você está criando uma nova bossa independente a partir dos <strong id="saveAsBossaCount">0</strong> compassos selecionados. Ela ficará salva na sua biblioteca para ser incluída por referência em qualquer apresentação!
+            Você está criando um novo item no seu repertório a partir dos <strong id="saveAsBossaCount">0</strong> compassos selecionados:
           </p>
+
+          <div class="form-group-clean" style="margin-bottom: 14px;">
+            <label class="form-label-clean" style="font-size: 0.8rem; font-weight: 600;">Salvar Como:</label>
+            <div class="save-type-selector">
+              <label class="save-type-option">
+                <input type="radio" name="saveItemType" id="radioSaveTypeBossa" value="bossa" checked>
+                <div class="save-type-card">
+                  <span class="save-type-icon">🥁</span>
+                  <div class="save-type-info">
+                    <strong>Bossa / Paradinha</strong>
+                    <small>Convenção modular para inserir em outras músicas</small>
+                  </div>
+                </div>
+              </label>
+              <label class="save-type-option">
+                <input type="radio" name="saveItemType" id="radioSaveTypePiece" value="piece">
+                <div class="save-type-card">
+                  <span class="save-type-icon">📜</span>
+                  <div class="save-type-info">
+                    <strong>Peça Completa</strong>
+                    <small>Música própria independente na biblioteca</small>
+                  </div>
+                </div>
+              </label>
+            </div>
+          </div>
+
           <div class="form-group-clean">
-            <label for="inputBossaName" class="form-label-clean">Nome da Bossa:</label>
-            <input type="text" id="inputBossaName" class="input-clean" placeholder="Ex: Bossa 1 - Telefone" value="Nova Bossa">
+            <label for="inputBossaName" class="form-label-clean" id="labelSaveItemName">Nome do Item:</label>
+            <input type="text" id="inputBossaName" class="input-clean" placeholder="Ex: Paradinha 1 ou Samba Enredo 2026" value="Nova Bossa">
           </div>
         </div>
 
         <div class="modal-bottom confirm-bottom">
           <button type="button" class="btn-clean-ghost" id="btnCancelSaveAsBossa">Cancelar</button>
           <button type="button" class="btn-clean-primary" id="btnConfirmSaveAsBossa" style="background: #10b981; border-color: #10b981;">
-            <span class="btn-icon">💾</span> Salvar Bossa na Biblioteca
+            <span class="btn-icon">💾</span> <span id="btnConfirmSaveAsBossaText">Salvar no Repertório</span>
           </button>
         </div>
       </div>
@@ -828,11 +865,15 @@
           <div class="confirm-content">
             <h4 class="confirm-title">Iniciar uma nova peça?</h4>
             <p class="confirm-desc">
-              A peça atual será <strong>salva automaticamente</strong> no seu histórico local (<em>📁 Minhas Peças Salvas</em>) para que nada seja perdido.
+              A peça atual será <strong>salva automaticamente</strong> no seu repertório (<em>📁 Minhas Peças Salvas</em>) para que nada seja perdido.
             </p>
+            <div class="form-group-clean" style="margin-top: 12px; margin-bottom: 8px;">
+              <label for="inputNewPieceName" class="form-label-clean" style="font-size: 0.82rem; font-weight: 600;">Título da Nova Peça:</label>
+              <input type="text" id="inputNewPieceName" class="input-clean" placeholder="Ex: Minha Nova Composição" value="Nova Peça">
+            </div>
             <div class="confirm-alert-box" style="background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.22);">
               <span class="confirm-alert-icon">💾</span>
-              <span class="confirm-alert-text" style="color: var(--text-primary, #e2e8f0);">Você poderá alternar e voltar para a peça anterior a qualquer momento pelo menu de seleção.</span>
+              <span class="confirm-alert-text" style="color: var(--text-primary, #e2e8f0);">Você poderá alternar e voltar para a peça anterior a qualquer momento pelo repertório ou seletor.</span>
             </div>
           </div>
         </div>

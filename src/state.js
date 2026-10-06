@@ -55,6 +55,7 @@ class PieceState {
     this.ownerId = data.ownerId || null;
     this.ownerName = data.ownerName || null;
     this.access = data.access || 'edit_link';
+    this.isBossa = data.isBossa !== undefined ? Boolean(data.isBossa) : Boolean(data.id?.startsWith('piece-bossa-') || data.id?.startsWith('bossa-'));
     
     // BPM oficial de apresentação da peça (da partitura/nuvem)
     this.presentationBpm = Math.max(20, Math.min(400, Number(data.presentationBpm || data.baseBpm) || 120));
@@ -389,24 +390,27 @@ class PieceState {
 
   // Salva a peça atual na biblioteca local do usuário (para nunca perder composições anteriores)
   saveCurrentPieceToLibrary() {
-    if (typeof window === 'undefined' || typeof localStorage === 'undefined') return;
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined') return null;
     try {
       const raw = localStorage.getItem(LIBRARY_KEY);
       let library = raw ? JSON.parse(raw) : [];
       if (!Array.isArray(library)) library = [];
 
+      const isBossaVal = this.isBossa !== undefined ? Boolean(this.isBossa) : Boolean(this.id?.startsWith('piece-bossa-') || this.id?.startsWith('bossa-'));
+
       const pieceData = {
         id: this.id,
-        name: this.name || "Peça Sem Nome",
+        name: this.name || (isBossaVal ? "Bossa Sem Nome" : "Peça Sem Nome"),
         description: this.description || "",
         presentationBpm: this.presentationBpm,
         baseBpm: this.baseBpm,
         ownerId: this.ownerId || null,
         ownerName: this.ownerName || null,
         access: this.access || 'edit_link',
+        isBossa: isBossaVal,
         measures: this.measures.map(m => ({ ...m })),
         groups: this.groups.map(g => ({ ...g })),
-        updatedAt: new Date().toISOString()
+        updatedAt: Date.now()
       };
 
       const existingIdx = library.findIndex(p => p.id === this.id);
@@ -416,14 +420,16 @@ class PieceState {
         library.unshift(pieceData);
       }
 
-      // Mantém até 50 peças locais
-      if (library.length > 50) {
-        library = library.slice(0, 50);
+      // Mantém até 100 peças locais
+      if (library.length > 100) {
+        library = library.slice(0, 100);
       }
 
       localStorage.setItem(LIBRARY_KEY, JSON.stringify(library));
+      return pieceData;
     } catch (e) {
       console.warn("Erro ao salvar peça na biblioteca:", e);
+      return null;
     }
   }
 
@@ -470,7 +476,7 @@ class PieceState {
   // Retorna apenas as bossas salvas na biblioteca local
   getBossaPieces() {
     const all = this.getLibraryPieces();
-    return all.filter(p => Boolean(p.isBossa || p.id?.startsWith('piece-bossa-') || p.id?.startsWith('bossa-')));
+    return all.filter(p => p.isBossa !== undefined ? Boolean(p.isBossa) : Boolean(p.id?.startsWith('piece-bossa-') || p.id?.startsWith('bossa-')));
   }
 
   // Renomeia uma bossa na biblioteca local
@@ -516,6 +522,7 @@ class PieceState {
     this.id = `piece-${Date.now()}`;
     this.name = name;
     this.description = "";
+    this.isBossa = false;
     this.presentationBpm = Math.max(20, Math.min(400, parseInt(baseBpm, 10) || 120));
     this.baseBpm = this.presentationBpm;
     this.isCustomPracticeBpm = false;
@@ -955,8 +962,8 @@ class PieceState {
     return true;
   }
 
-  // Salva uma seleção de compassos como uma nova Bossa / Peça na biblioteca local
-  saveMeasuresAsBossa(indices, bossaName) {
+  // Salva uma seleção de compassos como uma nova Bossa ou Peça na biblioteca local
+  saveMeasuresAsItem(indices, itemName, isBossa = true) {
     if (!indices || indices.length === 0) return null;
     const sorted = Array.from(new Set(indices))
       .filter(idx => typeof idx === 'number' && idx >= 0 && idx < this.measures.length)
@@ -964,13 +971,14 @@ class PieceState {
 
     if (sorted.length === 0) return null;
 
-    const name = (bossaName || "").trim() || `Bossa (${sorted.length} comp.)`;
-    const newId = `piece-bossa-${Date.now()}`;
+    const defaultPrefix = isBossa ? 'Bossa' : 'Peça';
+    const name = (itemName || "").trim() || `${defaultPrefix} (${sorted.length} comp.)`;
+    const newId = isBossa ? `piece-bossa-${Date.now()}` : `piece-${Date.now()}`;
 
-    const bossaMeasures = sorted.map((idx, i) => {
+    const itemMeasures = sorted.map((idx, i) => {
       const m = this.measures[idx];
       return {
-        id: `m-bossa-${Date.now()}-${i}`,
+        id: `m-${isBossa ? 'bossa' : 'piece'}-${Date.now()}-${i}`,
         nickname: m.nickname || `Compasso ${i + 1}`,
         beats: m.beats,
         beatUnit: m.beatUnit,
@@ -978,47 +986,46 @@ class PieceState {
         ratioNum: m.ratioNum,
         ratioDen: m.ratioDen,
         customBpm: m.customBpm,
-        color: m.color || "#8b5cf6",
+        color: m.color || (isBossa ? "#8b5cf6" : "#ff334b"),
         repeat: m.repeat || 1
       };
     });
 
-    const bossaData = {
+    const itemData = {
       id: newId,
       name: name,
-      description: `Bossa extraída da apresentação '${this.name}'`,
+      description: `${isBossa ? 'Bossa' : 'Peça'} extraída da apresentação '${this.name}'`,
       presentationBpm: this.presentationBpm,
       baseBpm: this.baseBpm,
-      isBossa: true,
-      measures: bossaMeasures,
-      groups: [
+      isBossa: Boolean(isBossa),
+      measures: itemMeasures,
+      groups: isBossa ? [
         {
           id: `grp-${newId}`,
           name: name,
           color: "#8b5cf6",
           startMeasure: 0,
-          endMeasure: bossaMeasures.length - 1,
+          endMeasure: itemMeasures.length - 1,
           isBossaBlock: true
         }
-      ],
+      ] : [],
       updatedAt: Date.now(),
       createdAt: Date.now()
     };
 
     // Salva na biblioteca local
     let library = this.getLibraryPieces();
-    library.unshift(bossaData);
+    library.unshift(itemData);
     if (library.length > 100) library = library.slice(0, 100);
-    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
-      try {
-        localStorage.setItem(LIBRARY_KEY, JSON.stringify(library));
-      } catch (e) {
-        console.warn("Não foi possível salvar bossa na biblioteca local:", e);
-      }
-    }
+    this.setLibraryPieces(library);
 
-    this.notify(`Criou e salvou nova bossa '${name}'`);
-    return bossaData;
+    this.notify(`Criou e salvou ${isBossa ? 'nova bossa' : 'nova peça'} '${name}'`);
+    return itemData;
+  }
+
+  // Wrapper compatível com chamadas legadas
+  saveMeasuresAsBossa(indices, bossaName) {
+    return this.saveMeasuresAsItem(indices, bossaName, true);
   }
 
   // Calcula timings detalhados para qualquer lista de compassos (usado em prévias de áudio)
