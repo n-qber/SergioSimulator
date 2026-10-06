@@ -158,21 +158,47 @@ class SergioApp {
       }
     };
 
+    this.toggleTheme = toggleTheme;
     this.dom.btnThemeToggle?.addEventListener('click', toggleTheme);
     this.dom.btnThemeToggleBossaMgr?.addEventListener('click', toggleTheme);
+    this.dom.btnUserThemeToggle?.addEventListener('click', () => {
+      toggleTheme();
+      if (this.dom.userMenuDropdown) this.dom.userMenuDropdown.style.display = 'none';
+    });
+    this.dom.btnAppMenuThemeToggle?.addEventListener('click', () => {
+      toggleTheme();
+      if (this.dom.appMenuDropdown) this.dom.appMenuDropdown.style.display = 'none';
+    });
   }
 
   setTheme(theme) {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('sergio_theme', theme);
+
+    const isDark = theme === 'dark';
+    const nextIcon = isDark ? '☀️' : '🌙';
+    const nextLabel = isDark ? 'Mudar para Tema Claro' : 'Mudar para Tema Escuro';
+
     if (this.dom.themeIcon) {
-      this.dom.themeIcon.textContent = theme === 'light' ? '🌙' : '☀️';
+      this.dom.themeIcon.textContent = nextIcon;
     }
     if (this.dom.themeIconBossaMgr) {
-      this.dom.themeIconBossaMgr.textContent = theme === 'light' ? '🌙' : '☀️';
+      this.dom.themeIconBossaMgr.textContent = nextIcon;
+    }
+    if (this.dom.userMenuThemeIcon) {
+      this.dom.userMenuThemeIcon.textContent = nextIcon;
+    }
+    if (this.dom.userMenuThemeLabel) {
+      this.dom.userMenuThemeLabel.textContent = nextLabel;
+    }
+    if (this.dom.appMenuThemeIcon) {
+      this.dom.appMenuThemeIcon.textContent = nextIcon;
+    }
+    if (this.dom.appMenuThemeLabel) {
+      this.dom.appMenuThemeLabel.textContent = nextLabel;
     }
     if (this.dom.btnThemeToggle) {
-      this.dom.btnThemeToggle.title = theme === 'light' ? 'Mudar para Tema Escuro (T)' : 'Mudar para Tema Claro (T)';
+      this.dom.btnThemeToggle.title = isDark ? 'Mudar para Tema Claro (T)' : 'Mudar para Tema Escuro (T)';
     }
     if (this.renderer) {
       this.renderer.markMinimapDirty?.();
@@ -215,8 +241,14 @@ class SergioApp {
       btnRedo: document.getElementById('btnRedo'),
       btnThemeToggle: document.getElementById('btnThemeToggle'),
       themeIcon: document.getElementById('themeIcon'),
+      btnUserThemeToggle: document.getElementById('btnUserThemeToggle'),
+      userMenuThemeIcon: document.getElementById('userMenuThemeIcon'),
+      userMenuThemeLabel: document.getElementById('userMenuThemeLabel'),
       btnAppMenu: document.getElementById('btnAppMenu'),
       appMenuDropdown: document.getElementById('appMenuDropdown'),
+      btnAppMenuThemeToggle: document.getElementById('btnAppMenuThemeToggle'),
+      appMenuThemeIcon: document.getElementById('appMenuThemeIcon'),
+      appMenuThemeLabel: document.getElementById('appMenuThemeLabel'),
       saveIndicator: document.getElementById('syncStatusPill') || document.getElementById('saveIndicator'),
       syncStatusPill: document.getElementById('syncStatusPill'),
       syncStatusText: document.getElementById('syncStatusText'),
@@ -1520,7 +1552,7 @@ class SergioApp {
         this.dom.btnMute.click();
       } else if (e.key === 't' || e.key === 'T') {
         if (!e.altKey) {
-          this.dom.btnThemeToggle?.click();
+          this.toggleTheme?.();
         }
       } else if (e.altKey && e.key === 'ArrowLeft') {
         e.preventDefault();
