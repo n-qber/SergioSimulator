@@ -71,6 +71,9 @@
             <span id="syncStatusIcon" class="sync-status-icon">☁️</span>
             <span id="syncStatusText" class="sync-status-text">Salvo</span>
           </div>
+          <button type="button" id="btnReturnToPreviousPiece" class="btn-return-previous-piece" style="display:none" title="Voltar para a apresentação anterior">
+            <span class="return-icon">↩</span> Voltar para <span id="returnPieceName" class="return-piece-name">Peça</span>
+          </button>
         </div>
 
         <div class="undo-redo-row" title="Histórico de Edições">
@@ -558,6 +561,7 @@
               Este compasso puxa informações por referência da bossa original. Você pode editar qualquer valor livremente; suas alterações serão salvas nesta apresentação como personalização local sem afetar a original.
             </p>
             <div class="bossa-banner-actions">
+              <button type="button" id="btnMeasureOpenBossaModal" class="btn-bossa-banner-action primary" title="Abrir esta bossa para edição completa da sua página">↗️ Abrir Página da Bossa</button>
               <button type="button" id="btnMeasureUnlinkModal" class="btn-bossa-banner-action" title="Desvincular este compasso da bossa original">🔓 Desvincular Agora</button>
               <button type="button" id="btnMeasureRestoreModal" class="btn-bossa-banner-action ghost" style="display:none" title="Restaurar valores da bossa original">↺ Restaurar da Bossa</button>
             </div>

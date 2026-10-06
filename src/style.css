@@ -5956,6 +5956,63 @@ kbd {
   gap: 4px;
 }
 
+.btn-open-bossa-page {
+  background: rgba(139, 92, 246, 0.22) !important;
+  border-color: rgba(139, 92, 246, 0.55) !important;
+  color: #ffffff !important;
+}
+
+.btn-open-bossa-page:hover {
+  background: rgba(139, 92, 246, 0.45) !important;
+  border-color: #a78bfa !important;
+  box-shadow: 0 0 10px rgba(139, 92, 246, 0.4);
+}
+
+.pill-open-arrow {
+  font-size: 0.72rem;
+  opacity: 0.85;
+  margin-left: 2px;
+  display: inline-block;
+  transition: transform 0.15s ease;
+}
+
+.measure-bossa-pill:hover .pill-open-arrow {
+  transform: translate(1px, -1px);
+  opacity: 1;
+}
+
+.btn-return-previous-piece {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(139, 92, 246, 0.22);
+  border: 1px solid rgba(139, 92, 246, 0.5);
+  color: #c4b5fd;
+  border-radius: 20px;
+  padding: 3px 12px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.btn-return-previous-piece:hover {
+  background: rgba(139, 92, 246, 0.38);
+  border-color: #8b5cf6;
+  color: #ffffff;
+  transform: translateY(-1px);
+  box-shadow: 0 0 10px rgba(139, 92, 246, 0.3);
+}
+
+.return-piece-name {
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #ffffff;
+}
+
 /* Tags de Bossa nos Cartões de Compasso */
 .measure-card-tags {
   display: flex;
@@ -6060,6 +6117,18 @@ kbd {
 .btn-bossa-banner-action:hover {
   background: #8b5cf6;
   border-color: #8b5cf6;
+}
+
+.btn-bossa-banner-action.primary {
+  background: #8b5cf6;
+  border-color: #8b5cf6;
+  color: #ffffff;
+}
+
+.btn-bossa-banner-action.primary:hover {
+  background: #7c3aed;
+  border-color: #7c3aed;
+  box-shadow: 0 0 10px rgba(139, 92, 246, 0.45);
 }
 
 .btn-bossa-banner-action.ghost {

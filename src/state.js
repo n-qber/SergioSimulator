@@ -542,6 +542,36 @@ class PieceState {
     }
   }
 
+  // Salva ou atualiza um item qualquer (peça ou bossa) na biblioteca local
+  saveItemToLibrary(item) {
+    if (!item || !item.id) return false;
+    const library = this.getLibraryPieces();
+    const existingIdx = library.findIndex(p => p.id === item.id);
+    if (existingIdx >= 0) {
+      library[existingIdx] = item;
+    } else {
+      library.unshift(item);
+    }
+    this.setLibraryPieces(library);
+    return true;
+  }
+
+  // Busca uma bossa ou peça na biblioteca ou presets por ID ou nome
+  findBossaOrPiece(pieceId, pieceName) {
+    const library = this.getLibraryPieces();
+    if (pieceId) {
+      const found = library.find(p => p.id === pieceId) || PRESETS.find(p => p.id === pieceId);
+      if (found) return found;
+    }
+    if (pieceName) {
+      const clean = pieceName.replace(/^[🔗📦✏️🔓\s]+/, '').trim().toLowerCase();
+      const found = library.find(p => p.name && p.name.replace(/^[🔗📦✏️🔓\s]+/, '').trim().toLowerCase() === clean)
+        || PRESETS.find(p => p.name && p.name.replace(/^[🔗📦✏️🔓\s]+/, '').trim().toLowerCase() === clean);
+      if (found) return found;
+    }
+    return null;
+  }
+
   // Retorna apenas as bossas salvas na biblioteca local
   getBossaPieces() {
     const all = this.getLibraryPieces();

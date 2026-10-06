@@ -472,8 +472,11 @@ class SergioApp {
       // Modais e Controles de Bossa Embutida
       measureBossaBanner: document.getElementById('measureBossaBanner'),
       bossaBannerName: document.getElementById('bossaBannerName'),
+      btnMeasureOpenBossaModal: document.getElementById('btnMeasureOpenBossaModal'),
       btnMeasureUnlinkModal: document.getElementById('btnMeasureUnlinkModal'),
       btnMeasureRestoreModal: document.getElementById('btnMeasureRestoreModal'),
+      btnReturnToPreviousPiece: document.getElementById('btnReturnToPreviousPiece'),
+      returnPieceName: document.getElementById('returnPieceName'),
       btnOpenInsertBossaModal: document.getElementById('btnOpenInsertBossaModal'),
       btnToolbarInsertBossa: document.getElementById('btnToolbarInsertBossa'),
       btnToolbarSaveAsBossa: document.getElementById('btnToolbarSaveAsBossa'),
@@ -1254,6 +1257,21 @@ class SergioApp {
       state.setPieceName(e.target.value);
     });
 
+    // Botão de retornar para peça anterior (quando navegou para edição de bossa)
+    this.dom.btnReturnToPreviousPiece?.addEventListener('click', () => {
+      if (this.previousPieceContext && this.previousPieceContext.id) {
+        const prev = this.previousPieceContext;
+        this.previousPieceContext = null;
+        this.updateReturnToPreviousButton();
+        const loaded = state.loadPieceFromLibrary(prev.id);
+        if (loaded) {
+          this.showToast(`Retornou para '${prev.name}'!`, '↩️');
+        } else {
+          this.showToast(`Peça anterior '${prev.name}' não encontrada na biblioteca.`, '⚠️');
+        }
+      }
+    });
+
     // Transporte
     this.dom.btnPlayPause.addEventListener('click', () => this.togglePlayPause());
     this.dom.btnStopRewind.addEventListener('click', () => this.stopPlayback());
@@ -1425,6 +1443,7 @@ class SergioApp {
       this.renderMeasuresList();
       this.updateHUD(this.playbackTime);
       this.initPresetsDropdown();
+      this.updateReturnToPreviousButton();
       if (this.renderer) {
         this.renderer.markMinimapDirty?.();
         this.renderer.resize();
@@ -2028,6 +2047,7 @@ class SergioApp {
         const bColor = grp.color || '#8b5cf6';
         blockHeader.style.setProperty('--bossa-color', bColor);
         const count = (grp.endMeasure - grp.startMeasure) + 1;
+        const cleanBossaName = (grp.sourcePieceName || grp.name || 'Bossa').replace(/^[🔗📦✏️🔓\s]+/, '').trim();
         blockHeader.innerHTML = `
           <div class="bossa-block-header-info">
             <span class="bossa-drag-handle" title="Arraste para reposicionar a bossa inteira na peça">⠿</span>
@@ -2038,6 +2058,9 @@ class SergioApp {
             <span class="bossa-block-header-range">c. ${grp.startMeasure + 1} a ${grp.endMeasure + 1} (${count} ${count === 1 ? 'compasso' : 'compassos'})</span>
           </div>
           <div class="bossa-block-header-actions">
+            <button type="button" class="btn-bossa-block-action btn-open-bossa-page" title="Abrir '${cleanBossaName}' para edição direta da sua página original">
+              ↗️ Abrir "${cleanBossaName}"
+            </button>
             <button type="button" class="btn-bossa-block-action btn-move-bossa-left" title="Mover bossa inteira para trás (←)" ${grp.startMeasure === 0 ? 'disabled style="opacity:0.35;pointer-events:none"' : ''}>
               ◀ Mover Bossa
             </button>
@@ -2054,6 +2077,14 @@ class SergioApp {
             ` : ''}
           </div>
         `;
+
+        const btnOpenPage = blockHeader.querySelector('.btn-open-bossa-page');
+        if (btnOpenPage) {
+          btnOpenPage.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.navigateToBossaOrPiece(grp.sourcePieceId, grp.sourcePieceName || grp.name, grp);
+          });
+        }
 
         const btnMoveLeft = blockHeader.querySelector('.btn-move-bossa-left');
         if (btnMoveLeft) {
@@ -2183,13 +2214,16 @@ class SergioApp {
       }
 
       let bossaPillHtml = '';
-      if (m.sourcePieceId) {
-        if (m.isLinked) {
-          bossaPillHtml = `<span class="measure-bossa-pill linked" draggable="true" title="Bossa vinculada à '${m.sourcePieceName || 'Bossa'}'. Arraste para mover o bloco da bossa inteira!">🔗 ${m.sourcePieceName || 'Bossa'}</span>`;
+      if (m.sourcePieceId || (grp && grp.isBossaBlock)) {
+        const bName = m.sourcePieceName || grp?.sourcePieceName || grp?.name || 'Bossa';
+        const cleanBName = bName.replace(/^[🔗📦✏️🔓\s]+/, '').trim();
+        const bId = m.sourcePieceId || grp?.sourcePieceId || '';
+        if (m.isLinked || (!m.sourcePieceId && grp?.isLinked)) {
+          bossaPillHtml = `<span class="measure-bossa-pill linked" data-bossa-id="${bId}" data-bossa-name="${cleanBName}" draggable="true" title="Bossa vinculada à '${cleanBName}'. Clique para abrir a página da bossa, ou arraste para reposicionar o bloco!">🔗 ${cleanBName} <span class="pill-open-arrow">↗</span></span>`;
         } else if (m.isLocallyModified) {
-          bossaPillHtml = `<span class="measure-bossa-pill modified" draggable="true" title="Modificado localmente (baseado em '${m.sourcePieceName || 'Bossa'}'). Arraste para mover o bloco da bossa inteira!">✏️ Local (${m.sourcePieceName || 'Bossa'})</span>`;
+          bossaPillHtml = `<span class="measure-bossa-pill modified" data-bossa-id="${bId}" data-bossa-name="${cleanBName}" draggable="true" title="Modificado localmente (baseado em '${cleanBName}'). Clique para abrir a original!">✏️ Local (${cleanBName}) <span class="pill-open-arrow">↗</span></span>`;
         } else {
-          bossaPillHtml = `<span class="measure-bossa-pill unlinked" draggable="true" title="Desvinculado de '${m.sourcePieceName || 'Bossa'}'. Arraste para mover o bloco da bossa inteira!">🔓 ${m.sourcePieceName || 'Bossa'}</span>`;
+          bossaPillHtml = `<span class="measure-bossa-pill unlinked" data-bossa-id="${bId}" data-bossa-name="${cleanBName}" draggable="true" title="Bossa '${cleanBName}'. Clique para abrir a página da bossa!">🔓 ${cleanBName} <span class="pill-open-arrow">↗</span></span>`;
         }
       }
 
@@ -2370,6 +2404,16 @@ class SergioApp {
         if (e.target.closest('.btn-card-edit')) {
           e.stopPropagation();
           this.openMeasureModal(idx);
+          return;
+        }
+
+        // Clique no pill da bossa abre a página/edição da bossa
+        const bossaPill = e.target.closest('.measure-bossa-pill');
+        if (bossaPill) {
+          e.stopPropagation();
+          const bId = bossaPill.getAttribute('data-bossa-id') || m.sourcePieceId || grp?.sourcePieceId;
+          const bName = bossaPill.getAttribute('data-bossa-name') || m.sourcePieceName || grp?.sourcePieceName || grp?.name;
+          this.navigateToBossaOrPiece(bId, bName, grp);
           return;
         }
 
@@ -2768,6 +2812,20 @@ class SergioApp {
       }
     });
 
+    this.dom.btnMeasureOpenBossaModal?.addEventListener('click', () => {
+      const idx = parseInt(this.dom.editMeasureIndex.value, 10);
+      if (idx >= 0) {
+        const m = state.measures[idx];
+        const grp = state.getGroupByMeasureIndex(idx);
+        this.closeMeasureModal();
+        if (m) {
+          const bId = m.sourcePieceId || grp?.sourcePieceId;
+          const bName = m.sourcePieceName || grp?.sourcePieceName || grp?.name;
+          this.navigateToBossaOrPiece(bId, bName, grp);
+        }
+      }
+    });
+
     form.addEventListener('submit', (e) => {
       e.preventDefault();
       const idx = parseInt(this.dom.editMeasureIndex.value, 10);
@@ -2841,9 +2899,16 @@ class SergioApp {
     this.dom.editRepeat.value = m.repeat || 1;
 
     // Configura o banner de Bossa Embutida
-    if (m.sourcePieceId) {
+    const grp = state.getGroupByMeasureIndex(index);
+    if (m.sourcePieceId || (grp && grp.isBossaBlock)) {
+      const bName = m.sourcePieceName || grp?.sourcePieceName || grp?.name || 'Bossa Vinculada';
+      const cleanName = bName.replace(/^[🔗📦✏️🔓\s]+/, '').trim();
       if (this.dom.measureBossaBanner) this.dom.measureBossaBanner.style.display = 'flex';
-      if (this.dom.bossaBannerName) this.dom.bossaBannerName.textContent = m.sourcePieceName || 'Bossa Vinculada';
+      if (this.dom.bossaBannerName) this.dom.bossaBannerName.textContent = cleanName;
+      if (this.dom.btnMeasureOpenBossaModal) {
+        this.dom.btnMeasureOpenBossaModal.textContent = `↗️ Abrir Página de "${cleanName}"`;
+        this.dom.btnMeasureOpenBossaModal.style.display = 'inline-flex';
+      }
       if (this.dom.btnMeasureUnlinkModal) this.dom.btnMeasureUnlinkModal.style.display = m.isLinked ? 'inline-flex' : 'none';
       if (this.dom.btnMeasureRestoreModal) this.dom.btnMeasureRestoreModal.style.display = m.isLocallyModified ? 'inline-flex' : 'none';
     } else {
@@ -5159,8 +5224,82 @@ class SergioApp {
     this.seekTo(0);
     this.closeMeasureToolbar();
     this.initPresetsDropdown();
+    this.updateReturnToPreviousButton();
     const isBossa = bossa.isBossa !== undefined ? Boolean(bossa.isBossa) : Boolean(bossa.id?.startsWith('piece-bossa-') || bossa.id?.startsWith('bossa-'));
     this.showToast(`${isBossa ? 'Bossa' : 'Peça'} '${bossa.name}' aberta para edição!`, '📂');
+  }
+
+  updateReturnToPreviousButton() {
+    if (!this.dom.btnReturnToPreviousPiece) return;
+    if (this.previousPieceContext && this.previousPieceContext.id && this.previousPieceContext.id !== state.id) {
+      this.dom.btnReturnToPreviousPiece.style.display = 'inline-flex';
+      if (this.dom.returnPieceName) {
+        this.dom.returnPieceName.textContent = this.previousPieceContext.name || 'Peça';
+      }
+    } else {
+      this.dom.btnReturnToPreviousPiece.style.display = 'none';
+    }
+  }
+
+  navigateToBossaOrPiece(pieceId, pieceName, groupContext = null) {
+    if (!pieceId && !pieceName) return;
+
+    // Salva a peça atual na biblioteca antes de alternar e guarda contexto para retorno
+    if (state.measures && state.measures.length > 0) {
+      state.saveCurrentPieceToLibrary();
+      this.previousPieceContext = {
+        id: state.id,
+        name: state.name || 'Peça Anterior',
+        isBossa: Boolean(state.isBossa)
+      };
+    }
+
+    this.pausePlayback();
+    this.closeMeasureToolbar();
+    this.closeMeasureModal();
+
+    // 1. Tenta buscar no state
+    let target = state.findBossaOrPiece ? state.findBossaOrPiece(pieceId, pieceName) : null;
+
+    // 2. Se não encontrou e temos contexto de grupo, sintetiza e salva na biblioteca
+    if (!target && groupContext && state.measures) {
+      const start = Math.max(0, groupContext.startMeasure);
+      const end = Math.min(state.measures.length - 1, groupContext.endMeasure);
+      if (end >= start) {
+        const sliceMeasures = state.measures.slice(start, end + 1).map((m, mi) => ({
+          beats: m.beats || 4,
+          beatUnit: m.beatUnit || 4,
+          tempoMode: m.tempoMode || 'ratio',
+          ratioNum: m.ratioNum || 1,
+          ratioDen: m.ratioDen || 1,
+          customBpm: m.customBpm || state.baseBpm,
+          repeat: m.repeat || 1,
+          color: m.color || '#8b5cf6',
+          nickname: m.nickname || '',
+          id: m.sourceMeasureId || `m-bossa-${Date.now()}-${mi}`
+        }));
+
+        const cleanName = (pieceName || groupContext.sourcePieceName || groupContext.name || 'Bossa').replace(/^[🔗📦✏️🔓\s]+/, '').trim();
+        target = {
+          id: pieceId || `piece-bossa-${Date.now()}`,
+          name: cleanName,
+          isBossa: true,
+          baseBpm: state.baseBpm,
+          measures: sliceMeasures,
+          updatedAt: Date.now()
+        };
+        if (state.saveItemToLibrary) {
+          state.saveItemToLibrary(target);
+        }
+      }
+    }
+
+    if (!target) {
+      this.showToast(`Não foi possível encontrar a bossa '${pieceName || pieceId}' na biblioteca.`, '⚠️');
+      return;
+    }
+
+    this.handleOpenBossaAsPiece(target);
   }
 
   handleOpenRenameBossaModal(bossa) {
