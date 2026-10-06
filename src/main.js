@@ -2048,6 +2048,15 @@ class SergioApp {
         blockHeader.style.setProperty('--bossa-color', bColor);
         const count = (grp.endMeasure - grp.startMeasure) + 1;
         const cleanBossaName = (grp.sourcePieceName || grp.name || 'Bossa').replace(/^[🔗📦✏️🔓\s]+/, '').trim();
+
+        // Calcula a duração total real desta bossa na peça atual
+        let bossaDurationSec = 0;
+        for (let bi = grp.startMeasure; bi <= grp.endMeasure; bi++) {
+          const mTimings = state.measureTimings.filter(t => t.measureIndex === bi);
+          mTimings.forEach(t => bossaDurationSec += t.duration);
+        }
+        const bossaDurationStr = this.formatFriendlyDuration(bossaDurationSec);
+
         blockHeader.innerHTML = `
           <div class="bossa-block-header-info">
             <span class="bossa-drag-handle" title="Arraste para reposicionar a bossa inteira na peça">⠿</span>
@@ -2056,6 +2065,7 @@ class SergioApp {
             </span>
             <span class="bossa-block-header-title">${grp.name}</span>
             <span class="bossa-block-header-range">c. ${grp.startMeasure + 1} a ${grp.endMeasure + 1} (${count} ${count === 1 ? 'compasso' : 'compassos'})</span>
+            <span class="bossa-block-header-time" title="Tempo total desta bossa na peça: ${bossaDurationStr}">⏱️ ${bossaDurationStr}</span>
           </div>
           <div class="bossa-block-header-actions">
             <button type="button" class="btn-bossa-block-action btn-open-bossa-page" title="Abrir '${cleanBossaName}' para edição direta da sua página original">
@@ -4464,6 +4474,12 @@ class SergioApp {
       this.dom.btnConfirmInsertBossa.disabled = true;
     }
 
+    const previewEl = this.dom.modalInsertBossa?.querySelector('#bossaSelectedPreview');
+    if (previewEl) {
+      previewEl.style.display = 'none';
+      previewEl.innerHTML = '';
+    }
+
     // Inicializa na aba correta
     if (this.currentBossaTab === 'presets') {
       this.dom.tabBossaPresets?.classList.add('active');
@@ -4538,32 +4554,66 @@ class SergioApp {
       const bpm = p.presentationBpm || p.baseBpm || 120;
       const { totalDuration: modalDuration } = state.calculateTimingsForMeasures(p.measures, bpm);
       const modalDurationStr = this.formatFriendlyDuration(modalDuration);
+
+      const pieceBpm = state.baseBpm || bpm;
+      const hasDifferentBpm = Math.abs(pieceBpm - bpm) >= 2;
+      const { totalDuration: pieceDuration } = state.calculateTimingsForMeasures(p.measures, pieceBpm);
+      const pieceDurationStr = this.formatFriendlyDuration(pieceDuration);
+
       const isPresetBossa = p.id?.startsWith('bossa-') || Boolean(p.isBossa && PRESETS.some(pr => pr.id === p.id));
       const isCloudBossa = Boolean(p.ownerId);
-      const badgeText = isPresetBossa ? '🥁 Modelo Pronto' : (p.isBossa ? (isCloudBossa ? '🥁 Bossa ☁️' : '🥁 Bossa 💾') : '🎵 Peça');
+      const badgeText = isPresetBossa ? '🥁 Modelo' : (p.isBossa ? (isCloudBossa ? '🥁 Bossa ☁️' : '🥁 Bossa') : '🎵 Peça');
 
       card.innerHTML = `
-        <div class="bossa-card-item-top">
-          <div class="bossa-card-title-wrap">
+        <div class="bossa-card-item-header">
+          <div class="bossa-card-title-group">
             <span class="bossa-card-badge">${badgeText}</span>
-            <span class="bossa-card-title">${escapeHtml(p.name || 'Sem título')}</span>
+            <strong class="bossa-card-title">${escapeHtml(p.name || 'Sem título')}</strong>
           </div>
-          <span class="bossa-card-meta">${measureCount} comp. • ${bpm} BPM • ⏱️ ${modalDurationStr}</span>
+          <div class="bossa-card-time-pill" title="Duração total da bossa: ${modalDurationStr} (${bpm} BPM)">
+            <span class="bossa-time-icon">⏱️</span>
+            <span class="bossa-time-text">${modalDurationStr}</span>
+          </div>
+        </div>
+        <div class="bossa-card-info-row">
+          <span class="bossa-card-info-item"><strong>${measureCount}</strong> ${measureCount === 1 ? 'compasso' : 'compassos'}</span>
+          <span class="bossa-card-info-dot">•</span>
+          <span class="bossa-card-info-item"><strong>${bpm}</strong> BPM</span>
+          ${hasDifferentBpm ? `
+            <span class="bossa-card-info-dot">•</span>
+            <span class="bossa-card-info-item piece-speed" title="Duração estimada no andamento desta peça (${pieceBpm} BPM)">
+              ⏱️ <strong>${pieceDurationStr}</strong> no andamento da peça (${pieceBpm} BPM)
+            </span>
+          ` : ''}
         </div>
         ${p.description ? `<p class="bossa-card-desc">${escapeHtml(p.description)}</p>` : ''}
       `;
 
-      card.addEventListener('click', () => {
+      const selectThis = () => {
         container.querySelectorAll('.bossa-card-item').forEach(c => c.classList.remove('selected'));
         card.classList.add('selected');
         this.selectedBossaPiece = p;
         if (this.dom.btnConfirmInsertBossa) {
           this.dom.btnConfirmInsertBossa.disabled = false;
         }
-      });
+
+        const previewEl = this.dom.modalInsertBossa?.querySelector('#bossaSelectedPreview');
+        if (previewEl) {
+          previewEl.style.display = 'flex';
+          previewEl.innerHTML = `
+            <span class="bossa-preview-badge">Selecionada</span>
+            <strong class="bossa-preview-name">${escapeHtml(p.name || 'Bossa')}</strong>
+            <span class="bossa-preview-meta">
+              • <strong>${measureCount}</strong> comp. • ⏱️ Tempo: <strong>${modalDurationStr}</strong> (${bpm} BPM)${hasDifferentBpm ? ` • ⏱️ <strong>${pieceDurationStr}</strong> no andamento da peça (${pieceBpm} BPM)` : ''}
+            </span>
+          `;
+        }
+      };
+
+      card.addEventListener('click', selectThis);
 
       card.addEventListener('dblclick', () => {
-        this.selectedBossaPiece = p;
+        selectThis();
         this.handleConfirmInsertBossa();
       });
 
