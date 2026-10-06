@@ -93,8 +93,8 @@
             <button type="button" id="btnUserCloudPieces" class="user-menu-item">
               <span class="menu-item-icon">☁️</span> Minhas Peças na Nuvem
             </button>
-            <button type="button" id="btnUserManageBossas" class="user-menu-item" title="Gerenciar minhas bossas salvas e sincronizadas">
-              <span class="menu-item-icon">🥁</span> Gerenciador de Bossas
+            <button type="button" id="btnUserManageBossas" class="user-menu-item" title="Gerenciar minhas peças e bossas salvas e sincronizadas">
+              <span class="menu-item-icon">🗂️</span> Minhas Peças & Bossas
             </button>
             <button type="button" id="btnUserLogout" class="user-menu-item user-menu-logout">
               <span class="menu-item-icon">🚪</span> Sair da Conta
@@ -125,8 +125,8 @@
               <span class="menu-item-icon">🔗</span> Inserir Bossa / Peça Externa
             </button>
 
-            <button type="button" id="btnMenuManageBossas" class="app-menu-item" title="Gerenciar todas as suas bossas, ouvir prévias e sincronizar">
-              <span class="menu-item-icon">🥁</span> Gerenciador de Bossas
+            <button type="button" id="btnMenuManageBossas" class="app-menu-item" title="Gerenciar todas as suas peças e bossas, ouvir prévias e sincronizar">
+              <span class="menu-item-icon">🗂️</span> Biblioteca de Repertório
             </button>
 
             <div class="app-menu-select-wrap">
@@ -139,6 +139,10 @@
             <button type="button" id="btnOpenHistory" class="app-menu-item" title="Histórico de Versões na Nuvem">
               <span class="menu-item-icon">🕒</span> Histórico de Versões
               <span id="historyBadgeCount" class="history-badge">0</span>
+            </button>
+
+            <button type="button" id="btnDeleteCurrentPiece" class="app-menu-item app-menu-danger" title="Apagar a peça atual da biblioteca e da nuvem">
+              <span class="menu-item-icon">🗑️</span> Apagar Esta Peça...
             </button>
 
             <div class="app-menu-row-buttons">
@@ -350,10 +354,10 @@
 
         <div class="bossa-topbar-center">
           <div class="bossa-topbar-badge">
-            <span class="bossa-tag-icon">🥁</span>
+            <span class="bossa-tag-icon">🗂️</span>
             <span class="bossa-tag-text">Repertório Musical</span>
           </div>
-          <h1 class="bossa-topbar-heading">Gerenciador de Bossas</h1>
+          <h1 class="bossa-topbar-heading">Biblioteca de Peças & Bossas</h1>
         </div>
 
         <div class="bossa-topbar-right">
@@ -380,16 +384,16 @@
           <!-- Banner Hero com Apresentação e Ações Rápidas -->
           <section class="bossa-page-hero">
             <div class="bossa-hero-text">
-              <h2 class="bossa-hero-title">Biblioteca de Bossas & Convenções</h2>
+              <h2 class="bossa-hero-title">Biblioteca de Peças & Bossas</h2>
               <p class="bossa-hero-desc">
-                Organize, ouça e sincronize suas convenções de bateria e percussão. Suas bossas ficam salvas na nuvem com sua conta, permitindo que você componha no celular e abra no computador com perfeita continuidade.
+                Organize, ouça, componha e sincronize suas peças completas e convenções de bateria num só lugar. Suas músicas ficam salvas na nuvem com sua conta, permitindo alternar entre dispositivos, abrir no palco e apagar ou exportar com facilidade.
               </p>
             </div>
             <div class="bossa-hero-actions">
-              <button type="button" id="btnMgrNewBossaFromCurrent" class="btn-bossa-hero-primary" title="Criar nova bossa a partir dos compassos da peça aberta">
-                <span class="btn-icon">➕</span> Criar Bossa da Peça
+              <button type="button" id="btnMgrNewBossaFromCurrent" class="btn-bossa-hero-primary" title="Salvar compassos da peça aberta como nova bossa/peça">
+                <span class="btn-icon">➕</span> Salvar da Peça
               </button>
-              <label class="btn-bossa-hero-secondary file-btn" title="Importar bossa de arquivo JSON">
+              <label class="btn-bossa-hero-secondary file-btn" title="Importar arquivo JSON de peça ou bossa">
                 <span class="btn-icon">📂</span> Importar JSON
                 <input type="file" id="fileImportBossa" accept=".json" style="display:none">
               </label>
@@ -400,19 +404,19 @@
           <section class="bossa-page-stats-grid">
             <div class="bossa-stat-box">
               <span class="stat-number" id="statTotalBossas">0</span>
-              <span class="stat-title">Total de Bossas</span>
+              <span class="stat-title">Total de Itens</span>
+            </div>
+            <div class="bossa-stat-box">
+              <span class="stat-number" id="statMyPieces">0</span>
+              <span class="stat-title">Minhas Peças 📜</span>
             </div>
             <div class="bossa-stat-box">
               <span class="stat-number" id="statMyBossas">0</span>
-              <span class="stat-title">Minhas Bossas</span>
+              <span class="stat-title">Minhas Bossas 🥁</span>
             </div>
             <div class="bossa-stat-box">
               <span class="stat-number" id="statCloudBossas">0</span>
               <span class="stat-title">Na Nuvem ☁️</span>
-            </div>
-            <div class="bossa-stat-box">
-              <span class="stat-number" id="statPresetBossas">0</span>
-              <span class="stat-title">Modelos Didáticos ⭐</span>
             </div>
           </section>
 
@@ -420,15 +424,16 @@
           <section class="bossa-page-toolbar">
             <div class="bossa-search-box">
               <span class="bossa-search-icon">🔍</span>
-              <input type="text" id="inputSearchBossas" class="clean-input bossa-search-input" placeholder="Buscar bossa por nome, andamento ou métrica...">
+              <input type="text" id="inputSearchBossas" class="clean-input bossa-search-input" placeholder="Buscar por nome, andamento ou compassos...">
               <button type="button" id="btnClearSearchBossas" class="btn-clear-search" style="display:none" title="Limpar busca">&times;</button>
             </div>
 
             <div class="bossa-filter-tabs">
               <button type="button" class="bossa-filter-pill active" data-filter="all">Todas (<span id="countFilterAll">0</span>)</button>
-              <button type="button" class="bossa-filter-pill" data-filter="my">Minhas Bossas (<span id="countFilterMy">0</span>)</button>
+              <button type="button" class="bossa-filter-pill" data-filter="pieces">Peças (<span id="countFilterPieces">0</span>)</button>
+              <button type="button" class="bossa-filter-pill" data-filter="bossas">Bossas (<span id="countFilterBossas">0</span>)</button>
               <button type="button" class="bossa-filter-pill" data-filter="cloud">Na Nuvem ☁️ (<span id="countFilterCloud">0</span>)</button>
-              <button type="button" class="bossa-filter-pill" data-filter="presets">Modelos Prontos ⭐ (<span id="countFilterPresets">0</span>)</button>
+              <button type="button" class="bossa-filter-pill" data-filter="presets">Modelos ⭐ (<span id="countFilterPresets">0</span>)</button>
             </div>
           </section>
 
@@ -463,7 +468,7 @@
       </button>
       <button type="button" class="mobile-nav-btn" data-tab="bossas" id="tabNavBossas">
         <span class="nav-btn-icon">🗂️</span>
-        <span class="nav-btn-label">Bossas</span>
+        <span class="nav-btn-label">Repertório</span>
       </button>
       <button type="button" class="mobile-nav-btn" data-tab="piece" id="tabNavPiece">
         <span class="nav-btn-icon">⚙️</span>

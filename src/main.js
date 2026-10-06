@@ -442,6 +442,7 @@ class SergioApp {
       themeIconBossaMgr: document.getElementById('themeIconBossaMgr'),
       tabNavBossas: document.getElementById('tabNavBossas'),
       statTotalBossas: document.getElementById('statTotalBossas'),
+      statMyPieces: document.getElementById('statMyPieces'),
       statMyBossas: document.getElementById('statMyBossas'),
       statCloudBossas: document.getElementById('statCloudBossas'),
       statPresetBossas: document.getElementById('statPresetBossas'),
@@ -455,9 +456,12 @@ class SergioApp {
       bossaMgrCardsContainer: document.getElementById('bossaMgrCardsContainer'),
       bossaMgrStats: document.getElementById('bossaMgrStats'),
       countFilterAll: document.getElementById('countFilterAll'),
+      countFilterPieces: document.getElementById('countFilterPieces'),
+      countFilterBossas: document.getElementById('countFilterBossas'),
       countFilterMy: document.getElementById('countFilterMy'),
       countFilterCloud: document.getElementById('countFilterCloud'),
       countFilterPresets: document.getElementById('countFilterPresets'),
+      btnDeleteCurrentPiece: document.getElementById('btnDeleteCurrentPiece'),
       modalRenameBossa: document.getElementById('modalRenameBossa'),
       btnRenameBossaClose: document.getElementById('btnRenameBossaClose'),
       btnCancelRenameBossa: document.getElementById('btnCancelRenameBossa'),
@@ -1239,6 +1243,17 @@ class SergioApp {
     // Botão Novo Arquivo & Limpar com double-check
     this.dom.btnNewPiece?.addEventListener('click', () => {
       this.openConfirmNewModal();
+    });
+
+    // Botão de Apagar Peça Aberta (Menu Peça)
+    this.dom.btnDeleteCurrentPiece?.addEventListener('click', () => {
+      if (this.dom.appMenuDropdown) this.dom.appMenuDropdown.style.display = 'none';
+      const currentItem = {
+        id: state.id,
+        name: state.name || 'Nova Peça',
+        isBossa: state.isBossa
+      };
+      this.handleDeletePieceOrBossa(currentItem);
     });
 
     if (this.dom.btnClearAllMeasures) {
@@ -2973,6 +2988,7 @@ class SergioApp {
       }
     };
     this.dom.btnNewPiece?.addEventListener('click', closeAppMenu);
+    this.dom.btnDeleteCurrentPiece?.addEventListener('click', closeAppMenu);
     this.dom.btnOpenHistory?.addEventListener('click', closeAppMenu);
     this.dom.btnExport?.addEventListener('click', closeAppMenu);
     this.dom.fileImport?.addEventListener('change', closeAppMenu);
@@ -4200,33 +4216,42 @@ class SergioApp {
     if (!container) return;
 
     const localLibrary = state.getLibraryPieces ? state.getLibraryPieces() : [];
+    const myPieces = localLibrary.filter(p => !p.isBossa && !p.id?.startsWith('piece-bossa-') && !p.id?.startsWith('bossa-'));
     const myBossas = localLibrary.filter(p => Boolean(p.isBossa || p.id?.startsWith('piece-bossa-') || p.id?.startsWith('bossa-')));
-    const cloudBossas = myBossas.filter(p => Boolean(p.ownerId));
-    const presetBossas = PRESETS.filter(p => Boolean(p.isBossa || p.id?.startsWith('bossa-')));
+    const allUserItems = [...localLibrary];
+    const cloudItems = allUserItems.filter(p => Boolean(p.ownerId));
+    const presetItems = PRESETS;
 
     // Atualiza contadores dos filtros
-    const totalCount = myBossas.length + presetBossas.length;
+    const totalCount = allUserItems.length + presetItems.length;
     if (this.dom.countFilterAll) this.dom.countFilterAll.textContent = totalCount;
-    if (this.dom.countFilterMy) this.dom.countFilterMy.textContent = myBossas.length;
-    if (this.dom.countFilterCloud) this.dom.countFilterCloud.textContent = cloudBossas.length;
-    if (this.dom.countFilterPresets) this.dom.countFilterPresets.textContent = presetBossas.length;
+    if (this.dom.countFilterPieces) this.dom.countFilterPieces.textContent = myPieces.length;
+    if (this.dom.countFilterBossas) this.dom.countFilterBossas.textContent = myBossas.length;
+    if (this.dom.countFilterMy) this.dom.countFilterMy.textContent = allUserItems.length;
+    if (this.dom.countFilterCloud) this.dom.countFilterCloud.textContent = cloudItems.length;
+    if (this.dom.countFilterPresets) this.dom.countFilterPresets.textContent = presetItems.length;
 
     // Atualiza cards de métricas no topo da página
     if (this.dom.statTotalBossas) this.dom.statTotalBossas.textContent = totalCount;
+    if (this.dom.statMyPieces) this.dom.statMyPieces.textContent = myPieces.length;
     if (this.dom.statMyBossas) this.dom.statMyBossas.textContent = myBossas.length;
-    if (this.dom.statCloudBossas) this.dom.statCloudBossas.textContent = cloudBossas.length;
-    if (this.dom.statPresetBossas) this.dom.statPresetBossas.textContent = presetBossas.length;
+    if (this.dom.statCloudBossas) this.dom.statCloudBossas.textContent = cloudItems.length;
+    if (this.dom.statPresetBossas) this.dom.statPresetBossas.textContent = presetItems.length;
 
     // Seleção de itens conforme filtro ativo
     let items = [];
-    if (this.currentMgrFilter === 'my') {
+    if (this.currentMgrFilter === 'pieces') {
+      items = [...myPieces];
+    } else if (this.currentMgrFilter === 'bossas') {
       items = [...myBossas];
     } else if (this.currentMgrFilter === 'cloud') {
-      items = [...cloudBossas];
+      items = [...cloudItems];
     } else if (this.currentMgrFilter === 'presets') {
-      items = [...presetBossas];
+      items = [...presetItems];
+    } else if (this.currentMgrFilter === 'my') {
+      items = [...allUserItems];
     } else {
-      items = [...myBossas, ...presetBossas];
+      items = [...allUserItems, ...presetItems];
     }
 
     // Busca textual
@@ -4242,7 +4267,7 @@ class SergioApp {
 
     // Atualiza estatísticas do rodapé
     if (this.dom.bossaMgrStats) {
-      this.dom.bossaMgrStats.textContent = `Exibindo ${items.length} de ${myBossas.length + presetBossas.length} bossas cadastradas`;
+      this.dom.bossaMgrStats.textContent = `Exibindo ${items.length} de ${totalCount} itens no repertório`;
     }
 
     container.innerHTML = '';
@@ -4250,20 +4275,22 @@ class SergioApp {
     if (items.length === 0) {
       container.innerHTML = `
         <div class="bossa-empty-state">
-          <span class="bossa-empty-icon">🥁</span>
-          <h4>Nenhuma bossa encontrada</h4>
-          <p>Você pode criar uma nova bossa a partir dos compassos da sua peça atual usando o botão "+ Criar Bossa da Peça" ou importar um arquivo .json.</p>
+          <span class="bossa-empty-icon">🗂️</span>
+          <h4>Nenhum item encontrado</h4>
+          <p>Você pode criar novas peças ou bossas usando o botão "+ Salvar da Peça" ou importar um arquivo .json.</p>
         </div>
       `;
       return;
     }
 
-    items.forEach(bossa => {
-      const isPreset = PRESETS.some(p => p.id === bossa.id);
-      const isCloud = Boolean(bossa.ownerId);
-      const isPlaying = this.activePreviewBossaId === bossa.id;
-      const measures = Array.isArray(bossa.measures) ? bossa.measures : [];
-      const bpm = bossa.presentationBpm || bossa.baseBpm || 120;
+    items.forEach(item => {
+      const isPreset = PRESETS.some(p => p.id === item.id);
+      const isCloud = Boolean(item.ownerId);
+      const isBossa = Boolean(item.isBossa || item.id?.startsWith('piece-bossa-') || item.id?.startsWith('bossa-'));
+      const isPlaying = this.activePreviewBossaId === item.id;
+      const isCurrentOpen = state.id === item.id;
+      const measures = Array.isArray(item.measures) ? item.measures : [];
+      const bpm = item.presentationBpm || item.baseBpm || 120;
 
       // Fita compacta de compassos
       let ribbonHtml = '';
@@ -4282,17 +4309,33 @@ class SergioApp {
         ribbonHtml += `<span class="ribbon-measure-tag">+${measures.length - 8}</span>`;
       }
 
+      // Badges de origem e tipo
+      let badgesHtml = '';
+      if (isPreset) {
+        badgesHtml += `<span class="bossa-origin-badge preset">⭐ Modelo</span>`;
+      } else if (isBossa) {
+        badgesHtml += isCloud
+          ? `<span class="bossa-origin-badge cloud">☁️ Bossa</span>`
+          : `<span class="bossa-origin-badge local">🥁 Bossa Local</span>`;
+      } else {
+        badgesHtml += isCloud
+          ? `<span class="bossa-origin-badge cloud">☁️ Peça</span>`
+          : `<span class="bossa-origin-badge local">📜 Minha Peça</span>`;
+      }
+
+      if (isCurrentOpen) {
+        badgesHtml += ` <span class="bossa-origin-badge" style="background:rgba(16, 185, 129, 0.2); color:#34d399; border:1px solid rgba(16,185,129,0.4);">▶ Aberta</span>`;
+      }
+
       const card = document.createElement('div');
-      card.className = `bossa-mgr-card ${isPlaying ? 'is-playing' : ''}`;
-      card.dataset.bossaId = bossa.id;
+      card.className = `bossa-mgr-card ${isPlaying ? 'is-playing' : ''} ${isCurrentOpen ? 'is-current-piece' : ''}`;
+      card.dataset.bossaId = item.id;
 
       card.innerHTML = `
         <div class="bossa-mgr-card-header">
           <div class="bossa-mgr-card-title-group">
-            <h4 class="bossa-mgr-card-title">${escapeHtml(bossa.name || 'Bossa Sem Título')}</h4>
-            ${isPreset 
-              ? `<span class="bossa-origin-badge preset">⭐ Modelo</span>`
-              : (isCloud ? `<span class="bossa-origin-badge cloud">☁️ Na Nuvem</span>` : `<span class="bossa-origin-badge local">💾 Local</span>`)}
+            <h4 class="bossa-mgr-card-title">${escapeHtml(item.name || (isBossa ? 'Bossa Sem Título' : 'Peça Sem Título'))}</h4>
+            ${badgesHtml}
           </div>
           <div class="bossa-mgr-card-meta">
             <span><strong>${measures.length}</strong> compassos</span>
@@ -4305,31 +4348,31 @@ class SergioApp {
           ${ribbonHtml}
         </div>
 
-        ${bossa.description ? `<p class="bossa-card-desc">${escapeHtml(bossa.description)}</p>` : ''}
+        ${item.description ? `<p class="bossa-card-desc">${escapeHtml(item.description)}</p>` : ''}
 
         <div class="bossa-card-actions">
           <div class="bossa-actions-left">
-            <button type="button" class="btn-card-action preview ${isPlaying ? 'playing' : ''}" data-action="preview" data-id="${bossa.id}">
+            <button type="button" class="btn-card-action preview ${isPlaying ? 'playing' : ''}" data-action="preview" data-id="${item.id}" title="Ouvir o áudio sintetizado">
               <span class="btn-icon">${isPlaying ? '⏹' : '▶'}</span> ${isPlaying ? 'Parar' : 'Ouvir Prévia'}
             </button>
-            <button type="button" class="btn-card-action insert" data-action="insert" data-id="${bossa.id}">
+            <button type="button" class="btn-card-action insert" data-action="insert" data-id="${item.id}" title="Inserir estes compassos na peça atual">
               <span class="btn-icon">🔗</span> Inserir na Peça
             </button>
-            <button type="button" class="btn-card-action open" data-action="open" data-id="${bossa.id}">
+            <button type="button" class="btn-card-action open" data-action="open" data-id="${item.id}" title="Abrir esta peça no simulador">
               <span class="btn-icon">📂</span> Abrir Peça
             </button>
           </div>
           <div class="bossa-actions-right">
             ${!isPreset ? `
-              <button type="button" class="btn-card-action icon-only" data-action="rename" data-id="${bossa.id}" title="Renomear Bossa">
+              <button type="button" class="btn-card-action icon-only" data-action="rename" data-id="${item.id}" title="Renomear">
                 ✏️
               </button>
             ` : ''}
-            <button type="button" class="btn-card-action icon-only" data-action="export" data-id="${bossa.id}" title="Exportar como JSON">
+            <button type="button" class="btn-card-action icon-only" data-action="export" data-id="${item.id}" title="Exportar como JSON">
               💾
             </button>
             ${!isPreset ? `
-              <button type="button" class="btn-card-action icon-only danger" data-action="delete" data-id="${bossa.id}" title="Excluir Bossa">
+              <button type="button" class="btn-card-action icon-only danger" data-action="delete" data-id="${item.id}" title="Apagar definitivamente da biblioteca e da nuvem">
                 🗑️
               </button>
             ` : ''}
@@ -4341,12 +4384,12 @@ class SergioApp {
         btn.addEventListener('click', (e) => {
           e.stopPropagation();
           const action = btn.dataset.action;
-          if (action === 'preview') this.playBossaPreview(bossa);
-          else if (action === 'insert') this.handleInsertBossaFromManager(bossa);
-          else if (action === 'open') this.handleOpenBossaAsPiece(bossa);
-          else if (action === 'rename') this.handleOpenRenameBossaModal(bossa);
-          else if (action === 'export') this.handleExportBossa(bossa);
-          else if (action === 'delete') this.handleDeleteBossa(bossa);
+          if (action === 'preview') this.playBossaPreview(item);
+          else if (action === 'insert') this.handleInsertBossaFromManager(item);
+          else if (action === 'open') this.handleOpenBossaAsPiece(item);
+          else if (action === 'rename') this.handleOpenRenameBossaModal(item);
+          else if (action === 'export') this.handleExportBossa(item);
+          else if (action === 'delete') this.handleDeletePieceOrBossa(item);
         });
       });
 
@@ -4497,26 +4540,47 @@ class SergioApp {
     this.showToast(`Bossa '${bossa.name}' exportada em JSON!`, '💾');
   }
 
-  async handleDeleteBossa(bossa) {
-    if (!bossa) return;
-    const confirmMsg = `Deseja realmente excluir a bossa "${bossa.name}"? Ela será removida da sua biblioteca local e da nuvem.`;
+  async handleDeletePieceOrBossa(item) {
+    if (!item) return;
+    const isBossa = Boolean(item.isBossa || item.id?.startsWith('piece-bossa-') || item.id?.startsWith('bossa-'));
+    const typeLabel = isBossa ? 'a bossa' : 'a peça';
+    const confirmMsg = `Deseja realmente apagar ${typeLabel} "${item.name || 'Sem Título'}"?\n\nEsta ação removerá o item da biblioteca local e da nuvem.`;
     if (!window.confirm(confirmMsg)) return;
 
-    if (this.activePreviewBossaId === bossa.id) {
+    if (this.activePreviewBossaId === item.id) {
       this.stopBossaPreview();
     }
 
-    state.deletePieceFromLibrary(bossa.id);
+    // 1. Remove da biblioteca local
+    state.deletePieceFromLibrary(item.id);
 
+    // 2. Remove da nuvem se autenticado
     if (this.authService && this.authService.isLoggedIn()) {
-      await collab.deleteBossaFromCloud(bossa.id).catch(err => {
-        console.warn("Erro ao excluir bossa da nuvem:", err);
+      await collab.deletePieceFromCloud(item.id).catch(err => {
+        console.warn("Erro ao excluir item da nuvem:", err);
       });
+    }
+
+    // 3. Se a peça apagada for a peça atualmente aberta no palco, reseta para uma peça nova em branco
+    if (state.id === item.id) {
+      state.createNewPiece("Nova Peça", 120);
+      collab.cleanupUrlPieceParam();
+      this.updateHUD(0);
+      this.renderMeasuresList();
+      this.renderQuickMeasureStrip();
+      if (this.renderer) {
+        this.renderer.resize();
+        this.renderer.render(0);
+      }
     }
 
     this.renderBossaManagerCards();
     this.initPresetsDropdown();
-    this.showToast(`Bossa '${bossa.name}' excluída.`, '🗑️');
+    this.showToast(`${isBossa ? 'Bossa' : 'Peça'} '${item.name || 'Item'}' apagada com sucesso!`, '🗑️');
+  }
+
+  async handleDeleteBossa(bossa) {
+    return this.handleDeletePieceOrBossa(bossa);
   }
 
   handleCreateBossaFromCurrent() {

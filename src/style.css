@@ -630,6 +630,15 @@ button {
   color: var(--red-primary);
 }
 
+.app-menu-item.app-menu-danger {
+  color: #f87171;
+}
+
+.app-menu-item.app-menu-danger:hover {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
 .app-menu-item .menu-item-icon {
   font-size: 0.95rem;
   line-height: 1;

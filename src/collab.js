@@ -586,6 +586,11 @@ class CollabService {
     }
   }
 
+  // Exclui uma Peça ou Bossa da nuvem (alias unificado)
+  async deletePieceFromCloud(pieceId) {
+    return this.deleteBossaFromCloud(pieceId);
+  }
+
   // Atualiza campos de uma Bossa na nuvem (ex: renomear)
   async updateBossaInCloud(bossaId, updates = {}) {
     const currentUid = authService.getUid();
@@ -604,7 +609,7 @@ class CollabService {
   }
 
   // Sincroniza bidirecionalmente a biblioteca local com a nuvem
-  // (Migra bossas criadas no celular para a conta do usuário e baixa no desktop)
+  // (Migra peças e bossas criadas no celular para a conta do usuário e baixa no desktop)
   async syncUserLibraryWithCloud(stateInstance) {
     const uid = authService.getUid();
     if (!db || !uid || !stateInstance) {
@@ -623,18 +628,18 @@ class CollabService {
       let localLibrary = stateInstance.getLibraryPieces();
       let hasLocalChanges = false;
 
-      // 3. Sincroniza bossas criadas localmente (ex: celular) que ainda não foram enviadas à nuvem
+      // 3. Sincroniza peças e bossas criadas localmente (ex: celular) que ainda não foram enviadas à nuvem
       for (const item of localLibrary) {
         if (!item || !item.id) continue;
         const isBossa = Boolean(item.isBossa || item.id.startsWith('piece-bossa-') || item.id.startsWith('bossa-'));
 
-        // Se for bossa do usuário ou bossa local sem dono explícito
-        if (isBossa && (!item.ownerId || item.ownerId === uid)) {
+        // Se for peça/bossa do usuário ou item local sem dono explícito
+        if (!item.ownerId || item.ownerId === uid) {
           if (!cloudMap.has(item.id)) {
             try {
               const uploadPayload = {
                 ...item,
-                isBossa: true,
+                isBossa: isBossa,
                 ownerId: uid,
                 ownerName: authService.getDisplayName() || 'Músico',
                 access: item.access || 'private',
@@ -644,10 +649,9 @@ class CollabService {
               await setDoc(doc(db, 'pieces', item.id), uploadPayload, { merge: true });
               cloudMap.set(item.id, uploadPayload);
               item.ownerId = uid;
-              item.isBossa = true;
               hasLocalChanges = true;
             } catch (upErr) {
-              console.warn("Erro ao sincronizar bossa local para a nuvem:", item.name, upErr);
+              console.warn("Erro ao sincronizar item local para a nuvem:", item.name, upErr);
             }
           }
         }
