@@ -5953,12 +5953,22 @@ kbd {
 }
 
 .bossa-mgr-card-meta {
-  font-size: 0.78rem;
+  font-size: 0.8rem;
   color: var(--white-muted);
   display: flex;
   align-items: center;
   gap: 10px;
   font-family: var(--font-mono);
+  flex-wrap: wrap;
+}
+
+.bossa-mgr-card-meta strong {
+  color: var(--white-pure);
+  font-weight: 700;
+}
+
+[data-theme="light"] .bossa-mgr-card-meta strong {
+  color: var(--text-primary, #1e293b);
 }
 
 /* Fita de Pré-visualização dos Compassos */

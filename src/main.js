@@ -1049,6 +1049,18 @@ class SergioApp {
     return `${mStr}:${sStr}.${tenths}`;
   }
 
+  formatFriendlyDuration(sec) {
+    if (isNaN(sec) || sec <= 0) return '0:00';
+    const totalSeconds = Math.round(sec);
+    const h = Math.floor(totalSeconds / 3600);
+    const m = Math.floor((totalSeconds % 3600) / 60);
+    const s = totalSeconds % 60;
+    if (h > 0) {
+      return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    }
+    return `${m}:${String(s).padStart(2, '0')}`;
+  }
+
   // =========================================================================
   // CONTROLE DO BASE BPM SEM BUGS DE DIGITAÇÃO
   // =========================================================================
@@ -4065,6 +4077,8 @@ class SergioApp {
 
       const measureCount = Array.isArray(p.measures) ? p.measures.length : 0;
       const bpm = p.presentationBpm || p.baseBpm || 120;
+      const { totalDuration: modalDuration } = state.calculateTimingsForMeasures(p.measures, bpm);
+      const modalDurationStr = this.formatFriendlyDuration(modalDuration);
       const isPresetBossa = p.id?.startsWith('bossa-') || Boolean(p.isBossa && PRESETS.some(pr => pr.id === p.id));
       const isCloudBossa = Boolean(p.ownerId);
       const badgeText = isPresetBossa ? '🥁 Modelo Pronto' : (p.isBossa ? (isCloudBossa ? '🥁 Bossa ☁️' : '🥁 Bossa 💾') : '🎵 Peça');
@@ -4075,7 +4089,7 @@ class SergioApp {
             <span class="bossa-card-badge">${badgeText}</span>
             <span class="bossa-card-title">${escapeHtml(p.name || 'Sem título')}</span>
           </div>
-          <span class="bossa-card-meta">${measureCount} comp. • ${bpm} BPM</span>
+          <span class="bossa-card-meta">${measureCount} comp. • ${bpm} BPM • ⏱️ ${modalDurationStr}</span>
         </div>
         ${p.description ? `<p class="bossa-card-desc">${escapeHtml(p.description)}</p>` : ''}
       `;
@@ -4565,22 +4579,8 @@ class SergioApp {
       const measures = Array.isArray(item.measures) ? item.measures : [];
       const bpm = item.presentationBpm || item.baseBpm || 120;
 
-      // Fita compacta de compassos
-      let ribbonHtml = '';
-      const previewLimit = Math.min(measures.length, 8);
-      for (let i = 0; i < previewLimit; i++) {
-        const m = measures[i];
-        const isRatio = m.tempoMode === 'ratio' && (m.ratioNum !== 1 || m.ratioDen !== 1);
-        const ratioText = isRatio ? ` (${m.ratioNum}/${m.ratioDen})` : '';
-        ribbonHtml += `
-          <span class="ribbon-measure-tag ${isRatio ? 'ratio' : ''}" title="${m.nickname || `Compasso ${i + 1}`} - ${m.beats}/${m.beatUnit || 4}${ratioText}">
-            c.${i + 1}: <strong>${m.beats}/${m.beatUnit || 4}</strong>${ratioText}
-          </span>
-        `;
-      }
-      if (measures.length > 8) {
-        ribbonHtml += `<span class="ribbon-measure-tag">+${measures.length - 8}</span>`;
-      }
+      const { totalDuration } = state.calculateTimingsForMeasures(measures, bpm);
+      const durationStr = this.formatFriendlyDuration(totalDuration);
 
       // Badges de origem e tipo
       let badgesHtml = '';
@@ -4611,14 +4611,12 @@ class SergioApp {
             ${badgesHtml}
           </div>
           <div class="bossa-mgr-card-meta">
-            <span><strong>${measures.length}</strong> compassos</span>
+            <span><strong>${measures.length}</strong> ${measures.length === 1 ? 'compasso' : 'compassos'}</span>
             <span>•</span>
             <span><strong>${bpm}</strong> BPM</span>
+            <span>•</span>
+            <span title="Tempo total: ${durationStr}">⏱️ <strong>${durationStr}</strong></span>
           </div>
-        </div>
-
-        <div class="bossa-measures-ribbon">
-          ${ribbonHtml}
         </div>
 
         ${item.description ? `<p class="bossa-card-desc">${escapeHtml(item.description)}</p>` : ''}
