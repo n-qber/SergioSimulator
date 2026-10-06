@@ -5514,17 +5514,30 @@ kbd {
   gap: 12px;
 }
 
-/* Indicador de Sincronização na Nuvem */
+/* Indicador de Sincronização Automática na Nuvem */
 .bossa-mgr-sync-indicator {
   display: inline-flex;
   align-items: center;
   gap: 8px;
   background: var(--bg-card);
   border: 1px solid var(--border-medium);
-  padding: 5px 12px;
+  padding: 6px 14px;
   border-radius: 20px;
-  font-size: 0.75rem;
+  font-size: 0.76rem;
+  font-weight: 600;
   color: var(--white-muted);
+  user-select: none;
+  transition: all 0.25s ease;
+}
+
+.bossa-mgr-sync-indicator.clickable {
+  cursor: pointer;
+}
+
+.bossa-mgr-sync-indicator.clickable:hover {
+  border-color: rgba(59, 130, 246, 0.4);
+  color: #93c5fd;
+  transform: translateY(-1px);
 }
 
 .sync-dot {
@@ -5532,14 +5545,15 @@ kbd {
   height: 8px;
   border-radius: 50%;
   background: #10b981;
-  box-shadow: 0 0 6px #10b981;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
   transition: all 0.3s ease;
+  flex-shrink: 0;
 }
 
 .sync-dot.syncing {
-  background: #f59e0b;
-  box-shadow: 0 0 8px #f59e0b;
-  animation: pulse-sync 1s infinite alternate;
+  background: #3b82f6;
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.8);
+  animation: pulse-sync 0.8s infinite alternate;
 }
 
 .sync-dot.offline {
@@ -5549,36 +5563,7 @@ kbd {
 
 @keyframes pulse-sync {
   from { opacity: 0.4; transform: scale(0.85); }
-  to { opacity: 1; transform: scale(1.15); }
-}
-
-.btn-sync-bossas {
-  background: transparent;
-  border: none;
-  color: #a78bfa;
-  font-size: 0.75rem;
-  font-weight: 700;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 6px;
-  border-radius: 4px;
-  transition: all 0.15s ease;
-}
-
-.btn-sync-bossas:hover {
-  background: rgba(139, 92, 246, 0.15);
-  color: #ffffff;
-}
-
-.btn-sync-bossas.spinning .sync-icon {
-  animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  to { opacity: 1; transform: scale(1.2); }
 }
 
 /* Conteúdo Principal da Página */

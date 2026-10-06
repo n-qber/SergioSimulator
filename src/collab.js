@@ -49,6 +49,7 @@ class CollabService {
     this.unsubPiece = null;
     this.unsubHistory = null;
     this.unsubPresence = null;
+    this.unsubUserLibrary = null;
     this.heartbeatTimer = null;
     
     // Callbacks da aplicação
@@ -703,6 +704,44 @@ class CollabService {
     }
   }
 
+  // Escuta em tempo real todas as alterações na nuvem do usuário (Google Docs style)
+  listenToUserLibrary(stateInstance, onChangeCallback) {
+    if (this.unsubUserLibrary) {
+      this.unsubUserLibrary();
+      this.unsubUserLibrary = null;
+    }
+
+    const uid = authService.getUid();
+    if (!db || !uid || !stateInstance) return;
+
+    try {
+      const piecesCol = collection(db, 'pieces');
+      const q = query(piecesCol, where('ownerId', '==', uid));
+
+      this.unsubUserLibrary = onSnapshot(q, async (snap) => {
+        try {
+          const updatedLib = await this.syncUserLibraryWithCloud(stateInstance);
+          if (typeof onChangeCallback === 'function') {
+            onChangeCallback(updatedLib);
+          }
+        } catch (err) {
+          console.warn("Aviso na sincronização automática em tempo real:", err);
+        }
+      }, (err) => {
+        console.warn("Aviso no listener em tempo real da biblioteca:", err);
+      });
+    } catch (err) {
+      console.warn("Erro ao registrar listener da biblioteca na nuvem:", err);
+    }
+  }
+
+  stopListeningToUserLibrary() {
+    if (this.unsubUserLibrary) {
+      this.unsubUserLibrary();
+      this.unsubUserLibrary = null;
+    }
+  }
+
   // Registra nova versão no histórico (grava na nuvem e atualiza localmente sem gastar leituras)
   async addHistoryEntry(pieceId, action, payload) {
     if (!db) return;
@@ -843,6 +882,7 @@ class CollabService {
     if (this.unsubPiece) { this.unsubPiece(); this.unsubPiece = null; }
     if (this.unsubHistory) { this.unsubHistory(); this.unsubHistory = null; }
     if (this.unsubPresence) { this.unsubPresence(); this.unsubPresence = null; }
+    this.stopListeningToUserLibrary();
     if (this.heartbeatTimer) { clearInterval(this.heartbeatTimer); this.heartbeatTimer = null; }
     clearTimeout(this.pendingCommitTimer);
   }

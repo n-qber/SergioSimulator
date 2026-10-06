@@ -114,6 +114,31 @@ class SergioApp {
     window.addEventListener('pointerdown', unlockAudio);
     window.addEventListener('keydown', unlockAudio);
 
+    // Sincronização automática contínua em segundo plano (ao focar aba, reconectar ou trocar de dispositivo)
+    window.addEventListener('focus', () => {
+      if (this.authService && this.authService.isLoggedIn()) {
+        this.handleSyncBossas(false);
+      }
+    });
+
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden && this.authService && this.authService.isLoggedIn()) {
+        this.handleSyncBossas(false);
+      }
+    });
+
+    window.addEventListener('online', () => {
+      if (this.authService && this.authService.isLoggedIn()) {
+        this.handleSyncBossas(false);
+      }
+    });
+
+    setInterval(() => {
+      if (this.authService && this.authService.isLoggedIn() && !document.hidden) {
+        this.handleSyncBossas(false);
+      }
+    }, 45000);
+
     // Loop de renderização visual (requestAnimationFrame 60 FPS)
     this.lastFrameTime = performance.now();
     requestAnimationFrame((t) => this.renderLoop(t));
@@ -456,7 +481,7 @@ class SergioApp {
       statMyBossas: document.getElementById('statMyBossas'),
       statCloudBossas: document.getElementById('statCloudBossas'),
       statPresetBossas: document.getElementById('statPresetBossas'),
-      btnSyncBossasNow: document.getElementById('btnSyncBossasNow'),
+      bossaMgrSyncIndicator: document.getElementById('bossaMgrSyncIndicator'),
       bossaSyncDot: document.getElementById('bossaSyncDot'),
       bossaMgrSyncText: document.getElementById('bossaMgrSyncText'),
       btnMgrCreateNewBlankPiece: document.getElementById('btnMgrCreateNewBlankPiece'),
@@ -2978,16 +3003,29 @@ class SergioApp {
       this.updateAuthUi(user, isLoggedIn);
       this.initPresetsDropdown();
 
-      // Sincroniza biblioteca e bossas com a nuvem automaticamente ao autenticar
+      // Sincroniza biblioteca e bossas com a nuvem automaticamente ao autenticar (tempo real Google Docs)
       if (isLoggedIn) {
+        collab.listenToUserLibrary(state, () => {
+          this.initPresetsDropdown();
+          if (this.currentView === 'bossas' || (this.dom.viewBossaManager && this.dom.viewBossaManager.style.display === 'flex')) {
+            this.renderBossaManagerCards();
+          }
+          this.updateBossaManagerSyncIndicator('idle', 'Sincronizado automaticamente');
+        });
+
         collab.syncUserLibraryWithCloud(state).then(() => {
           this.initPresetsDropdown();
           if (this.currentView === 'bossas' || (this.dom.viewBossaManager && this.dom.viewBossaManager.style.display === 'flex')) {
             this.renderBossaManagerCards();
           }
+          this.updateBossaManagerSyncIndicator('idle', 'Sincronizado automaticamente');
         }).catch(err => {
           console.warn("Erro ao sincronizar bossas com a nuvem:", err);
+          this.updateBossaManagerSyncIndicator('idle', 'Salvo localmente');
         });
+      } else {
+        collab.stopListeningToUserLibrary();
+        this.updateBossaManagerSyncIndicator('idle', 'Salvo no dispositivo');
       }
 
       // Se havia uma peça privada que foi negada antes e o usuário acabou de logar, tenta reconectar
@@ -3840,9 +3878,13 @@ class SergioApp {
     this.dom.btnBackToSimulator?.addEventListener('click', () => this.closeBossaManager(true));
     this.dom.btnBackToSimulatorBottom?.addEventListener('click', () => this.closeBossaManager(true));
 
-    // Sincronizar Bossas na Nuvem
-    this.dom.btnSyncBossasNow?.addEventListener('click', () => {
-      this.handleSyncBossas(true);
+    // Indicador de Sincronização Automática na Nuvem
+    this.dom.bossaMgrSyncIndicator?.addEventListener('click', () => {
+      if (!this.authService || !this.authService.isLoggedIn()) {
+        this.openAuthModal('login');
+      } else {
+        this.handleSyncBossas(false);
+      }
     });
 
     // Ações Rápidas do Gerenciador
@@ -4318,29 +4360,37 @@ class SergioApp {
   updateBossaManagerSyncIndicator(status = 'idle', message = null) {
     const dot = this.dom.bossaSyncDot;
     const text = this.dom.bossaMgrSyncText;
-    const btn = this.dom.btnSyncBossasNow;
+    const container = this.dom.bossaMgrSyncIndicator;
     if (!dot || !text) return;
 
     if (status === 'syncing') {
       dot.className = 'sync-dot syncing';
-      text.textContent = message || 'Sincronizando com a Nuvem...';
-      if (btn) btn.classList.add('spinning');
+      text.textContent = message || 'Sincronizando com a nuvem...';
+      if (container) {
+        container.classList.remove('clickable');
+        container.title = 'Sincronizando biblioteca com a nuvem...';
+      }
       return;
     }
 
-    if (btn) btn.classList.remove('spinning');
-
     if (this.authService && this.authService.isLoggedIn()) {
       dot.className = 'sync-dot';
-      const name = this.authService.getDisplayName() || 'Conectado';
-      text.textContent = message || `Nuvem Pronta (${name})`;
+      text.textContent = message || 'Sincronizado automaticamente';
+      if (container) {
+        container.classList.remove('clickable');
+        container.title = 'Suas músicas sincronizam automaticamente com a nuvem.';
+      }
     } else {
       dot.className = 'sync-dot offline';
-      text.textContent = message || 'Apenas Local (Conecte-se para Nuvem)';
+      text.textContent = message || 'Salvo no dispositivo (conectar nuvem)';
+      if (container) {
+        container.classList.add('clickable');
+        container.title = 'Clique para entrar com sua conta e ativar a sincronização automática.';
+      }
     }
   }
 
-  async handleSyncBossas(showToastNotice = true) {
+  async handleSyncBossas(showToastNotice = false) {
     if (!this.authService || !this.authService.isLoggedIn()) {
       if (showToastNotice) {
         this.openAuthModal('login');
@@ -4353,7 +4403,7 @@ class SergioApp {
 
     try {
       await collab.syncUserLibraryWithCloud(state);
-      this.updateBossaManagerSyncIndicator('idle', 'Sincronizado com Sucesso!');
+      this.updateBossaManagerSyncIndicator('idle', 'Sincronizado automaticamente');
       this.renderBossaManagerCards();
       this.initPresetsDropdown();
       if (showToastNotice) {
@@ -4361,7 +4411,7 @@ class SergioApp {
       }
     } catch (err) {
       console.warn("Erro ao sincronizar bossas:", err);
-      this.updateBossaManagerSyncIndicator('idle', 'Erro na sincronização');
+      this.updateBossaManagerSyncIndicator('idle', 'Salvo localmente (offline)');
       if (showToastNotice) {
         this.showToast('Não foi possível sincronizar no momento.', '⚠️');
       }
