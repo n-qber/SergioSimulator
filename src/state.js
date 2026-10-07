@@ -81,7 +81,25 @@ class PieceState {
       this.baseBpm = this.presentationBpm;
     }
     
-    if (Array.isArray(data.items)) {
+    const hasItems = Array.isArray(data.items) && data.items.length > 0;
+    const hasBossasInItems = hasItems && data.items.some(it => it.type === 'bossa');
+    const isBossaGroup = (g) => Boolean(
+      g && (
+        g.isBossaBlock ||
+        g.sourcePieceId ||
+        g.id?.startsWith('grp-bossa-') ||
+        g.id?.startsWith('bossa-') ||
+        (g.name && (g.name.startsWith('🔗') || /bossa/i.test(g.name)))
+      )
+    );
+    const hasBossaGroupsInLegacy = Array.isArray(data.groups) && data.groups.some(isBossaGroup);
+    const hasBossaMeasuresInLegacy = Array.isArray(data.measures) && data.measures.some(m => m.sourcePieceId || m.isLinked);
+
+    // Se data.items não possui bossas mas data.groups ou data.measures possuía bossas vinculadas/blocos,
+    // significa que data.items foi achatado acidentalmente. Priorizamos a recuperação a partir dos grupos/medidas!
+    const shouldUseLegacyMigration = !hasItems || (!hasBossasInItems && (hasBossaGroupsInLegacy || hasBossaMeasuresInLegacy));
+
+    if (!shouldUseLegacyMigration && hasItems) {
       this.items = data.items.map((it, idx) => {
         if (it.type === 'bossa') {
           let bossaMs = Array.isArray(it.measures) ? it.measures : [];
@@ -118,18 +136,18 @@ class PieceState {
         };
       });
     } else {
-      // Migração on-the-fly de dados legados (measures + groups)
+      // Migração e recuperação on-the-fly de dados legados (measures + groups)
       const rawMeasures = data.measures || [];
       const rawGroups = data.groups || [];
       const migratedItems = [];
       let mIdx = 0;
       while (mIdx < rawMeasures.length) {
-        let bossaGrp = rawGroups.find(g => (g.isBossaBlock || g.sourcePieceId || (g.name && /bossa/i.test(g.name))) && g.startMeasure === mIdx && g.endMeasure >= mIdx && g.endMeasure < rawMeasures.length);
+        let bossaGrp = rawGroups.find(g => isBossaGroup(g) && g.startMeasure === mIdx && g.endMeasure >= mIdx && g.endMeasure < rawMeasures.length);
         const curM = rawMeasures[mIdx];
 
         // Se houver compassos com sourcePieceId mesmo sem match exato de startMeasure no grupo
         if (!bossaGrp && curM && (curM.sourcePieceId || (curM.nickname && /bossa/i.test(curM.nickname)))) {
-          bossaGrp = rawGroups.find(g => (g.isBossaBlock || (curM.sourcePieceId && g.sourcePieceId === curM.sourcePieceId) || (g.name && /bossa/i.test(g.name))));
+          bossaGrp = rawGroups.find(g => isBossaGroup(g) || (curM.sourcePieceId && g.sourcePieceId === curM.sourcePieceId));
           let endIdx = mIdx;
           while (endIdx + 1 < rawMeasures.length && (
             (curM.sourcePieceId && rawMeasures[endIdx + 1].sourcePieceId === curM.sourcePieceId) ||
@@ -138,18 +156,33 @@ class PieceState {
             endIdx++;
           }
           const bossaMs = rawMeasures.slice(mIdx, endIdx + 1);
-          const isLinked = curM.isLinked !== undefined ? Boolean(curM.isLinked) : (bossaGrp?.isLinked !== undefined ? Boolean(bossaGrp.isLinked) : Boolean(curM.sourcePieceId || bossaGrp?.sourcePieceId));
+          const cleanName = (curM.sourcePieceName || bossaGrp?.name || curM.nickname || 'Bossa').replace(/^[🔗📦✏️🔓\s]+/, '').trim();
+          const isLinked = curM.isLinked !== undefined
+            ? Boolean(curM.isLinked)
+            : (bossaGrp?.isLinked !== undefined ? Boolean(bossaGrp.isLinked) : (bossaGrp?.name?.startsWith('🔗') || true));
+
+          let srcId = curM.sourcePieceId || bossaGrp?.sourcePieceId || null;
+          if (!srcId) {
+            const orig = this.findBossaOrPiece(null, cleanName);
+            if (orig) srcId = orig.id;
+          }
+
           migratedItems.push({
             type: 'bossa',
             id: bossaGrp?.id || `bossa-${Date.now()}-${migratedItems.length}`,
-            name: (curM.sourcePieceName || bossaGrp?.name || curM.nickname || 'Bossa').replace(/^[🔗📦✏️🔓\s]+/, '').trim(),
+            name: cleanName,
             color: curM.color || bossaGrp?.color || '#8b5cf6',
             repeat: Math.max(1, Math.min(999, parseInt(bossaGrp?.repeat || 1, 10))),
             collapsed: bossaGrp?.collapsed !== undefined ? Boolean(bossaGrp.collapsed) : true,
             isLinked: isLinked,
-            sourcePieceId: curM.sourcePieceId || bossaGrp?.sourcePieceId || null,
-            sourcePieceName: curM.sourcePieceName || bossaGrp?.sourcePieceName || bossaGrp?.name || curM.nickname || 'Bossa',
-            measures: bossaMs
+            sourcePieceId: srcId,
+            sourcePieceName: cleanName,
+            measures: bossaMs.map((bm, bIdx) => ({
+              ...bm,
+              sourcePieceId: srcId,
+              sourcePieceName: cleanName,
+              isLinked: isLinked
+            }))
           });
           mIdx = endIdx + 1;
           continue;
@@ -157,17 +190,37 @@ class PieceState {
 
         if (bossaGrp) {
           const bossaMs = rawMeasures.slice(bossaGrp.startMeasure, bossaGrp.endMeasure + 1);
+          const cleanName = (bossaGrp.name || bossaGrp.sourcePieceName || 'Bossa').replace(/^[🔗📦✏️🔓\s]+/, '').trim();
+          const isLinked = bossaGrp.isLinked !== undefined
+            ? Boolean(bossaGrp.isLinked)
+            : (bossaGrp.name?.startsWith('🔗') || Boolean(bossaGrp.sourcePieceId) || true);
+
+          let srcId = bossaGrp.sourcePieceId || null;
+          if (!srcId) {
+            const mWithSrc = bossaMs.find(m => m.sourcePieceId);
+            if (mWithSrc) srcId = mWithSrc.sourcePieceId;
+          }
+          if (!srcId) {
+            const orig = this.findBossaOrPiece(null, cleanName);
+            if (orig) srcId = orig.id;
+          }
+
           migratedItems.push({
             type: 'bossa',
             id: bossaGrp.id || `bossa-${Date.now()}-${migratedItems.length}`,
-            name: (bossaGrp.name || bossaGrp.sourcePieceName || 'Bossa').replace(/^[🔗📦✏️🔓\s]+/, '').trim(),
+            name: cleanName,
             color: bossaGrp.color || '#8b5cf6',
             repeat: Math.max(1, Math.min(999, parseInt(bossaGrp.repeat, 10) || 1)),
             collapsed: bossaGrp.collapsed !== undefined ? Boolean(bossaGrp.collapsed) : true,
-            isLinked: bossaGrp.isLinked !== undefined ? Boolean(bossaGrp.isLinked) : Boolean(bossaGrp.sourcePieceId),
-            sourcePieceId: bossaGrp.sourcePieceId || null,
-            sourcePieceName: bossaGrp.sourcePieceName || bossaGrp.name || 'Bossa',
-            measures: bossaMs
+            isLinked: isLinked,
+            sourcePieceId: srcId,
+            sourcePieceName: cleanName,
+            measures: bossaMs.map((bm, bIdx) => ({
+              ...bm,
+              sourcePieceId: srcId,
+              sourcePieceName: cleanName,
+              isLinked: isLinked
+            }))
           });
           mIdx = bossaGrp.endMeasure + 1;
         } else {
