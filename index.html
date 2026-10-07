@@ -300,6 +300,7 @@
         <div id="runnerMeasureToolbar" class="runner-measure-toolbar" style="display:none">
           <div class="toolbar-info">
             <span class="toolbar-badge" id="toolbarMeasureBadge">c. 1</span>
+            <span class="toolbar-duration" id="toolbarMeasureDuration" style="display:none" title="Duração total dos compassos selecionados">⏱️ 0:00</span>
             <span class="toolbar-name" id="toolbarMeasureName"></span>
           </div>
           <div class="toolbar-actions">
@@ -365,7 +366,7 @@
             <button type="button" id="btnClearAllMeasures" class="btn-ghost-sm" title="Remover todos os compassos da peça"><span data-lucide="trash-2" data-size="14"></span> Limpar Peça</button>
             <button type="button" id="btnOpenBossaManager" class="btn-bossa-sm btn-mgr-accent" title="Abrir biblioteca de peças e bossas, ouvir prévias e sincronizar"><span data-lucide="library" data-size="14"></span> Ver Repertório</button>
             <button type="button" id="btnOpenInsertBossaModal" class="btn-bossa-sm" title="Inserir outra peça ou bossa por referência nesta peça"><span data-lucide="link" data-size="14"></span> Inserir Bloco</button>
-            <button type="button" id="btnOpenGroupModal" class="btn-ghost-sm"><span data-lucide="folder-plus" data-size="14"></span> Novo Grupo</button>
+            <button type="button" id="btnOpenGroupModal" class="btn-ghost-sm" title="Criar ou gerenciar seções da peça"><span data-lucide="folder-plus" data-size="14"></span> Nova Seção</button>
             <button type="button" id="btnAddMeasureBottom" class="btn-red-sm"><span data-lucide="plus" data-size="14"></span> Compasso</button>
           </div>
         </div>
@@ -1210,6 +1211,10 @@
     <div id="runnerContextMenu" class="runner-context-menu" style="display:none">
       <div class="context-menu-header" id="ctxMenuHeader">Compasso 1</div>
       <button type="button" class="ctx-item" id="ctxEdit"><span data-lucide="sliders" data-size="14"></span> Configurar Compasso</button>
+      <button type="button" class="ctx-item" id="ctxAddMeasureRight"><span data-lucide="plus" data-size="14"></span> Adicionar Compasso à Direita</button>
+      <button type="button" class="ctx-item" id="ctxInsertSectionBefore"><span data-lucide="folder-plus" data-size="14"></span> Inserir Seção Antes</button>
+      <button type="button" class="ctx-item" id="ctxInsertSectionAfter"><span data-lucide="folder-plus" data-size="14"></span> Inserir Seção Depois</button>
+      <div class="ctx-divider"></div>
       <button type="button" class="ctx-item" id="ctxMoveLeft"><span data-lucide="arrow-left" data-size="14"></span> Mover para a Esquerda</button>
       <button type="button" class="ctx-item" id="ctxMoveRight"><span data-lucide="arrow-right" data-size="14"></span> Mover para a Direita</button>
       <div class="ctx-divider"></div>

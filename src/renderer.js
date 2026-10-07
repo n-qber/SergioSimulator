@@ -411,7 +411,11 @@ export class DJRunnerRenderer {
     const visibleTimeStart = currentTime - (playheadX / this.pixelsPerSecond) - 0.5;
     const visibleTimeEnd = currentTime + ((w - playheadX) / this.pixelsPerSecond) + 0.5;
 
-    // 1. Faixas de Grupos (apenas os visíveis)
+    const topY = 28;
+    const bottomY = h - 12;
+    const blockH = Math.max(80, bottomY - topY);
+
+    // 1. Faixas e Delimitações de Seções / Grupos (apenas os visíveis)
     const groups = this.state.groups || [];
     if (groups.length > 0) {
       const bannerHeight = 18;
@@ -451,7 +455,18 @@ export class DJRunnerRenderer {
           const grpX2 = playheadX + (endTiming.endTime - currentTime) * this.pixelsPerSecond;
           const grpW = grpX2 - grpX1;
 
-          ctx.fillStyle = `${grp.color}18`;
+          // Cobertura visual sutil ocupando a área dos compassos da seção
+          ctx.fillStyle = `${grp.color}0a`;
+          ctx.fillRect(grpX1, topY, grpW, blockH);
+
+          // Linhas verticais separadoras nas extremidades da seção ("só umas linhazinha")
+          ctx.fillStyle = grp.color;
+          ctx.fillRect(grpX1, topY, 2.5, blockH);
+          ctx.fillRect(grpX2 - 2.5, topY, 2.5, blockH);
+          ctx.fillRect(grpX1, topY, grpW, 1.5);
+
+          // Faixa de cabeçalho da seção no topo da esteira
+          ctx.fillStyle = `${grp.color}20`;
           ctx.fillRect(grpX1, 3, grpW, bannerHeight);
 
           ctx.fillStyle = grp.color;
@@ -481,10 +496,6 @@ export class DJRunnerRenderer {
         high = mid - 1;
       }
     }
-
-    const topY = 28;
-    const bottomY = h - 12;
-    const blockH = Math.max(80, bottomY - topY);
     const midY = topY + blockH * 0.52;
     const maxTickH = Math.min(blockH * 0.42, 90);
 

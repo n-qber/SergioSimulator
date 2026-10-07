@@ -474,6 +474,10 @@ class CollabService {
                 repeat: Math.max(1, Math.min(999, parseInt(it.repeat, 10) || 1)),
                 collapsed: it.collapsed !== undefined ? Boolean(it.collapsed) : true,
                 isLinked: Boolean(it.isLinked),
+                tempoMode: it.tempoMode || 'inherit',
+                bpm: it.bpm ? Number(it.bpm) : null,
+                ratioNum: it.ratioNum ? Number(it.ratioNum) : 1,
+                ratioDen: it.ratioDen ? Number(it.ratioDen) : 1,
                 sourcePieceId: it.sourcePieceId || null,
                 sourcePieceName: it.sourcePieceName || it.name || 'Bossa',
                 measures: (it.measures && it.measures.length > 0)
@@ -482,6 +486,16 @@ class CollabService {
                 groups: Array.isArray(it.groups) ? it.groups : [],
                 variables: Array.isArray(it.variables) ? it.variables : [],
                 variableValues: it.variableValues || {}
+              };
+            }
+            if (it.type === 'section') {
+              return {
+                type: 'section',
+                id: it.id,
+                name: (it.name || 'Seção').trim(),
+                color: it.color || '#3b82f6',
+                repeat: Math.max(1, Math.min(999, parseInt(it.repeat, 10) || 1)),
+                repeatVariable: it.repeatVariable ? String(it.repeatVariable).trim() : null
               };
             }
             return {
@@ -1028,7 +1042,9 @@ class CollabService {
           if (it.type === 'bossa') {
             const innerMeasures = (it.measures || []).map(m => `${m.id || ''}:${m.beats || 4}:${m.beatUnit || 4}:${m.repeatVariable || ''}`).join(',');
             const varsStr = JSON.stringify(it.variableValues || {});
-            return `B:${it.id || ''}:${it.name || ''}:${it.sourcePieceId || ''}:${it.isLinked ? 1 : 0}:${it.repeat || 1}:${varsStr}:${innerMeasures}`;
+            return `B:${it.id || ''}:${it.name || ''}:${it.sourcePieceId || ''}:${it.isLinked ? 1 : 0}:${it.repeat || 1}:${it.tempoMode || 'inherit'}:${it.bpm || ''}:${it.ratioNum || 1}/${it.ratioDen || 1}:${varsStr}:${innerMeasures}`;
+          } else if (it.type === 'section') {
+            return `S:${it.id || ''}:${it.name || ''}:${it.color || ''}:${it.repeat || 1}:${it.repeatVariable || ''}`;
           } else {
             const m = it.measure || it;
             return `M:${m.id || ''}:${m.nickname || ''}:${m.beats || 4}:${m.beatUnit || 4}:${m.tempoMode || 'ratio'}:${m.ratioNum || 1}/${m.ratioDen || 1}:${m.customBpm || 120}:${m.color || ''}:${m.repeat || 1}:${m.repeatVariable || ''}`;

@@ -6737,6 +6737,357 @@ kbd {
   opacity: 1;
 }
 
+/* =========================================================================
+   DIVISOR DE SEÇÃO VISUAL NA GRADE DE COMPASSOS
+   ========================================================================= */
+.section-block-header {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 8px 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-medium);
+  border-left: 6px solid var(--section-color, #3b82f6);
+  border-radius: 10px;
+  margin-top: 14px;
+  margin-bottom: 6px;
+  box-shadow: var(--shadow-sm);
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.section-block-header.is-drag-source {
+  opacity: 0.45;
+  border-style: dashed;
+}
+
+.section-block-header.is-drag-target {
+  outline: 2px dashed #3b82f6;
+  outline-offset: 3px;
+  background: rgba(59, 130, 246, 0.15);
+}
+
+.section-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.section-drag-handle {
+  font-size: 1.15rem;
+  line-height: 1;
+  color: var(--white-muted);
+  cursor: grab;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.15s ease;
+  letter-spacing: -1px;
+}
+
+.section-drag-handle:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--white-pure);
+}
+
+.section-color-label {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  margin-right: 2px;
+}
+
+.input-section-color {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.section-color-pip {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 0 6px rgba(0, 0, 0, 0.3);
+  transition: transform 0.15s ease;
+  cursor: pointer;
+}
+
+.section-color-label:hover .section-color-pip {
+  transform: scale(1.15);
+  border-color: #ffffff;
+}
+
+.section-type-badge {
+  font-size: 0.68rem;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.input-section-name {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--white-pure);
+  padding: 2px 6px;
+  min-width: 130px;
+  max-width: 280px;
+  transition: all 0.15s ease;
+}
+
+.input-section-name:hover {
+  border-color: var(--border-light);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.input-section-name:focus {
+  outline: none;
+  border-color: #3b82f6;
+  background: rgba(59, 130, 246, 0.12);
+}
+
+.section-header-range {
+  font-size: 0.74rem;
+  color: var(--white-muted);
+  font-family: var(--font-mono);
+}
+
+.section-header-time {
+  font-size: 0.72rem;
+  color: var(--white-muted);
+  font-family: var(--font-mono);
+  background: rgba(255, 255, 255, 0.05);
+  padding: 2px 7px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.section-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.section-repeat-stepper-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(0, 0, 0, 0.22);
+  padding: 2px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border-light);
+}
+
+.section-repeat-stepper-wrap .card-stepper-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--white-muted);
+}
+
+.section-repeat-stepper-wrap .input-card-repeat {
+  width: 36px;
+  padding: 1px 0;
+  font-size: 0.74rem;
+  height: 22px;
+}
+
+.section-repeat-stepper-wrap .btn-repeat-step {
+  width: 20px;
+  height: 20px;
+  font-size: 0.75rem;
+}
+
+.btn-sec-action {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border-medium);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--white-pure);
+  cursor: pointer;
+  transition: all 0.18s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.btn-sec-action:hover {
+  background: rgba(59, 130, 246, 0.25);
+  border-color: #3b82f6;
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+.btn-sec-action.danger {
+  color: #f87171;
+}
+
+.btn-sec-action.danger:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: #ef4444;
+  color: #ffffff;
+}
+
+/* Duração dos Compassos Selecionados */
+.toolbar-duration {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(59, 130, 246, 0.18);
+  color: #93c5fd;
+  border: 1px solid rgba(59, 130, 246, 0.35);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 5px;
+  letter-spacing: 0.2px;
+}
+
+.count-tag.has-selection {
+  background: rgba(59, 130, 246, 0.15) !important;
+  border-color: rgba(59, 130, 246, 0.4) !important;
+  color: #93c5fd !important;
+}
+
+.selection-time-highlight {
+  font-weight: 800;
+  color: #60a5fa;
+}
+
+/* Controles de Andamento de Bossa */
+.bossa-tempo-stepper-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(0, 0, 0, 0.22);
+  padding: 2px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border-light);
+}
+
+.bossa-tempo-stepper-wrap .card-stepper-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--white-muted);
+}
+
+.select-bossa-tempo-mode {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-medium);
+  border-radius: 5px;
+  color: var(--white-pure);
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.15s ease;
+}
+
+.select-bossa-tempo-mode:hover,
+.select-bossa-tempo-mode:focus {
+  border-color: #8b5cf6;
+  background: rgba(139, 92, 246, 0.15);
+}
+
+.select-bossa-tempo-mode option {
+  background: #18181b;
+  color: #f4f4f5;
+}
+
+.bossa-bpm-stepper {
+  display: inline-flex;
+  align-items: center;
+}
+
+.input-bossa-bpm {
+  width: 42px !important;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  padding: 1px 0;
+  font-size: 0.75rem;
+  height: 22px;
+}
+
+.bossa-bpm-stepper .btn-repeat-step {
+  font-size: 0.65rem;
+  font-weight: 800;
+  width: 22px;
+  height: 20px;
+  padding: 0;
+}
+
+.bossa-ratio-stepper-box {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+}
+
+.input-bossa-ratio-num,
+.input-bossa-ratio-den {
+  width: 28px !important;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  padding: 1px 0;
+  font-size: 0.74rem;
+  height: 22px;
+}
+
+.bossa-ratio-divider {
+  font-weight: 800;
+  color: var(--white-muted);
+}
+
+.bossa-ratio-calc-preview {
+  font-size: 0.7rem;
+  color: #c4b5fd;
+  margin-left: 3px;
+}
+
+.bossa-block-header-tempo-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  padding: 2px 7px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.bossa-compact-tempo-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.bossa-tempo-stepper-row {
+  margin-top: 4px;
+}
+
 .btn-return-previous-piece {
   display: inline-flex;
   align-items: center;
@@ -7163,6 +7514,81 @@ kbd {
 [data-theme="light"] .bossa-repeat-multiplier {
   background: rgba(15, 23, 42, 0.1);
   color: #0f172a;
+}
+
+[data-theme="light"] .section-block-header {
+  background: #ffffff;
+  border-color: #e2e8f0;
+}
+
+[data-theme="light"] .input-section-name {
+  color: #0f172a;
+}
+
+[data-theme="light"] .input-section-name:hover {
+  background: rgba(15, 23, 42, 0.04);
+}
+
+[data-theme="light"] .section-drag-handle {
+  background: rgba(15, 23, 42, 0.05);
+  border-color: rgba(15, 23, 42, 0.1);
+  color: #64748b;
+}
+
+[data-theme="light"] .section-drag-handle:hover {
+  background: rgba(15, 23, 42, 0.1);
+  color: #0f172a;
+}
+
+[data-theme="light"] .section-header-time {
+  background: rgba(15, 23, 42, 0.04);
+  border-color: rgba(15, 23, 42, 0.08);
+  color: #64748b;
+}
+
+[data-theme="light"] .section-repeat-stepper-wrap,
+[data-theme="light"] .bossa-tempo-stepper-wrap {
+  background: rgba(15, 23, 42, 0.04);
+  border-color: #e2e8f0;
+}
+
+[data-theme="light"] .select-bossa-tempo-mode {
+  background: #ffffff;
+  border-color: #cbd5e1;
+  color: #1e293b;
+}
+
+[data-theme="light"] .select-bossa-tempo-mode option {
+  background: #ffffff;
+  color: #0f172a;
+}
+
+[data-theme="light"] .btn-sec-action {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  color: #1e293b;
+}
+
+[data-theme="light"] .btn-sec-action:hover {
+  background: rgba(59, 130, 246, 0.15);
+  border-color: #3b82f6;
+  color: #2563eb;
+}
+
+[data-theme="light"] .toolbar-duration {
+  background: rgba(59, 130, 246, 0.12);
+  border-color: rgba(59, 130, 246, 0.3);
+  color: #1d4ed8;
+}
+
+[data-theme="light"] .count-tag.has-selection {
+  background: rgba(59, 130, 246, 0.1) !important;
+  border-color: rgba(59, 130, 246, 0.3) !important;
+  color: #1d4ed8 !important;
+}
+
+[data-theme="light"] .selection-time-highlight {
+  color: #2563eb;
 }
 
 /* Modal de Acesso Negado (Proteção Total de Privacidade) */

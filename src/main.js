@@ -441,6 +441,7 @@ class SergioApp {
       runnerResizer: document.getElementById('runnerResizer'),
       runnerMeasureToolbar: document.getElementById('runnerMeasureToolbar'),
       toolbarMeasureBadge: document.getElementById('toolbarMeasureBadge'),
+      toolbarMeasureDuration: document.getElementById('toolbarMeasureDuration'),
       toolbarMeasureName: document.getElementById('toolbarMeasureName'),
       btnMoveMeasureLeft: document.getElementById('btnMoveMeasureLeft'),
       btnMoveMeasureRight: document.getElementById('btnMoveMeasureRight'),
@@ -458,6 +459,9 @@ class SergioApp {
       runnerContextMenu: document.getElementById('runnerContextMenu'),
       ctxMenuHeader: document.getElementById('ctxMenuHeader'),
       ctxEdit: document.getElementById('ctxEdit'),
+      ctxAddMeasureRight: document.getElementById('ctxAddMeasureRight'),
+      ctxInsertSectionBefore: document.getElementById('ctxInsertSectionBefore'),
+      ctxInsertSectionAfter: document.getElementById('ctxInsertSectionAfter'),
       ctxMoveLeft: document.getElementById('ctxMoveLeft'),
       ctxMoveRight: document.getElementById('ctxMoveRight'),
       ctxCopy: document.getElementById('ctxCopy'),
@@ -1153,6 +1157,37 @@ class SergioApp {
     return `${m}:${String(s).padStart(2, '0')}`;
   }
 
+  // Formatação detalhada de duração para seleção de compassos (ex: 2.0s, 12.5s, 1m 20.0s)
+  formatDurationDetailed(sec) {
+    if (isNaN(sec) || sec <= 0) return '0.0s';
+    if (sec < 60) {
+      return `${sec.toFixed(1)}s`;
+    }
+    const mins = Math.floor(sec / 60);
+    const rem = (sec % 60).toFixed(1);
+    const remStr = (sec % 60) < 10 ? `0${rem}` : `${rem}`;
+    return `${mins}m ${remStr}s (${sec.toFixed(1)}s)`;
+  }
+
+  // Adicionar compasso à direita do compasso selecionado (ou ao final se nenhum selecionado)
+  handleAddMeasureAction() {
+    const selectedIndices = this.getSelectedMeasureIndicesList();
+    if (selectedIndices.length > 0) {
+      const targetIdx = Math.max(...selectedIndices);
+      const res = state.addMeasureAfter(targetIdx);
+      this.renderMeasuresList();
+      if (res && typeof res.measureIndex === 'number') {
+        this.handleMeasureSelected(res.measureIndex);
+      }
+      return;
+    }
+
+    state.addMeasure(-1);
+    this.renderMeasuresList();
+    const newIdx = Math.max(0, state.measures.length - 1);
+    this.handleMeasureSelected(newIdx);
+  }
+
   // =========================================================================
   // CONTROLE DO BASE BPM SEM BUGS DE DIGITAÇÃO
   // =========================================================================
@@ -1363,15 +1398,13 @@ class SergioApp {
       this.preparePieceAudio(true);
     });
 
-    // Adicionar Compasso
+    // Adicionar Compasso (à direita do selecionado ou ao final)
     this.dom.btnAddMeasureQuick.addEventListener('click', () => {
-      state.addMeasure();
-      this.renderMeasuresList();
+      this.handleAddMeasureAction();
     });
 
     this.dom.btnAddMeasureBottom.addEventListener('click', () => {
-      state.addMeasure();
-      this.renderMeasuresList();
+      this.handleAddMeasureAction();
     });
 
     // Botão Novo Arquivo & Limpar com double-check
@@ -1844,10 +1877,14 @@ class SergioApp {
 
     this.dom.btnGroupSelectedMeasures?.addEventListener('click', () => {
       if (this.selectedMeasureIndices.size === 0) return;
-      const indices = Array.from(this.selectedMeasureIndices);
-      const minIdx = Math.min(...indices);
-      const maxIdx = Math.max(...indices);
-      this.openGroupModalWithRange(minIdx, maxIdx);
+      const indices = Array.from(this.selectedMeasureIndices).sort((a, b) => a - b);
+      const minIdx = indices[0];
+      const targetM = state.measures[minIdx];
+      const targetItemIdx = targetM ? targetM._itemIndex : 0;
+      const secCount = state.groups.filter(g => !g.isBossaBlock).length + 1;
+      state.addSection(targetItemIdx, { name: `Seção ${secCount}` });
+      this.renderMeasuresList();
+      this.showToast(`Seção criada a partir do compasso c. ${minIdx + 1}!`, '🏷️');
     });
 
     this.dom.btnConfigureSelectedMeasure?.addEventListener('click', () => {
@@ -1886,6 +1923,41 @@ class SergioApp {
     this.dom.ctxEdit?.addEventListener('click', () => {
       if (this._contextMeasureIdx !== undefined) {
         this.openMeasureModal(this._contextMeasureIdx);
+      }
+      this.closeContextMenu();
+    });
+
+    this.dom.ctxAddMeasureRight?.addEventListener('click', () => {
+      if (this._contextMeasureIdx !== undefined) {
+        const res = state.addMeasureAfter(this._contextMeasureIdx);
+        this.renderMeasuresList();
+        if (res && typeof res.measureIndex === 'number') {
+          this.handleMeasureSelected(res.measureIndex);
+        }
+      }
+      this.closeContextMenu();
+    });
+
+    this.dom.ctxInsertSectionBefore?.addEventListener('click', () => {
+      if (this._contextMeasureIdx !== undefined) {
+        const m = state.measures[this._contextMeasureIdx];
+        const itemIdx = m ? m._itemIndex : 0;
+        const secCount = state.groups.filter(g => !g.isBossaBlock).length + 1;
+        state.addSection(itemIdx, { name: `Seção ${secCount}` });
+        this.renderMeasuresList();
+        this.showToast(`Nova seção inserida antes do compasso c. ${this._contextMeasureIdx + 1}!`, '🏷️');
+      }
+      this.closeContextMenu();
+    });
+
+    this.dom.ctxInsertSectionAfter?.addEventListener('click', () => {
+      if (this._contextMeasureIdx !== undefined) {
+        const m = state.measures[this._contextMeasureIdx];
+        const itemIdx = m ? m._itemIndex + 1 : state.items.length;
+        const secCount = state.groups.filter(g => !g.isBossaBlock).length + 1;
+        state.addSection(itemIdx, { name: `Seção ${secCount}` });
+        this.renderMeasuresList();
+        this.showToast(`Nova seção inserida após o compasso c. ${this._contextMeasureIdx + 1}!`, '🏷️');
       }
       this.closeContextMenu();
     });
@@ -2017,6 +2089,52 @@ class SergioApp {
     const primaryIdx = indices[0];
     const m = state.measures[primaryIdx];
 
+    // Cálculo da duração total dos compassos selecionados
+    let totalSelectedDurationSec = 0;
+    let singlePassDurationSec = 0;
+
+    if (state.measureTimings && state.measureTimings.length > 0) {
+      state.measureTimings.forEach(t => {
+        if (this.selectedMeasureIndices.has(t.measureIndex)) {
+          totalSelectedDurationSec += t.duration;
+        }
+      });
+    }
+
+    indices.forEach(idx => {
+      const measureObj = state.measures[idx];
+      if (!measureObj) return;
+      let effBpm = state.baseBpm;
+      if (measureObj.tempoMode === "ratio") {
+        effBpm = state.baseBpm * ((measureObj.ratioNum || 1) / (measureObj.ratioDen || 1));
+      } else {
+        effBpm = measureObj.customBpm || state.baseBpm;
+      }
+      const beatDur = 60 / effBpm;
+      const mRep = measureObj.repeat || 1;
+      singlePassDurationSec += (measureObj.beats || 4) * beatDur * mRep;
+    });
+
+    if (totalSelectedDurationSec <= 0) {
+      totalSelectedDurationSec = singlePassDurationSec;
+    }
+
+    const durFormatted = this.formatDurationDetailed(totalSelectedDurationSec);
+    const hasRepeatsDiff = Math.abs(totalSelectedDurationSec - singlePassDurationSec) > 0.05;
+
+    if (this.dom.toolbarMeasureDuration) {
+      this.dom.toolbarMeasureDuration.textContent = `⏱️ ${durFormatted}`;
+      this.dom.toolbarMeasureDuration.title = hasRepeatsDiff
+        ? `Tempo total na execução: ${durFormatted} (tempo de 1 ciclo: ${this.formatDurationDetailed(singlePassDurationSec)})`
+        : `Duração total da seleção: ${durFormatted}`;
+      this.dom.toolbarMeasureDuration.style.display = 'inline-flex';
+    }
+
+    if (this.dom.measureCountBadge) {
+      this.dom.measureCountBadge.innerHTML = `<span class="selection-time-highlight">⏱️ ${durFormatted}</span> (${count} sel.)`;
+      this.dom.measureCountBadge.classList.add('has-selection');
+    }
+
     if (this.renderer) {
       this.renderer.setSelectedMeasures(indices);
       this.renderer.render(this.playbackTime);
@@ -2042,7 +2160,7 @@ class SergioApp {
       if (count > 1) {
         const minIdx = indices[0] + 1;
         const maxIdx = indices[indices.length - 1] + 1;
-        this.dom.toolbarMeasureBadge.textContent = `${count} compassos (${minIdx} a ${maxIdx})`;
+        this.dom.toolbarMeasureBadge.textContent = `${count} compassos (${minIdx} a ${maxIdx}) • ${durFormatted}`;
         this.dom.toolbarMeasureName.textContent = '(Shift para estender seleção)';
 
         if (this.dom.btnMoveMeasureLeft) this.dom.btnMoveMeasureLeft.style.display = 'none';
@@ -2073,7 +2191,7 @@ class SergioApp {
           this.dom.btnDeleteSelectedMeasure.style.display = 'inline-flex';
         }
       } else {
-        this.dom.toolbarMeasureBadge.textContent = `c. ${primaryIdx + 1}`;
+        this.dom.toolbarMeasureBadge.textContent = `c. ${primaryIdx + 1} • ${durFormatted}`;
         this.dom.toolbarMeasureName.textContent = m?.nickname || '';
 
         if (this.dom.btnMoveMeasureLeft) {
@@ -2364,6 +2482,17 @@ class SergioApp {
     if (this.dom.runnerMeasureToolbar) {
       this.dom.runnerMeasureToolbar.style.display = 'none';
     }
+    if (this.dom.toolbarMeasureDuration) {
+      this.dom.toolbarMeasureDuration.style.display = 'none';
+    }
+    if (this.dom.measureCountBadge) {
+      this.dom.measureCountBadge.classList.remove('has-selection');
+      const uniqueCount = state.measures.length;
+      const totalCount = state.getTotalMeasureCount();
+      this.dom.measureCountBadge.textContent = (totalCount !== uniqueCount)
+        ? `${totalCount} compassos no total (${uniqueCount} ${uniqueCount === 1 ? 'cartão' : 'cartões'})`
+        : `${uniqueCount} ${uniqueCount === 1 ? 'compasso' : 'compassos'}`;
+    }
     document.querySelectorAll('.measure-card').forEach(c => c.classList.remove('is-selected'));
   }
 
@@ -2405,6 +2534,208 @@ class SergioApp {
   // =========================================================================
   // GRADE DE COMPASSOS INFERIOR
   // =========================================================================
+
+  createSectionHeaderElement(sec, itemIdx) {
+    const grp = state.computedGroups.find(g => g.id === sec.id);
+    const hasMeasures = (grp && grp.startMeasure <= grp.endMeasure);
+    const count = hasMeasures ? (grp.endMeasure - grp.startMeasure + 1) : 0;
+    const secColor = sec.color || '#3b82f6';
+
+    let secDurationSec = 0;
+    if (grp) {
+      const timings = state.measureTimings.filter(t => t.groupId === sec.id);
+      if (timings.length > 0) {
+        timings.forEach(t => secDurationSec += t.duration);
+      } else if (hasMeasures) {
+        for (let mi = grp.startMeasure; mi <= grp.endMeasure; mi++) {
+          const mTims = state.measureTimings.filter(t => t.measureIndex === mi);
+          mTims.forEach(t => secDurationSec += t.duration);
+        }
+      }
+    }
+    const secDurationStr = this.formatFriendlyDuration(secDurationSec);
+    const repeatTagHtml = (sec.repeat || 1) > 1
+      ? `<span class="measure-card-repeat-tag" title="Esta seção se repete ${sec.repeat} vezes na peça">×${sec.repeat}</span>`
+      : '';
+
+    const el = document.createElement('div');
+    el.className = 'section-block-header';
+    el.setAttribute('draggable', 'true');
+    el.setAttribute('data-section-id', sec.id);
+    el.setAttribute('data-item-index', itemIdx);
+    el.style.setProperty('--section-color', secColor);
+
+    el.innerHTML = `
+      <div class="section-header-left">
+        <span class="section-drag-handle" title="Arraste para reposicionar esta seção inteira na peça">⠿</span>
+        <label class="section-color-label" title="Alterar cor da seção">
+          <input type="color" class="input-section-color" value="${secColor}">
+          <span class="section-color-pip" style="background:${secColor}"></span>
+        </label>
+        <span class="section-type-badge" style="background:${secColor}25; color:${secColor}">SEÇÃO</span>
+        <input type="text" class="input-section-name" value="${sec.name || 'Nova Seção'}" placeholder="Nome da Seção (ex: Intro, Refrão...)" title="Clique para editar o nome da seção">
+        <span class="section-header-range">${hasMeasures ? `c. ${grp.startMeasure + 1} a ${grp.endMeasure + 1} (${count} ${count === 1 ? 'comp.' : 'comp.'})` : '(seção vazia)'}</span>
+        ${secDurationSec > 0 ? `<span class="section-header-time" title="Tempo total desta seção na peça: ${secDurationStr}">${iconSvg('clock', { size: 13 })} ${secDurationStr}</span>` : ''}
+        ${repeatTagHtml}
+      </div>
+      <div class="section-header-actions">
+        <div class="section-repeat-stepper-wrap" title="Número de vezes que esta seção se repete na peça">
+          <span class="card-stepper-label">Repetir:</span>
+          <div class="repeat-stepper">
+            <button type="button" class="btn-repeat-step btn-sec-rep-minus" title="Diminuir repetições">-</button>
+            <input type="number" class="input-card-repeat input-sec-repeat" min="1" max="999" value="${sec.repeat || 1}" title="Número de vezes que esta seção se repete">
+            <button type="button" class="btn-repeat-step btn-sec-rep-plus" title="Aumentar repetições">+</button>
+          </div>
+        </div>
+        <button type="button" class="btn-sec-action btn-sec-add-measure" title="Adicionar compasso nesta seção">
+          ${iconSvg('plus', { size: 13 })} <span>Compasso</span>
+        </button>
+        <button type="button" class="btn-sec-action btn-sec-move-left" title="Mover seção para trás (←)" ${itemIdx === 0 ? 'disabled style="opacity:0.35;pointer-events:none"' : ''}>
+          ${iconSvg('arrow-left', { size: 13 })}
+        </button>
+        <button type="button" class="btn-sec-action btn-sec-move-right" title="Mover seção para frente (→)" ${itemIdx >= state.items.length - 1 ? 'disabled style="opacity:0.35;pointer-events:none"' : ''}>
+          ${iconSvg('arrow-right', { size: 13 })}
+        </button>
+        <button type="button" class="btn-sec-action danger btn-sec-delete" title="Excluir divisor de seção (mantém os compassos)">
+          ${iconSvg('trash-2', { size: 13 })}
+        </button>
+      </div>
+    `;
+
+    // Edição do nome inline
+    const inputName = el.querySelector('.input-section-name');
+    if (inputName) {
+      inputName.addEventListener('click', e => e.stopPropagation());
+      inputName.addEventListener('mousedown', e => e.stopPropagation());
+      const commitName = () => {
+        const val = inputName.value.trim() || 'Seção';
+        if (val !== sec.name) {
+          state.updateSection(sec.id, { name: val });
+        }
+      };
+      inputName.addEventListener('change', commitName);
+      inputName.addEventListener('blur', commitName);
+      inputName.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') inputName.blur();
+      });
+    }
+
+    // Cor da seção
+    const inputColor = el.querySelector('.input-section-color');
+    if (inputColor) {
+      inputColor.addEventListener('click', e => e.stopPropagation());
+      inputColor.addEventListener('input', (e) => {
+        state.updateSection(sec.id, { color: e.target.value });
+        const pip = el.querySelector('.section-color-pip');
+        if (pip) pip.style.background = e.target.value;
+        el.style.setProperty('--section-color', e.target.value);
+      });
+    }
+
+    // Repetições da seção
+    const inputRep = el.querySelector('.input-sec-repeat');
+    const updateRep = (val) => {
+      const parsed = Math.max(1, Math.min(999, parseInt(val, 10) || 1));
+      if (parsed !== sec.repeat) {
+        state.updateSection(sec.id, { repeat: parsed });
+        this.renderMeasuresList();
+      }
+    };
+    if (inputRep) {
+      inputRep.addEventListener('click', e => e.stopPropagation());
+      inputRep.addEventListener('mousedown', e => e.stopPropagation());
+      inputRep.addEventListener('change', e => { e.stopPropagation(); updateRep(e.target.value); });
+      inputRep.addEventListener('blur', e => { e.stopPropagation(); updateRep(e.target.value); });
+    }
+    el.querySelector('.btn-sec-rep-minus')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const cur = parseInt(inputRep.value, 10) || 1;
+      if (cur > 1) updateRep(cur - 1);
+    });
+    el.querySelector('.btn-sec-rep-plus')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const cur = parseInt(inputRep.value, 10) || 1;
+      if (cur < 999) updateRep(cur + 1);
+    });
+
+    // Adicionar compasso dentro desta seção
+    el.querySelector('.btn-sec-add-measure')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (hasMeasures) {
+        const res = state.addMeasureAfter(grp.endMeasure);
+        this.renderMeasuresList();
+        if (res?.measureIndex !== undefined) this.handleMeasureSelected(res.measureIndex);
+      } else {
+        state.addMeasure(itemIdx + 1);
+        this.renderMeasuresList();
+        const newM = state.measures.findIndex(m => m._itemIndex === itemIdx + 1);
+        if (newM !== -1) this.handleMeasureSelected(newM);
+      }
+    });
+
+    // Mover seção
+    el.querySelector('.btn-sec-move-left')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (state.moveSectionLeft(sec.id)) {
+        this.renderMeasuresList();
+        this.showToast(`Seção '${sec.name}' movida para trás!`, '🏷️');
+      }
+    });
+
+    el.querySelector('.btn-sec-move-right')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (state.moveSectionRight(sec.id)) {
+        this.renderMeasuresList();
+        this.showToast(`Seção '${sec.name}' movida para frente!`, '🏷️');
+      }
+    });
+
+    // Excluir seção
+    el.querySelector('.btn-sec-delete')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      state.removeSection(sec.id);
+      this.renderMeasuresList();
+      this.showToast(`Divisor de seção '${sec.name}' removido.`, '✕');
+    });
+
+    // Drag & Drop no divisor de seção
+    el.addEventListener('dragstart', (e) => {
+      if (e.target.closest('input, button, select, textarea')) {
+        e.preventDefault();
+        return;
+      }
+      e.dataTransfer.setData('text/item-index', itemIdx);
+      e.dataTransfer.setData('text/plain', `item:${itemIdx}`);
+      el.classList.add('is-drag-source');
+    });
+
+    el.addEventListener('dragend', () => {
+      el.classList.remove('is-drag-source');
+      document.querySelectorAll('.is-drag-target').forEach(c => c.classList.remove('is-drag-target'));
+    });
+
+    el.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      el.classList.add('is-drag-target');
+    });
+
+    el.addEventListener('dragleave', () => {
+      el.classList.remove('is-drag-target');
+    });
+
+    el.addEventListener('drop', (e) => {
+      e.preventDefault();
+      el.classList.remove('is-drag-target');
+      const rawItem = e.dataTransfer.getData('text/item-index') || (e.dataTransfer.getData('text/plain') || '').replace('item:', '');
+      const fromIdx = parseInt(rawItem, 10);
+      if (!isNaN(fromIdx) && fromIdx !== itemIdx) {
+        state.moveItem(fromIdx, itemIdx);
+        this.renderMeasuresList();
+      }
+    });
+
+    return el;
+  }
 
   createMeasureCardElement(m, idx, parentBossa = null) {
     const timing = state.getFirstTimingForMeasure(idx) || { effectiveBpm: state.baseBpm };
@@ -2559,6 +2890,8 @@ class SergioApp {
 
       <div class="measure-card-actions">
         <div class="card-actions-secondary">
+          <button type="button" class="btn-card-icon btn-card-add-right" title="Adicionar Compasso à Direita">${iconSvg('plus', { size: 14 })}</button>
+          <button type="button" class="btn-card-icon btn-card-add-section-right" title="Inserir Seção após este compasso">${iconSvg('folder-plus', { size: 13 })}</button>
           <button type="button" class="btn-card-icon btn-card-move-left" title="Mover Compasso para Trás (←)" ${idx === 0 ? 'disabled style="opacity:0.3;pointer-events:none"' : ''}>${iconSvg('chevron-left', { size: 14 })}</button>
           <button type="button" class="btn-card-icon btn-card-move-right" title="Mover Compasso para Frente (→)" ${idx === state.measures.length - 1 ? 'disabled style="opacity:0.3;pointer-events:none"' : ''}>${iconSvg('chevron-right', { size: 14 })}</button>
           <button type="button" class="btn-card-icon btn-card-dup" title="Duplicar Compasso">${iconSvg('copy', { size: 13 })}</button>
@@ -2689,6 +3022,24 @@ class SergioApp {
 
     // Action buttons & card clicks
     card.addEventListener('click', (e) => {
+      if (e.target.closest('.btn-card-add-right')) {
+        e.stopPropagation();
+        const res = state.addMeasureAfter(idx);
+        this.renderMeasuresList();
+        if (res && typeof res.measureIndex === 'number') {
+          this.handleMeasureSelected(res.measureIndex);
+        }
+        return;
+      }
+      if (e.target.closest('.btn-card-add-section-right')) {
+        e.stopPropagation();
+        const insertItemIdx = (m._itemIndex !== undefined) ? m._itemIndex + 1 : state.items.length;
+        const secCount = state.groups.filter(g => !g.isBossaBlock).length + 1;
+        state.addSection(insertItemIdx, { name: `Seção ${secCount}` });
+        this.renderMeasuresList();
+        this.showToast(`Seção criada após o compasso c. ${idx + 1}!`, '🏷️');
+        return;
+      }
       if (e.target.closest('.btn-card-move-left')) {
         e.stopPropagation();
         state.moveMeasure(idx, idx - 1);
@@ -2816,10 +3167,17 @@ class SergioApp {
     }
 
     items.forEach((item, itemIdx) => {
+      if (item.type === 'section') {
+        grid.appendChild(this.createSectionHeaderElement(item, itemIdx));
+        return;
+      }
+
       if (item.type === 'bossa') {
         const bossaMeasures = measures.filter(m => m._itemIndex === itemIdx);
         const count = bossaMeasures.length;
         const cleanBossaName = (item.sourcePieceName || item.name || 'Bossa').replace(/^[🔗📦✏️🔓\s]+/, '').trim();
+        const bossaEffectiveBpm = state.getBossaEffectiveBpm(item);
+        const tempoMode = item.tempoMode || 'inherit';
 
         // Variáveis de repetição suportadas por esta bossa
         const bossaVars = state.getBossaVariables(item);
@@ -2909,7 +3267,7 @@ class SergioApp {
 
             <div class="measure-card-details">
               <span class="measure-card-meter" title="${count} compassos • Duração: ${bossaDurationStr}">${count} ${count === 1 ? 'compasso' : 'compassos'}</span>
-              <span class="measure-card-tempo" title="Duração total: ${bossaDurationStr}">${iconSvg('clock', { size: 12 })} ${bossaDurationStr}</span>
+              <span class="measure-card-tempo" title="Andamento: ${bossaEffectiveBpm} BPM • Duração total: ${bossaDurationStr}">${iconSvg('clock', { size: 12 })} ${bossaDurationStr} • ${bossaEffectiveBpm} BPM</span>
             </div>
 
             ${compactVarsHtml}
@@ -2921,6 +3279,26 @@ class SergioApp {
                   <button type="button" class="btn-repeat-step btn-bossa-repeat-minus" title="Diminuir repetições da bossa">-</button>
                   <input type="number" class="input-card-repeat input-bossa-repeat" min="1" max="999" value="${item.repeat || 1}" title="Número de vezes que esta bossa se repete">
                   <button type="button" class="btn-repeat-step btn-bossa-repeat-plus" title="Aumentar repetições da bossa">+</button>
+                </div>
+              </div>
+              <div class="measure-card-stepper-row bossa-tempo-stepper-row" style="width:100%; margin-top:4px;">
+                <span class="card-stepper-label">Andamento:</span>
+                <div class="bossa-compact-tempo-wrap">
+                  <select class="select-bossa-tempo-mode" title="Modo de andamento da bossa">
+                    <option value="inherit" ${tempoMode === 'inherit' ? 'selected' : ''}>Peça (${state.baseBpm})</option>
+                    <option value="fixed" ${tempoMode === 'fixed' ? 'selected' : ''}>Fixo (${item.bpm || bossaEffectiveBpm} BPM)</option>
+                    <option value="ratio" ${tempoMode === 'ratio' ? 'selected' : ''}>Proporção (${item.ratioNum || 1}/${item.ratioDen || 1})</option>
+                  </select>
+                  <div class="repeat-stepper bossa-bpm-stepper" style="${tempoMode === 'fixed' ? 'display:inline-flex;' : 'display:none;'}">
+                    <button type="button" class="btn-repeat-step btn-bossa-bpm-minus" title="Diminuir 5 BPM">-5</button>
+                    <input type="number" class="input-card-repeat input-bossa-bpm" min="20" max="400" value="${item.bpm || bossaEffectiveBpm}" title="BPM da bossa">
+                    <button type="button" class="btn-repeat-step btn-bossa-bpm-plus" title="Aumentar 5 BPM">+5</button>
+                  </div>
+                  <div class="bossa-ratio-stepper-box" style="${tempoMode === 'ratio' ? 'display:inline-flex;' : 'display:none;'}">
+                    <input type="number" class="input-card-repeat input-bossa-ratio-num" min="1" max="32" value="${item.ratioNum || 1}" title="Numerador da proporção">
+                    <span class="bossa-ratio-divider">/</span>
+                    <input type="number" class="input-card-repeat input-bossa-ratio-den" min="1" max="32" value="${item.ratioDen || 1}" title="Denominador da proporção">
+                  </div>
                 </div>
               </div>
             </div>
@@ -2965,6 +3343,9 @@ class SergioApp {
                 <span class="bossa-block-header-title" style="cursor:pointer" title="Clique para recolher">${item.name}</span>
                 <span class="bossa-block-header-range">${count} ${count === 1 ? 'compasso' : 'compassos'}</span>
                 <span class="bossa-block-header-time" title="Tempo total desta bossa na peça: ${bossaDurationStr}">${iconSvg('clock', { size: 13 })} ${bossaDurationStr}</span>
+                <span class="bossa-block-header-tempo-badge" title="Andamento efetivo desta bossa: ${bossaEffectiveBpm} BPM (${tempoMode === 'inherit' ? 'Seguindo Peça' : tempoMode === 'fixed' ? 'Fixo' : 'Proporção'})" style="background:${item.color || '#8b5cf6'}20; color:${item.color || '#8b5cf6'}">
+                  ${iconSvg('activity', { size: 12 })} ${bossaEffectiveBpm} BPM
+                </span>
                 ${bossaRepeatTagHtml}
               </div>
               <div class="bossa-block-header-actions">
@@ -2979,6 +3360,26 @@ class SergioApp {
                     <button type="button" class="btn-repeat-step btn-bossa-repeat-minus" title="Diminuir repetições da bossa">-</button>
                     <input type="number" class="input-card-repeat input-bossa-repeat" min="1" max="999" value="${item.repeat || 1}" title="Número de vezes que esta bossa se repete">
                     <button type="button" class="btn-repeat-step btn-bossa-repeat-plus" title="Aumentar repetições da bossa">+</button>
+                  </div>
+                </div>
+
+                <div class="bossa-tempo-stepper-wrap" title="Configurar andamento desta bossa (funciona vinculada)">
+                  <span class="card-stepper-label">Andamento:</span>
+                  <select class="select-bossa-tempo-mode" title="Modo de andamento da bossa">
+                    <option value="inherit" ${tempoMode === 'inherit' ? 'selected' : ''}>Seguir Peça (${state.baseBpm} BPM)</option>
+                    <option value="fixed" ${tempoMode === 'fixed' ? 'selected' : ''}>BPM Fixo</option>
+                    <option value="ratio" ${tempoMode === 'ratio' ? 'selected' : ''}>Proporção</option>
+                  </select>
+                  <div class="repeat-stepper bossa-bpm-stepper" style="${tempoMode === 'fixed' ? 'display:inline-flex;' : 'display:none;'}">
+                    <button type="button" class="btn-repeat-step btn-bossa-bpm-minus" title="Diminuir 5 BPM">-5</button>
+                    <input type="number" class="input-card-repeat input-bossa-bpm" min="20" max="400" value="${item.bpm || bossaEffectiveBpm}" title="BPM da bossa">
+                    <button type="button" class="btn-repeat-step btn-bossa-bpm-plus" title="Aumentar 5 BPM">+5</button>
+                  </div>
+                  <div class="bossa-ratio-stepper-box" style="${tempoMode === 'ratio' ? 'display:inline-flex;' : 'display:none;'}">
+                    <input type="number" class="input-card-repeat input-bossa-ratio-num" min="1" max="32" value="${item.ratioNum || 1}" title="Numerador da proporção">
+                    <span class="bossa-ratio-divider">/</span>
+                    <input type="number" class="input-card-repeat input-bossa-ratio-den" min="1" max="32" value="${item.ratioDen || 1}" title="Denominador da proporção">
+                    <span class="bossa-ratio-calc-preview">(${bossaEffectiveBpm} BPM)</span>
                   </div>
                 </div>
 
@@ -3154,6 +3555,86 @@ class SergioApp {
           };
           input.addEventListener('change', (e) => { e.stopPropagation(); apply(); });
           input.addEventListener('blur', (e) => { e.stopPropagation(); apply(); });
+          input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === 'Escape') { e.stopPropagation(); input.blur(); }
+          });
+        });
+
+        // Controles de Andamento / BPM da Bossa (mantém vinculação ativa)
+        bossaElement.querySelectorAll('.select-bossa-tempo-mode').forEach(sel => {
+          sel.addEventListener('click', e => e.stopPropagation());
+          sel.addEventListener('mousedown', e => e.stopPropagation());
+          sel.addEventListener('change', (e) => {
+            e.stopPropagation();
+            const newMode = e.target.value;
+            const currentEffBpm = state.getBossaEffectiveBpm(item);
+            state.updateBossaTempo(item.id, {
+              tempoMode: newMode,
+              bpm: item.bpm || currentEffBpm,
+              ratioNum: item.ratioNum || 1,
+              ratioDen: item.ratioDen || 1
+            });
+            this.renderMeasuresList();
+          });
+        });
+
+        const handleBpmUpdate = (val) => {
+          const parsed = Math.max(20, Math.min(400, Math.round(Number(val)) || state.baseBpm));
+          state.updateBossaTempo(item.id, { tempoMode: 'fixed', bpm: parsed });
+          this.renderMeasuresList();
+        };
+
+        bossaElement.querySelectorAll('.input-bossa-bpm').forEach(input => {
+          input.addEventListener('click', e => e.stopPropagation());
+          input.addEventListener('mousedown', e => e.stopPropagation());
+          input.addEventListener('change', (e) => { e.stopPropagation(); handleBpmUpdate(e.target.value); });
+          input.addEventListener('blur', (e) => { e.stopPropagation(); handleBpmUpdate(e.target.value); });
+          input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === 'Escape') { e.stopPropagation(); input.blur(); }
+          });
+        });
+
+        bossaElement.querySelectorAll('.btn-bossa-bpm-minus').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const cur = item.bpm || state.getBossaEffectiveBpm(item);
+            handleBpmUpdate(cur - 5);
+          });
+        });
+
+        bossaElement.querySelectorAll('.btn-bossa-bpm-plus').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const cur = item.bpm || state.getBossaEffectiveBpm(item);
+            handleBpmUpdate(cur + 5);
+          });
+        });
+
+        bossaElement.querySelectorAll('.input-bossa-ratio-num').forEach(input => {
+          input.addEventListener('click', e => e.stopPropagation());
+          input.addEventListener('mousedown', e => e.stopPropagation());
+          const update = () => {
+            const val = Math.max(1, Math.min(32, parseInt(input.value, 10) || 1));
+            state.updateBossaTempo(item.id, { tempoMode: 'ratio', ratioNum: val });
+            this.renderMeasuresList();
+          };
+          input.addEventListener('change', (e) => { e.stopPropagation(); update(); });
+          input.addEventListener('blur', (e) => { e.stopPropagation(); update(); });
+          input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === 'Escape') { e.stopPropagation(); input.blur(); }
+          });
+        });
+
+        bossaElement.querySelectorAll('.input-bossa-ratio-den').forEach(input => {
+          input.addEventListener('click', e => e.stopPropagation());
+          input.addEventListener('mousedown', e => e.stopPropagation());
+          const update = () => {
+            const val = Math.max(1, Math.min(32, parseInt(input.value, 10) || 1));
+            state.updateBossaTempo(item.id, { tempoMode: 'ratio', ratioDen: val });
+            this.renderMeasuresList();
+          };
+          input.addEventListener('change', (e) => { e.stopPropagation(); update(); });
+          input.addEventListener('blur', (e) => { e.stopPropagation(); update(); });
           input.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' || e.key === 'Escape') { e.stopPropagation(); input.blur(); }
           });
@@ -3415,17 +3896,7 @@ class SergioApp {
       `;
 
       const handleAdd = () => {
-        state.addMeasure(-1, {
-          beats: 4,
-          beatUnit: 4,
-          tempoMode: 'ratio',
-          ratioNum: 1,
-          ratioDen: 1,
-          repeat: 1,
-          nickname: ''
-        });
-        const newIdx = state.measures.length - 1;
-        this.handleMeasureSelected(newIdx);
+        this.handleAddMeasureAction();
       };
 
       addCard.addEventListener('click', handleAdd);
