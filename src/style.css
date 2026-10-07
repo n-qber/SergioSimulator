@@ -6137,6 +6137,83 @@ kbd {
   color: #c4b5fd;
 }
 
+/* Seção de variáveis no card compacto de bossa */
+.bossa-compact-vars-box {
+  margin: 6px 0 4px 0;
+  padding: 6px 8px;
+  background: rgba(139, 92, 246, 0.09);
+  border: 1px solid rgba(139, 92, 246, 0.28);
+  border-radius: 7px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.bossa-vars-header-label {
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #c4b5fd;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.bossa-compact-var-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.bossa-var-label {
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--white-pure);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 110px;
+}
+
+/* Seção de variáveis no container expandido de bossa */
+.bossa-expanded-vars-box {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 6px 12px;
+  background: rgba(139, 92, 246, 0.08);
+  border: 1px solid rgba(139, 92, 246, 0.22);
+  border-radius: 8px;
+  margin: 6px 0;
+}
+
+.bossa-var-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(139, 92, 246, 0.35);
+}
+
+.bossa-var-name {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #ddd6fe;
+}
+
+.measure-card-repeat-tag.is-variable {
+  background: rgba(139, 92, 246, 0.25);
+  color: #c4b5fd;
+  border: 1px solid rgba(139, 92, 246, 0.45);
+  font-weight: 800;
+  letter-spacing: 0.3px;
+}
+
 /* Container de Bloco Bossa Expandido (ocupa linha inteira com a grade interna) */
 .bossa-block-container {
   grid-column: 1 / -1;
@@ -6925,6 +7002,39 @@ kbd {
 
 [data-theme="light"] .bossa-compact-title:hover {
   color: #7c3aed;
+}
+
+[data-theme="light"] .bossa-compact-vars-box {
+  background: rgba(139, 92, 246, 0.08);
+  border-color: rgba(139, 92, 246, 0.25);
+}
+
+[data-theme="light"] .bossa-vars-header-label {
+  color: #6d28d9;
+}
+
+[data-theme="light"] .bossa-var-label {
+  color: #1e1b4b;
+}
+
+[data-theme="light"] .bossa-expanded-vars-box {
+  background: rgba(139, 92, 246, 0.06);
+  border-color: rgba(139, 92, 246, 0.2);
+}
+
+[data-theme="light"] .bossa-var-badge {
+  background: #ffffff;
+  border-color: rgba(139, 92, 246, 0.25);
+}
+
+[data-theme="light"] .bossa-var-name {
+  color: #4c1d95;
+}
+
+[data-theme="light"] .measure-card-repeat-tag.is-variable {
+  background: rgba(139, 92, 246, 0.15);
+  color: #6d28d9;
+  border-color: rgba(139, 92, 246, 0.35);
 }
 
 [data-theme="light"] .bossa-card-title {

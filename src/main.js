@@ -399,6 +399,7 @@ class SergioApp {
       btnEditBeatsPlus: document.getElementById('btnEditBeatsPlus'),
       editBeatUnit: document.getElementById('editBeatUnit'),
       editRepeat: document.getElementById('editRepeat'),
+      editRepeatVariable: document.getElementById('editRepeatVariable'),
       btnEditRepeatMinus: document.getElementById('btnEditRepeatMinus'),
       btnEditRepeatPlus: document.getElementById('btnEditRepeatPlus'),
       detailsTempoModulation: document.getElementById('detailsTempoModulation'),
@@ -424,6 +425,7 @@ class SergioApp {
       newGroupStart: document.getElementById('newGroupStart'),
       newGroupEnd: document.getElementById('newGroupEnd'),
       newGroupRepeat: document.getElementById('newGroupRepeat'),
+      newGroupRepeatVariable: document.getElementById('newGroupRepeatVariable'),
       newGroupColorPicker: document.getElementById('newGroupColorPicker'),
       existingGroupsList: document.getElementById('existingGroupsList'),
 
@@ -2433,7 +2435,12 @@ class SergioApp {
 
     let groupTagHtml = '';
     if (grp && !parentBossa && !grp.isBossaBlock) {
-      const grpRepMultiplier = (grp.repeat || 1) > 1 ? ` <span class="group-repeat-multiplier" title="Seção repetida ${grp.repeat} vezes">×${grp.repeat}</span>` : '';
+      let grpRepMultiplier = '';
+      if (grp.repeatVariable) {
+        grpRepMultiplier = ` <span class="group-repeat-multiplier is-variable" title="Repetições do grupo vinculadas à variável '${grp.repeatVariable}'">×[${grp.repeatVariable}]</span>`;
+      } else if ((grp.repeat || 1) > 1) {
+        grpRepMultiplier = ` <span class="group-repeat-multiplier" title="Seção repetida ${grp.repeat} vezes">×${grp.repeat}</span>`;
+      }
       groupTagHtml = `<span class="measure-card-group-tag" style="background:${grp.color}33; color:${grp.color}">${grp.name}${grpRepMultiplier}</span>`;
     }
 
@@ -2469,9 +2476,18 @@ class SergioApp {
     const isTempoChange = idx > 0 && (isBpmDiff || isRatioDiff || isModeDiff);
     const showBpm = idx === 0 || isTempoChange;
 
-    const repeatTagHtml = ((m.repeat || 1) > 1)
-      ? `<span class="measure-card-repeat-tag" title="Este compasso se repete continuamente ${m.repeat} vezes">×${m.repeat}</span>`
-      : '';
+    let repeatTagHtml = '';
+    if (m.repeatVariable) {
+      const activeVarVal = (parentBossa && parentBossa.variableValues && parentBossa.variableValues[m.repeatVariable] !== undefined)
+        ? parentBossa.variableValues[m.repeatVariable]
+        : null;
+      const titleHint = activeVarVal !== null
+        ? `Repetições vinculadas à variável '${m.repeatVariable}' (valor atual: ${activeVarVal})`
+        : `Repetições vinculadas à variável '${m.repeatVariable}'`;
+      repeatTagHtml = `<span class="measure-card-repeat-tag is-variable" title="${titleHint}">×[${m.repeatVariable}]</span>`;
+    } else if ((m.repeat || 1) > 1) {
+      repeatTagHtml = `<span class="measure-card-repeat-tag" title="Este compasso se repete continuamente ${m.repeat} vezes">×${m.repeat}</span>`;
+    }
 
     card.style.setProperty('--card-measure-color', m.color || '#ff334b');
 
@@ -2805,6 +2821,15 @@ class SergioApp {
         const count = bossaMeasures.length;
         const cleanBossaName = (item.sourcePieceName || item.name || 'Bossa').replace(/^[🔗📦✏️🔓\s]+/, '').trim();
 
+        // Variáveis de repetição suportadas por esta bossa
+        const bossaVars = state.getBossaVariables(item);
+        if (!item.variableValues) item.variableValues = {};
+        bossaVars.forEach(v => {
+          if (item.variableValues[v.name] === undefined) {
+            item.variableValues[v.name] = v.defaultValue;
+          }
+        });
+
         let bossaDurationSec = 0;
         bossaMeasures.forEach(m => {
           const mIdx = measures.indexOf(m);
@@ -2838,6 +2863,28 @@ class SergioApp {
             ? (firstIdx === lastIdx ? `c. ${firstIdx + 1}` : `c. ${firstIdx + 1}–${lastIdx + 1}`)
             : `${count} comp.`;
 
+          let compactVarsHtml = '';
+          if (bossaVars.length > 0) {
+            compactVarsHtml = `
+              <div class="bossa-compact-vars-box" onclick="event.stopPropagation()">
+                <div class="bossa-vars-header-label">${iconSvg('sliders', { size: 11 })} Repetições da Bossa:</div>
+                ${bossaVars.map(v => {
+                  const curVal = item.variableValues[v.name] !== undefined ? item.variableValues[v.name] : v.defaultValue;
+                  return `
+                    <div class="bossa-compact-var-row" title="Variável de repetição da bossa: ${v.label || v.name}">
+                      <span class="bossa-var-label">${v.name}:</span>
+                      <div class="repeat-stepper compact-var-stepper" data-var="${v.name}">
+                        <button type="button" class="btn-repeat-step btn-var-minus" data-var="${v.name}" title="Diminuir repetições de ${v.name}">-</button>
+                        <input type="number" class="input-card-repeat input-bossa-var" data-var="${v.name}" min="1" max="999" value="${curVal}" title="Repetições de ${v.name}">
+                        <button type="button" class="btn-repeat-step btn-var-plus" data-var="${v.name}" title="Aumentar repetições de ${v.name}">+</button>
+                      </div>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            `;
+          }
+
           bossaElement.innerHTML = `
             <div class="measure-card-group-strip" style="background:${item.color || '#8b5cf6'}"></div>
 
@@ -2864,6 +2911,8 @@ class SergioApp {
               <span class="measure-card-meter" title="${count} compassos • Duração: ${bossaDurationStr}">${count} ${count === 1 ? 'compasso' : 'compassos'}</span>
               <span class="measure-card-tempo" title="Duração total: ${bossaDurationStr}">${iconSvg('clock', { size: 12 })} ${bossaDurationStr}</span>
             </div>
+
+            ${compactVarsHtml}
 
             <div class="measure-card-steppers">
               <div class="measure-card-stepper-row" style="width:100%;">
@@ -2972,6 +3021,28 @@ class SergioApp {
             body.appendChild(notice);
           }
 
+          if (bossaVars.length > 0) {
+            const expandedVarsDiv = document.createElement('div');
+            expandedVarsDiv.className = 'bossa-expanded-vars-box';
+            expandedVarsDiv.innerHTML = `
+              <span class="bossa-vars-header-label">${iconSvg('sliders', { size: 12 })} Variáveis Internas:</span>
+              ${bossaVars.map(v => {
+                const curVal = item.variableValues[v.name] !== undefined ? item.variableValues[v.name] : v.defaultValue;
+                return `
+                  <div class="bossa-var-badge" title="Variável '${v.label || v.name}'">
+                    <span class="bossa-var-name">${v.label || v.name}:</span>
+                    <div class="repeat-stepper var-stepper" data-var="${v.name}">
+                      <button type="button" class="btn-repeat-step btn-var-minus" data-var="${v.name}">-</button>
+                      <input type="number" class="input-card-repeat input-bossa-var" data-var="${v.name}" min="1" max="999" value="${curVal}">
+                      <button type="button" class="btn-repeat-step btn-var-plus" data-var="${v.name}">+</button>
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            `;
+            body.appendChild(expandedVarsDiv);
+          }
+
           const innerGrid = document.createElement('div');
           innerGrid.className = 'bossa-inner-measures-grid';
 
@@ -3044,6 +3115,49 @@ class SergioApp {
             if (cur < 999) updateBossaRep(cur + 1);
           });
         }
+
+        // Steppers de Variáveis da Bossa
+        bossaElement.querySelectorAll('.btn-var-minus').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const varName = btn.dataset.var;
+            const input = bossaElement.querySelector(`.input-bossa-var[data-var="${varName}"]`);
+            const cur = parseInt(input?.value, 10) || 1;
+            if (cur > 1) {
+              state.updateBossaVariable(itemIdx, varName, cur - 1);
+              this.renderMeasuresList();
+            }
+          });
+        });
+
+        bossaElement.querySelectorAll('.btn-var-plus').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const varName = btn.dataset.var;
+            const input = bossaElement.querySelector(`.input-bossa-var[data-var="${varName}"]`);
+            const cur = parseInt(input?.value, 10) || 1;
+            if (cur < 999) {
+              state.updateBossaVariable(itemIdx, varName, cur + 1);
+              this.renderMeasuresList();
+            }
+          });
+        });
+
+        bossaElement.querySelectorAll('.input-bossa-var').forEach(input => {
+          input.addEventListener('click', (e) => e.stopPropagation());
+          input.addEventListener('mousedown', (e) => e.stopPropagation());
+          const apply = () => {
+            const varName = input.dataset.var;
+            const val = Math.max(1, Math.min(999, parseInt(input.value, 10) || 1));
+            state.updateBossaVariable(itemIdx, varName, val);
+            this.renderMeasuresList();
+          };
+          input.addEventListener('change', (e) => { e.stopPropagation(); apply(); });
+          input.addEventListener('blur', (e) => { e.stopPropagation(); apply(); });
+          input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === 'Escape') { e.stopPropagation(); input.blur(); }
+          });
+        });
 
         bossaElement.querySelector('.btn-open-bossa-page')?.addEventListener('click', (e) => {
           e.stopPropagation();
@@ -3592,12 +3706,14 @@ class SergioApp {
       const fixedBpm = parseFloat(this.dom.editCustomBpm.value) || state.baseBpm;
       const beats = parseInt(this.dom.editBeats.value, 10) || 4;
       const repeat = Math.max(1, Math.min(999, parseInt(this.dom.editRepeat.value, 10) || 1));
+      const repeatVariable = this.dom.editRepeatVariable ? this.dom.editRepeatVariable.value.trim() : null;
       const color = this.dom.editColorPicker.value;
 
       const updates = {
         beats,
         beatUnit: 4,
         repeat,
+        repeatVariable: repeatVariable || null,
         tempoMode,
         ratioNum: num,
         ratioDen: den,
@@ -3772,6 +3888,7 @@ class SergioApp {
     this.dom.editBeats.value = firstM.beats;
     if (this.dom.editBeatUnit) this.dom.editBeatUnit.value = firstM.beatUnit || 4;
     this.dom.editRepeat.value = firstM.repeat || 1;
+    if (this.dom.editRepeatVariable) this.dom.editRepeatVariable.value = firstM.repeatVariable || '';
 
     if (firstM.tempoMode === 'fixed') {
       this.dom.radioModeFixed.checked = true;
@@ -3860,13 +3977,15 @@ class SergioApp {
       const start = parseInt(this.dom.newGroupStart.value, 10);
       const end = parseInt(this.dom.newGroupEnd.value, 10);
       const repeat = parseInt(this.dom.newGroupRepeat?.value, 10) || 1;
+      const repeatVariable = this.dom.newGroupRepeatVariable ? this.dom.newGroupRepeatVariable.value.trim() : null;
       const color = this.dom.newGroupColorPicker.value;
 
       if (!name) return;
 
-      state.addGroup(name, color, start, end, repeat);
+      state.addGroup(name, color, start, end, repeat, repeatVariable);
       this.dom.newGroupName.value = '';
       if (this.dom.newGroupRepeat) this.dom.newGroupRepeat.value = '1';
+      if (this.dom.newGroupRepeatVariable) this.dom.newGroupRepeatVariable.value = '';
       this.renderExistingGroupsList();
       this.renderMeasuresList();
     });
@@ -3917,7 +4036,10 @@ class SergioApp {
         <div class="group-item-info">
           <div class="group-item-dot" style="background:${g.color}"></div>
           <div>
-            <div class="group-item-name">${g.name}</div>
+            <div class="group-item-name">
+              ${g.name}
+              ${g.repeatVariable ? ` <span class="group-item-var-badge" style="font-size:0.7rem; background:rgba(139,92,246,0.18); color:#a78bfa; padding:2px 6px; border-radius:4px; border:1px solid rgba(139,92,246,0.3); font-weight:700;" title="Repetições controladas pela variável '${g.repeatVariable}'">🎛️ Var: [${g.repeatVariable}]</span>` : ''}
+            </div>
             <div class="group-item-span">c. ${g.startMeasure + 1} até c. ${g.endMeasure + 1}</div>
           </div>
         </div>

@@ -478,7 +478,10 @@ class CollabService {
                 sourcePieceName: it.sourcePieceName || it.name || 'Bossa',
                 measures: (it.measures && it.measures.length > 0)
                   ? it.measures
-                  : (stateData.getBossaMeasures ? stateData.getBossaMeasures(it) : [])
+                  : (stateData.getBossaMeasures ? stateData.getBossaMeasures(it) : []),
+                groups: Array.isArray(it.groups) ? it.groups : [],
+                variables: Array.isArray(it.variables) ? it.variables : [],
+                variableValues: it.variableValues || {}
               };
             }
             return {
@@ -492,7 +495,8 @@ class CollabService {
               ratioDen: it.ratioDen,
               customBpm: it.customBpm,
               color: it.color,
-              repeat: it.repeat || 1
+              repeat: it.repeat || 1,
+              repeatVariable: it.repeatVariable || null
             };
           }),
           measures: stateData.measures.map(m => ({
@@ -506,6 +510,7 @@ class CollabService {
             customBpm: m.customBpm,
             color: m.color,
             repeat: m.repeat || 1,
+            repeatVariable: m.repeatVariable || null,
             sourcePieceId: m.sourcePieceId || null,
             sourcePieceName: m.sourcePieceName || null,
             sourceMeasureId: m.sourceMeasureId || null,
@@ -519,12 +524,14 @@ class CollabService {
             startMeasure: g.startMeasure,
             endMeasure: g.endMeasure,
             repeat: Math.max(1, Math.min(999, parseInt(g.repeat, 10) || 1)),
+            repeatVariable: g.repeatVariable || null,
             isBossaBlock: Boolean(g.isBossaBlock),
             sourcePieceId: g.sourcePieceId || null,
             sourcePieceName: g.sourcePieceName || null,
             isLinked: g.isLinked === undefined ? Boolean(g.sourcePieceId) : Boolean(g.isLinked),
             collapsed: Boolean(g.collapsed)
           })),
+          variables: stateData.variables || [],
           updatedAt: Date.now(),
           updatedBy: this.localUser,
           lastAction: actionDescription || "Alteração na peça"
@@ -632,6 +639,7 @@ class CollabService {
         presentationBpm: bossaData.presentationBpm || bossaData.baseBpm || 120,
         measures: Array.isArray(bossaData.measures) ? bossaData.measures : [],
         groups: Array.isArray(bossaData.groups) ? bossaData.groups : [],
+        variables: Array.isArray(bossaData.variables) ? bossaData.variables : [],
         isBossa: isBossaVal,
         ownerId: currentUid,
         ownerName: authService.getDisplayName() || 'Músico',
@@ -1018,21 +1026,23 @@ class CollabService {
       if (pieceData.items && pieceData.items.length > 0) {
         itemsStr = pieceData.items.map(it => {
           if (it.type === 'bossa') {
-            const innerMeasures = (it.measures || []).map(m => `${m.id || ''}:${m.beats || 4}:${m.beatUnit || 4}`).join(',');
-            return `B:${it.id || ''}:${it.name || ''}:${it.sourcePieceId || ''}:${it.isLinked ? 1 : 0}:${it.repeat || 1}:${innerMeasures}`;
+            const innerMeasures = (it.measures || []).map(m => `${m.id || ''}:${m.beats || 4}:${m.beatUnit || 4}:${m.repeatVariable || ''}`).join(',');
+            const varsStr = JSON.stringify(it.variableValues || {});
+            return `B:${it.id || ''}:${it.name || ''}:${it.sourcePieceId || ''}:${it.isLinked ? 1 : 0}:${it.repeat || 1}:${varsStr}:${innerMeasures}`;
           } else {
             const m = it.measure || it;
-            return `M:${m.id || ''}:${m.nickname || ''}:${m.beats || 4}:${m.beatUnit || 4}:${m.tempoMode || 'ratio'}:${m.ratioNum || 1}/${m.ratioDen || 1}:${m.customBpm || 120}:${m.color || ''}:${m.repeat || 1}`;
+            return `M:${m.id || ''}:${m.nickname || ''}:${m.beats || 4}:${m.beatUnit || 4}:${m.tempoMode || 'ratio'}:${m.ratioNum || 1}/${m.ratioDen || 1}:${m.customBpm || 120}:${m.color || ''}:${m.repeat || 1}:${m.repeatVariable || ''}`;
           }
         }).join('|');
       }
       const measures = (pieceData.measures || []).map(m => 
-        `${m.id || ''}:${m.nickname || ''}:${m.beats || 4}:${m.beatUnit || 4}:${m.tempoMode || 'ratio'}:${m.ratioNum || 1}/${m.ratioDen || 1}:${m.customBpm || 120}:${m.color || ''}:${m.repeat || 1}:${m.sourcePieceId || ''}:${m.isLinked ? 1 : 0}`
+        `${m.id || ''}:${m.nickname || ''}:${m.beats || 4}:${m.beatUnit || 4}:${m.tempoMode || 'ratio'}:${m.ratioNum || 1}/${m.ratioDen || 1}:${m.customBpm || 120}:${m.color || ''}:${m.repeat || 1}:${m.repeatVariable || ''}:${m.sourcePieceId || ''}:${m.isLinked ? 1 : 0}`
       ).join('|');
       const groups = (pieceData.groups || []).map(g => 
-        `${g.id || ''}:${g.name || ''}:${g.color || ''}:${g.startMeasure || 0}-${g.endMeasure || 0}:${g.repeat || 1}:${g.isBossaBlock ? 1 : 0}:${g.sourcePieceId || ''}`
+        `${g.id || ''}:${g.name || ''}:${g.color || ''}:${g.startMeasure || 0}-${g.endMeasure || 0}:${g.repeat || 1}:${g.repeatVariable || ''}:${g.isBossaBlock ? 1 : 0}:${g.sourcePieceId || ''}`
       ).join('|');
-      return `${name}#${bpm}#${desc}#${access}#${itemsStr}#${measures}#${groups}`;
+      const vars = JSON.stringify(pieceData.variables || []);
+      return `${name}#${bpm}#${desc}#${access}#${itemsStr}#${measures}#${groups}#${vars}`;
     } catch (_) {
       return '';
     }

@@ -57,6 +57,7 @@ class PieceState {
     this.ownerName = data.ownerName || null;
     this.access = data.access || 'edit_link';
     this.isBossa = data.isBossa !== undefined ? Boolean(data.isBossa) : Boolean(data.id?.startsWith('piece-bossa-') || data.id?.startsWith('bossa-'));
+    this.variables = Array.isArray(data.variables) ? data.variables.map(v => ({ ...v })) : [];
     
     // BPM oficial de apresentação da peça (da partitura/nuvem)
     this.presentationBpm = Math.max(20, Math.min(400, Number(data.presentationBpm || data.baseBpm) || 120));
@@ -118,7 +119,10 @@ class PieceState {
             isLinked: it.isLinked !== undefined ? Boolean(it.isLinked) : Boolean(it.sourcePieceId),
             sourcePieceId: it.sourcePieceId || null,
             sourcePieceName: it.sourcePieceName || it.name || 'Bossa',
-            measures: bossaMs
+            measures: bossaMs,
+            groups: Array.isArray(it.groups) ? it.groups : [],
+            variables: Array.isArray(it.variables) ? it.variables : [],
+            variableValues: (typeof it.variableValues === 'object' && it.variableValues !== null) ? { ...it.variableValues } : {}
           };
         }
         return {
@@ -132,7 +136,8 @@ class PieceState {
           ratioDen: Math.max(1, parseInt(it.ratioDen, 10) || 1),
           customBpm: Math.max(20, Math.min(500, Number(it.customBpm) || this.baseBpm)),
           color: it.color || '#ff334b',
-          repeat: Math.max(1, Math.min(999, parseInt(it.repeat, 10) || 1))
+          repeat: Math.max(1, Math.min(999, parseInt(it.repeat, 10) || 1)),
+          repeatVariable: it.repeatVariable ? String(it.repeatVariable).trim() : null
         };
       });
     } else {
@@ -408,12 +413,27 @@ class PieceState {
   syncLinkedBossa(itemIndex) {
     const item = this.items[itemIndex];
     if (!item || item.type !== 'bossa') return false;
-    if (item.sourcePieceId) {
-      const orig = this.getLibraryPieces().find(p => p.id === item.sourcePieceId)
-        || PRESETS.find(p => p.id === item.sourcePieceId);
+    if (item.sourcePieceId || item.sourcePieceName) {
+      const orig = this.findBossaOrPiece(item.sourcePieceId, item.sourcePieceName);
       if (orig) {
         item.name = orig.name;
         item.sourcePieceName = orig.name;
+        if (Array.isArray(orig.measures)) {
+          item.measures = JSON.parse(JSON.stringify(orig.measures));
+        }
+        if (Array.isArray(orig.groups)) {
+          item.groups = JSON.parse(JSON.stringify(orig.groups));
+        }
+        if (Array.isArray(orig.variables)) {
+          item.variables = JSON.parse(JSON.stringify(orig.variables));
+        }
+        if (!item.variableValues) item.variableValues = {};
+        const vars = this.getBossaVariables(item);
+        vars.forEach(v => {
+          if (item.variableValues[v.name] === undefined) {
+            item.variableValues[v.name] = v.defaultValue;
+          }
+        });
       }
     }
     this.recalculateTimings();
@@ -611,6 +631,7 @@ class PieceState {
         items: (this.items || []).map(it => ({ ...it })),
         measures: this.measures.map(m => ({ ...m })),
         groups: this.groups.map(g => ({ ...g })),
+        variables: (this.variables || []).map(v => ({ ...v })),
         updatedAt: Date.now()
       };
 
@@ -869,6 +890,7 @@ class PieceState {
           if (updates.customBpm !== undefined) target.customBpm = Math.max(20, Math.min(500, Number(updates.customBpm) || this.baseBpm));
           if (updates.color !== undefined) target.color = updates.color;
           if (updates.repeat !== undefined) target.repeat = Math.max(1, Math.min(999, parseInt(updates.repeat, 10) || 1));
+          if (updates.repeatVariable !== undefined) target.repeatVariable = updates.repeatVariable ? String(updates.repeatVariable).trim() : null;
         }
       } else if (m._itemIndex !== undefined && this.items[m._itemIndex]) {
         const target = this.items[m._itemIndex];
@@ -881,6 +903,7 @@ class PieceState {
         if (updates.customBpm !== undefined) target.customBpm = Math.max(20, Math.min(500, Number(updates.customBpm) || this.baseBpm));
         if (updates.color !== undefined) target.color = updates.color;
         if (updates.repeat !== undefined) target.repeat = Math.max(1, Math.min(999, parseInt(updates.repeat, 10) || 1));
+        if (updates.repeatVariable !== undefined) target.repeatVariable = updates.repeatVariable ? String(updates.repeatVariable).trim() : null;
       }
     });
 
@@ -900,7 +923,7 @@ class PieceState {
   }
 
   // Agrupamento: criar ou atualizar grupo
-  addGroup(name, color, startMeasure, endMeasure, repeat = 1) {
+  addGroup(name, color, startMeasure, endMeasure, repeat = 1, repeatVariable = null) {
     if (this.measures.length === 0) return null;
     const start = Math.max(0, Math.min(startMeasure, endMeasure));
     const end = Math.min(this.measures.length - 1, Math.max(startMeasure, endMeasure));
@@ -911,7 +934,8 @@ class PieceState {
       color: color || "#3b82f6",
       startMeasure: start,
       endMeasure: end,
-      repeat: Math.max(1, Math.min(999, parseInt(repeat, 10) || 1))
+      repeat: Math.max(1, Math.min(999, parseInt(repeat, 10) || 1)),
+      repeatVariable: repeatVariable ? String(repeatVariable).trim() : null
     };
 
     this.groups.push(newGroup);
@@ -937,6 +961,7 @@ class PieceState {
     if (updates.name !== undefined) grp.name = updates.name.trim() || "Grupo";
     if (updates.color !== undefined) grp.color = updates.color;
     if (updates.repeat !== undefined) grp.repeat = Math.max(1, Math.min(999, parseInt(updates.repeat, 10) || 1));
+    if (updates.repeatVariable !== undefined) grp.repeatVariable = updates.repeatVariable ? String(updates.repeatVariable).trim() : null;
     if (updates.collapsed !== undefined) grp.collapsed = Boolean(updates.collapsed);
     this.recalculateTimings();
     this.notify(`Atualizou grupo '${grp.name}'`, isLocalOnly);
@@ -1073,8 +1098,20 @@ class PieceState {
       isLinked: Boolean(isLinked),
       measures: Array.isArray(bossaPiece.measures)
         ? JSON.parse(JSON.stringify(bossaPiece.measures))
-        : []
+        : [],
+      groups: Array.isArray(bossaPiece.groups)
+        ? JSON.parse(JSON.stringify(bossaPiece.groups))
+        : [],
+      variables: Array.isArray(bossaPiece.variables)
+        ? JSON.parse(JSON.stringify(bossaPiece.variables))
+        : [],
+      variableValues: {}
     };
+
+    const vars = this.getBossaVariables(bossaItem);
+    vars.forEach(v => {
+      bossaItem.variableValues[v.name] = v.defaultValue;
+    });
 
     this.items.splice(insertPos, 0, bossaItem);
     this.recalculateTimings();
@@ -1318,6 +1355,7 @@ class PieceState {
           sourcePieceId: bossaItem.sourcePieceId || orig.id,
           sourcePieceName: orig.name || bossaItem.name,
           color: m.color || bossaItem.color || '#8b5cf6',
+          repeatVariable: m.repeatVariable || null,
           isLinked: true
         }));
       }
@@ -1329,8 +1367,86 @@ class PieceState {
       sourcePieceId: bossaItem.sourcePieceId || null,
       sourcePieceName: bossaItem.sourcePieceName || bossaItem.name,
       color: m.color || bossaItem.color || '#8b5cf6',
+      repeatVariable: m.repeatVariable || null,
       isLinked: Boolean(bossaItem.isLinked)
     }));
+  }
+
+  // Obtém todas as variáveis de repetição suportadas por um bloco de Bossa
+  getBossaVariables(bossaItem) {
+    if (!bossaItem) return [];
+    const orig = (bossaItem.isLinked && (bossaItem.sourcePieceId || bossaItem.sourcePieceName))
+      ? this.findBossaOrPiece(bossaItem.sourcePieceId, bossaItem.sourcePieceName)
+      : null;
+
+    const bossaMs = (orig && Array.isArray(orig.measures) && orig.measures.length > 0)
+      ? orig.measures
+      : (bossaItem.measures || []);
+
+    const bossaGrps = (orig && Array.isArray(orig.groups))
+      ? orig.groups
+      : (Array.isArray(bossaItem.groups) ? bossaItem.groups : []);
+
+    const declaredVars = (orig && Array.isArray(orig.variables))
+      ? orig.variables
+      : (Array.isArray(bossaItem.variables) ? bossaItem.variables : []);
+
+    const varsMap = new Map();
+
+    // 1. Variáveis explicitamente declaradas
+    declaredVars.forEach(v => {
+      if (v && v.name) {
+        const key = String(v.name).trim();
+        if (key) {
+          varsMap.set(key, {
+            name: key,
+            label: (v.label || v.name).trim(),
+            defaultValue: Math.max(1, Math.min(999, parseInt(v.defaultValue || v.default || 1, 10)))
+          });
+        }
+      }
+    });
+
+    // 2. Variáveis usadas em grupos internos
+    bossaGrps.forEach(g => {
+      if (g && g.repeatVariable && !g.isBossaBlock) {
+        const key = String(g.repeatVariable).trim();
+        if (key && !varsMap.has(key)) {
+          varsMap.set(key, {
+            name: key,
+            label: g.name ? g.name.trim() : `Grupo ${key}`,
+            defaultValue: Math.max(1, Math.min(999, parseInt(g.repeat || 1, 10)))
+          });
+        }
+      }
+    });
+
+    // 3. Variáveis usadas em compassos
+    bossaMs.forEach((m, idx) => {
+      if (m && m.repeatVariable) {
+        const key = String(m.repeatVariable).trim();
+        if (key && !varsMap.has(key)) {
+          varsMap.set(key, {
+            name: key,
+            label: m.nickname ? m.nickname.trim() : `c. ${idx + 1}`,
+            defaultValue: Math.max(1, Math.min(999, parseInt(m.repeat || 1, 10)))
+          });
+        }
+      }
+    });
+
+    return Array.from(varsMap.values());
+  }
+
+  // Atualiza o valor de uma variável de repetição da Bossa vinculada na peça
+  updateBossaVariable(itemIdx, varName, value, isLocalOnly = false) {
+    const item = this.items[itemIdx];
+    if (!item || item.type !== 'bossa') return;
+    if (!item.variableValues) item.variableValues = {};
+    const val = Math.max(1, Math.min(999, parseInt(value, 10) || 1));
+    item.variableValues[varName] = val;
+    this.recalculateTimings();
+    this.notify(`Atualizou variável '${varName}' da bossa '${item.name}' para ${val}x`, isLocalOnly);
   }
 
   // Recálculo matemático de tempos precisos considerando estrutura em blocos de itens (compassos e bossas)
@@ -1383,51 +1499,122 @@ class PieceState {
           };
           computedGroups.push(grp);
 
+          // Identifica grupos internos e resolve repetições com base em variáveis
+          const origBossa = (item.isLinked && (item.sourcePieceId || item.sourcePieceName))
+            ? this.findBossaOrPiece(item.sourcePieceId, item.sourcePieceName)
+            : null;
+          const rawInternalGroups = (origBossa && Array.isArray(origBossa.groups))
+            ? origBossa.groups
+            : (Array.isArray(item.groups) ? item.groups : []);
+
+          const internalGroups = rawInternalGroups.filter(g =>
+            !g.isBossaBlock &&
+            typeof g.startMeasure === 'number' &&
+            typeof g.endMeasure === 'number' &&
+            g.startMeasure >= 0 &&
+            g.endMeasure < bossaMs.length &&
+            g.startMeasure <= g.endMeasure
+          );
+
+          const resolveRepeat = (target) => {
+            if (target && target.repeatVariable && item.variableValues && item.variableValues[target.repeatVariable] !== undefined) {
+              return Math.max(1, Math.min(999, parseInt(item.variableValues[target.repeatVariable], 10) || 1));
+            }
+            return Math.max(1, Math.min(999, parseInt(target?.repeat, 10) || 1));
+          };
+
           for (let r = 0; r < repeatCount; r++) {
-            const groupContext = {
-              id: item.id,
-              iteration: r,
-              repeatCount: repeatCount
-            };
+            let subIdx = 0;
+            while (subIdx < bossaMs.length) {
+              const intGrp = internalGroups.find(g => g.startMeasure === subIdx && g.endMeasure >= subIdx && g.endMeasure < bossaMs.length);
+              if (intGrp) {
+                const grpRepeat = resolveRepeat(intGrp);
+                const gStart = intGrp.startMeasure;
+                const gEnd = intGrp.endMeasure;
+                for (let gr = 0; gr < grpRepeat; gr++) {
+                  for (let s = gStart; s <= gEnd; s++) {
+                    const mIdx = startMeasureIdx + s;
+                    const m = flattenedMeasures[mIdx];
+                    const mRepeat = resolveRepeat(m);
 
-            for (let mIdx = startMeasureIdx; mIdx <= endMeasureIdx; mIdx++) {
-              const m = flattenedMeasures[mIdx];
-              const mRepeat = Math.max(1, Math.min(999, parseInt(m.repeat, 10) || 1));
+                    let effectiveBpm = this.baseBpm;
+                    if (m.tempoMode === "ratio") {
+                      effectiveBpm = this.baseBpm * ((m.ratioNum || 1) / (m.ratioDen || 1));
+                    } else {
+                      effectiveBpm = m.customBpm || this.baseBpm;
+                    }
+                    const beatDuration = 60 / effectiveBpm;
+                    const measureDuration = (m.beats || 4) * beatDuration;
 
-              let effectiveBpm = this.baseBpm;
-              if (m.tempoMode === "ratio") {
-                effectiveBpm = this.baseBpm * ((m.ratioNum || 1) / (m.ratioDen || 1));
-              } else {
-                effectiveBpm = m.customBpm || this.baseBpm;
-              }
-
-              const beatDuration = 60 / effectiveBpm;
-              const measureDuration = (m.beats || 4) * beatDuration;
-
-              for (let mr = 0; mr < mRepeat; mr++) {
-                const timing = {
-                  timingIndex: globalTimingIndex++,
-                  measureIndex: mIdx,
-                  repeatIteration: mr,
-                  repeatCount: mRepeat,
-                  groupId: item.id,
-                  groupRepeatIteration: r,
-                  groupRepeatCount: repeatCount,
-                  startTime: accumulatedTime,
-                  endTime: accumulatedTime + measureDuration,
-                  duration: measureDuration,
-                  effectiveBpm: effectiveBpm,
-                  beatDuration: beatDuration,
-                  beats: m.beats || 4,
-                  beatUnit: m.beatUnit || 4
-                };
-
-                this.measureTimings.push(timing);
-                if (!this.firstTimingByMeasure.has(mIdx)) {
-                  this.firstTimingByMeasure.set(mIdx, timing);
+                    for (let mr = 0; mr < mRepeat; mr++) {
+                      const timing = {
+                        timingIndex: globalTimingIndex++,
+                        measureIndex: mIdx,
+                        repeatIteration: mr,
+                        repeatCount: mRepeat,
+                        groupId: item.id,
+                        groupRepeatIteration: r,
+                        groupRepeatCount: repeatCount,
+                        subGroupId: intGrp.id,
+                        subGroupRepeatIteration: gr,
+                        subGroupRepeatCount: grpRepeat,
+                        startTime: accumulatedTime,
+                        endTime: accumulatedTime + measureDuration,
+                        duration: measureDuration,
+                        effectiveBpm: effectiveBpm,
+                        beatDuration: beatDuration,
+                        beats: m.beats || 4,
+                        beatUnit: m.beatUnit || 4
+                      };
+                      this.measureTimings.push(timing);
+                      if (!this.firstTimingByMeasure.has(mIdx)) {
+                        this.firstTimingByMeasure.set(mIdx, timing);
+                      }
+                      this.lastTimingByMeasure.set(mIdx, timing);
+                      accumulatedTime += measureDuration;
+                    }
+                  }
                 }
-                this.lastTimingByMeasure.set(mIdx, timing);
-                accumulatedTime += measureDuration;
+                subIdx = gEnd + 1;
+              } else {
+                const mIdx = startMeasureIdx + subIdx;
+                const m = flattenedMeasures[mIdx];
+                const mRepeat = resolveRepeat(m);
+
+                let effectiveBpm = this.baseBpm;
+                if (m.tempoMode === "ratio") {
+                  effectiveBpm = this.baseBpm * ((m.ratioNum || 1) / (m.ratioDen || 1));
+                } else {
+                  effectiveBpm = m.customBpm || this.baseBpm;
+                }
+                const beatDuration = 60 / effectiveBpm;
+                const measureDuration = (m.beats || 4) * beatDuration;
+
+                for (let mr = 0; mr < mRepeat; mr++) {
+                  const timing = {
+                    timingIndex: globalTimingIndex++,
+                    measureIndex: mIdx,
+                    repeatIteration: mr,
+                    repeatCount: mRepeat,
+                    groupId: item.id,
+                    groupRepeatIteration: r,
+                    groupRepeatCount: repeatCount,
+                    startTime: accumulatedTime,
+                    endTime: accumulatedTime + measureDuration,
+                    duration: measureDuration,
+                    effectiveBpm: effectiveBpm,
+                    beatDuration: beatDuration,
+                    beats: m.beats || 4,
+                    beatUnit: m.beatUnit || 4
+                  };
+                  this.measureTimings.push(timing);
+                  if (!this.firstTimingByMeasure.has(mIdx)) {
+                    this.firstTimingByMeasure.set(mIdx, timing);
+                  }
+                  this.lastTimingByMeasure.set(mIdx, timing);
+                  accumulatedTime += measureDuration;
+                }
+                subIdx++;
               }
             }
           }
