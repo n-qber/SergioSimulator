@@ -2801,12 +2801,6 @@ class SergioApp {
 
     items.forEach((item, itemIdx) => {
       if (item.type === 'bossa') {
-        const bossaContainer = document.createElement('div');
-        bossaContainer.className = 'bossa-block-container' + (item.collapsed ? ' is-collapsed' : '');
-        bossaContainer.dataset.itemIndex = itemIdx;
-        bossaContainer.draggable = true;
-        bossaContainer.style.setProperty('--bossa-color', item.color || '#8b5cf6');
-
         const bossaMeasures = measures.filter(m => m._itemIndex === itemIdx);
         const count = bossaMeasures.length;
         const cleanBossaName = (item.sourcePieceName || item.name || 'Bossa').replace(/^[🔗📦✏️🔓\s]+/, '').trim();
@@ -2823,33 +2817,56 @@ class SergioApp {
         const bossaRepeatTagHtml = (item.repeat || 1) > 1
           ? `<span class="measure-card-repeat-tag" title="Esta bossa se repete ${item.repeat} vezes na peça">×${item.repeat}</span>`
           : '';
-        const collapsedTagHtml = item.collapsed
-          ? `<span class="bossa-collapsed-tag" title="${count} compassos recolhidos para economizar espaço">${iconSvg('layers', { size: 12 })} Fechada (${count})</span>`
-          : '';
 
-        bossaContainer.innerHTML = `
-          <div class="bossa-container-header">
-            <div class="bossa-block-header-info">
-              <span class="bossa-drag-handle" title="Arraste para reposicionar a bossa inteira na peça">⠿</span>
-              <button type="button" class="btn-toggle-bossa-collapse" title="${item.collapsed ? 'Expandir compassos desta bossa' : 'Recolher bossa para economizar espaço'}">
-                ${iconSvg(item.collapsed ? 'chevron-right' : 'chevron-down', { size: 14 })}
-              </button>
-              <span class="bossa-block-header-badge" style="background:${item.color || '#8b5cf6'}25; color:${item.color || '#8b5cf6'}">
-                ${item.isLinked ? `${iconSvg('link', { size: 12 })} Bossa Vinculada` : `${iconSvg('box', { size: 12 })} Bloco Bossa`}
-              </span>
-              <span class="bossa-block-header-title" style="cursor:pointer" title="${item.collapsed ? 'Clique para expandir' : 'Clique para recolher'}">${item.name}</span>
-              <span class="bossa-block-header-range">${count} ${count === 1 ? 'compasso' : 'compassos'}</span>
-              ${collapsedTagHtml}
-              <span class="bossa-block-header-time" title="Tempo total desta bossa na peça: ${bossaDurationStr}">${iconSvg('clock', { size: 13 })} ${bossaDurationStr}</span>
-              ${bossaRepeatTagHtml}
+        const bossaElement = document.createElement('div');
+        bossaElement.dataset.itemIndex = itemIdx;
+        bossaElement.draggable = true;
+        bossaElement.style.setProperty('--bossa-color', item.color || '#8b5cf6');
+        bossaElement.style.setProperty('--card-bossa-color', item.color || '#8b5cf6');
+
+        if (item.collapsed) {
+          // =========================================================================
+          // ESTADO RECOLHIDO: Exibe exatamente como um card de compasso na grade
+          // =========================================================================
+          bossaElement.className = 'measure-card bossa-card-compact is-collapsed is-bossa-member';
+
+          const firstM = bossaMeasures[0];
+          const lastM = bossaMeasures[bossaMeasures.length - 1];
+          const firstIdx = firstM ? measures.indexOf(firstM) : -1;
+          const lastIdx = lastM ? measures.indexOf(lastM) : -1;
+          const rangeStr = (firstIdx >= 0 && lastIdx >= 0)
+            ? (firstIdx === lastIdx ? `c. ${firstIdx + 1}` : `c. ${firstIdx + 1}–${lastIdx + 1}`)
+            : `${count} comp.`;
+
+          bossaElement.innerHTML = `
+            <div class="measure-card-group-strip" style="background:${item.color || '#8b5cf6'}"></div>
+
+            <div class="measure-card-header">
+              <div class="card-idx-wrap">
+                <span class="bossa-drag-handle" title="Arraste para reposicionar a bossa inteira na peça" style="cursor:grab; font-size:1.05rem; line-height:1; opacity:0.65; margin-right:3px;">⠿</span>
+                <span class="measure-card-idx" style="color:${item.color || '#8b5cf6'}; font-weight:800">${rangeStr}</span>
+                ${bossaRepeatTagHtml}
+              </div>
+              <div class="measure-card-tags">
+                <span class="measure-bossa-pill linked" style="background:${item.color || '#8b5cf6'}25; color:${item.color || '#8b5cf6'}; border-color:${item.color || '#8b5cf6'}40" title="${item.isLinked ? 'Bossa vinculada' : 'Bloco de bossa'}">
+                  ${item.isLinked ? iconSvg('link', { size: 11 }) : iconSvg('box', { size: 11 })} ${item.isLinked ? 'Bossa' : 'Bloco'}
+                </span>
+              </div>
             </div>
-            <div class="bossa-block-header-actions">
-              <button type="button" class="btn-bossa-block-action btn-bossa-toggle-view ${item.collapsed ? 'is-collapsed' : ''}" title="${item.collapsed ? 'Expandir para visualizar os compassos' : 'Recolher para não ocupar espaço'}">
-                ${iconSvg(item.collapsed ? 'chevron-down' : 'chevron-up', { size: 13 })}
-                <span>${item.collapsed ? `Expandir (${count})` : 'Recolher'}</span>
-              </button>
 
-              <div class="bossa-repeat-stepper-wrap" title="Número de vezes que esta bossa se repete na peça">
+            <div class="measure-card-title-wrap">
+              <div class="bossa-compact-title bossa-block-header-title" style="cursor:pointer;" title="Clique para expandir esta bossa">
+                <strong style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${item.name}</strong>
+              </div>
+            </div>
+
+            <div class="measure-card-details">
+              <span class="measure-card-meter" title="${count} compassos • Duração: ${bossaDurationStr}">${count} ${count === 1 ? 'compasso' : 'compassos'}</span>
+              <span class="measure-card-tempo" title="Duração total: ${bossaDurationStr}">${iconSvg('clock', { size: 12 })} ${bossaDurationStr}</span>
+            </div>
+
+            <div class="measure-card-steppers">
+              <div class="measure-card-stepper-row" style="width:100%;">
                 <span class="card-stepper-label">Repetir:</span>
                 <div class="repeat-stepper">
                   <button type="button" class="btn-repeat-step btn-bossa-repeat-minus" title="Diminuir repetições da bossa">-</button>
@@ -2857,50 +2874,150 @@ class SergioApp {
                   <button type="button" class="btn-repeat-step btn-bossa-repeat-plus" title="Aumentar repetições da bossa">+</button>
                 </div>
               </div>
+            </div>
 
-              ${item.sourcePieceId ? `
-                <button type="button" class="btn-bossa-block-action btn-open-bossa-page" title="Abrir '${cleanBossaName}' para edição direta">
-                  ${iconSvg('external-link', { size: 13 })} Abrir "${cleanBossaName}"
-                </button>
-              ` : ''}
-
-              <button type="button" class="btn-bossa-block-action btn-move-bossa-left" title="Mover bossa para trás (←)" ${itemIdx === 0 ? 'disabled style="opacity:0.35;pointer-events:none"' : ''}>
-                ${iconSvg('arrow-left', { size: 13 })} Mover
-              </button>
-              <button type="button" class="btn-bossa-block-action btn-move-bossa-right" title="Mover bossa para frente (→)" ${itemIdx >= items.length - 1 ? 'disabled style="opacity:0.35;pointer-events:none"' : ''}>
-                Mover ${iconSvg('arrow-right', { size: 13 })}
-              </button>
-
-              ${item.isLinked ? `
-                <button type="button" class="btn-bossa-block-action btn-sync-bossa-block" title="Sincronizar este bloco com a bossa original">
-                  ${iconSvg('rotate-ccw', { size: 13 })} Sincronizar
-                </button>
-                <button type="button" class="btn-bossa-block-action btn-unlink-bossa-block" title="Desvincular bloco da peça original (tornar edições independentes)">
-                  ${iconSvg('unlock', { size: 13 })} Desvincular
-                </button>
-              ` : ''}
-
-              <button type="button" class="btn-bossa-block-action btn-del-bossa-block" title="Excluir este bloco de bossa da peça" style="color:#f87171">
-                ${iconSvg('trash-2', { size: 13 })}
+            <div class="measure-card-actions">
+              <div class="card-actions-secondary">
+                <button type="button" class="btn-card-icon btn-move-bossa-left" title="Mover bossa para trás (←)" ${itemIdx === 0 ? 'disabled style="opacity:0.3;pointer-events:none"' : ''}>${iconSvg('chevron-left', { size: 14 })}</button>
+                <button type="button" class="btn-card-icon btn-move-bossa-right" title="Mover bossa para frente (→)" ${itemIdx >= items.length - 1 ? 'disabled style="opacity:0.3;pointer-events:none"' : ''}>${iconSvg('chevron-right', { size: 14 })}</button>
+                ${item.sourcePieceId ? `<button type="button" class="btn-card-icon btn-open-bossa-page" title="Abrir '${cleanBossaName}' para edição direta">${iconSvg('external-link', { size: 13 })}</button>` : ''}
+                ${item.isLinked ? `<button type="button" class="btn-card-icon btn-sync-bossa-block" title="Sincronizar com a bossa original">${iconSvg('rotate-ccw', { size: 13 })}</button>` : ''}
+                ${item.isLinked ? `<button type="button" class="btn-card-icon btn-unlink-bossa-block" title="Desvincular bloco da peça original">${iconSvg('unlock', { size: 13 })}</button>` : ''}
+                <button type="button" class="btn-card-icon btn-del-bossa-block" title="Excluir este bloco de bossa da peça" style="color:#f87171">${iconSvg('trash-2', { size: 13 })}</button>
+              </div>
+              <button type="button" class="btn-card-edit btn-bossa-toggle-view" title="Expandir compassos desta bossa">
+                <span class="btn-card-edit-icon">${iconSvg('chevron-down', { size: 13 })}</span>
+                <span class="btn-card-edit-text">Expandir (${count})</span>
               </button>
             </div>
-          </div>
-        `;
+          `;
 
-        // Wire up bossa container header events:
+          // Mapeia os compassos da bossa para este card no cache de playback
+          bossaMeasures.forEach(m => {
+            const mIdx = measures.indexOf(m);
+            if (mIdx >= 0) this.cachedCards[mIdx] = bossaElement;
+          });
+        } else {
+          // =========================================================================
+          // ESTADO EXPANDIDO: Container amplo em toda a linha com a grade interna
+          // =========================================================================
+          bossaElement.className = 'bossa-block-container is-expanded';
+
+          bossaElement.innerHTML = `
+            <div class="bossa-container-header">
+              <div class="bossa-block-header-info">
+                <span class="bossa-drag-handle" title="Arraste para reposicionar a bossa inteira na peça">⠿</span>
+                <button type="button" class="btn-toggle-bossa-collapse" title="Recolher bossa para card individual">
+                  ${iconSvg('chevron-down', { size: 14 })}
+                </button>
+                <span class="bossa-block-header-badge" style="background:${item.color || '#8b5cf6'}25; color:${item.color || '#8b5cf6'}">
+                  ${item.isLinked ? `${iconSvg('link', { size: 12 })} Bossa Vinculada` : `${iconSvg('box', { size: 12 })} Bloco Bossa`}
+                </span>
+                <span class="bossa-block-header-title" style="cursor:pointer" title="Clique para recolher">${item.name}</span>
+                <span class="bossa-block-header-range">${count} ${count === 1 ? 'compasso' : 'compassos'}</span>
+                <span class="bossa-block-header-time" title="Tempo total desta bossa na peça: ${bossaDurationStr}">${iconSvg('clock', { size: 13 })} ${bossaDurationStr}</span>
+                ${bossaRepeatTagHtml}
+              </div>
+              <div class="bossa-block-header-actions">
+                <button type="button" class="btn-bossa-block-action btn-bossa-toggle-view" title="Recolher para card compacto">
+                  ${iconSvg('chevron-up', { size: 13 })}
+                  <span>Recolher</span>
+                </button>
+
+                <div class="bossa-repeat-stepper-wrap" title="Número de vezes que esta bossa se repete na peça">
+                  <span class="card-stepper-label">Repetir:</span>
+                  <div class="repeat-stepper">
+                    <button type="button" class="btn-repeat-step btn-bossa-repeat-minus" title="Diminuir repetições da bossa">-</button>
+                    <input type="number" class="input-card-repeat input-bossa-repeat" min="1" max="999" value="${item.repeat || 1}" title="Número de vezes que esta bossa se repete">
+                    <button type="button" class="btn-repeat-step btn-bossa-repeat-plus" title="Aumentar repetições da bossa">+</button>
+                  </div>
+                </div>
+
+                ${item.sourcePieceId ? `
+                  <button type="button" class="btn-bossa-block-action btn-open-bossa-page" title="Abrir '${cleanBossaName}' para edição direta">
+                    ${iconSvg('external-link', { size: 13 })} Abrir "${cleanBossaName}"
+                  </button>
+                ` : ''}
+
+                <button type="button" class="btn-bossa-block-action btn-move-bossa-left" title="Mover bossa para trás (←)" ${itemIdx === 0 ? 'disabled style="opacity:0.35;pointer-events:none"' : ''}>
+                  ${iconSvg('arrow-left', { size: 13 })} Mover
+                </button>
+                <button type="button" class="btn-bossa-block-action btn-move-bossa-right" title="Mover bossa para frente (→)" ${itemIdx >= items.length - 1 ? 'disabled style="opacity:0.35;pointer-events:none"' : ''}>
+                  Mover ${iconSvg('arrow-right', { size: 13 })}
+                </button>
+
+                ${item.isLinked ? `
+                  <button type="button" class="btn-bossa-block-action btn-sync-bossa-block" title="Sincronizar este bloco com a bossa original">
+                    ${iconSvg('rotate-ccw', { size: 13 })} Sincronizar
+                  </button>
+                  <button type="button" class="btn-bossa-block-action btn-unlink-bossa-block" title="Desvincular bloco da peça original (tornar edições independentes)">
+                    ${iconSvg('unlock', { size: 13 })} Desvincular
+                  </button>
+                ` : ''}
+
+                <button type="button" class="btn-bossa-block-action btn-del-bossa-block" title="Excluir este bloco de bossa da peça" style="color:#f87171">
+                  ${iconSvg('trash-2', { size: 13 })}
+                </button>
+              </div>
+            </div>
+          `;
+
+          const body = document.createElement('div');
+          body.className = 'bossa-container-body';
+
+          if (item.isLinked) {
+            const notice = document.createElement('div');
+            notice.className = 'bossa-linked-notice';
+            notice.innerHTML = `${iconSvg('link', { size: 14 })} Bossa vinculada à <strong>${cleanBossaName}</strong>. Os compassos são sincronizados dinamicamente da bossa original.`;
+            body.appendChild(notice);
+          }
+
+          const innerGrid = document.createElement('div');
+          innerGrid.className = 'bossa-inner-measures-grid';
+
+          bossaMeasures.forEach(m => {
+            const mIdx = measures.indexOf(m);
+            const card = this.createMeasureCardElement(m, mIdx, item);
+            innerGrid.appendChild(card);
+            if (mIdx >= 0) this.cachedCards[mIdx] = card;
+          });
+
+          body.appendChild(innerGrid);
+          bossaElement.appendChild(body);
+        }
+
+        // Eventos comuns para ambos os layouts (expandido ou recolhido):
         const handleToggle = (e) => {
           e.stopPropagation();
           state.toggleBossaCollapse(itemIdx);
           this.renderMeasuresList();
         };
-        bossaContainer.querySelector('.btn-toggle-bossa-collapse')?.addEventListener('click', handleToggle);
-        bossaContainer.querySelector('.btn-bossa-toggle-view')?.addEventListener('click', handleToggle);
-        bossaContainer.querySelector('.bossa-block-header-title')?.addEventListener('click', handleToggle);
+        bossaElement.querySelector('.btn-toggle-bossa-collapse')?.addEventListener('click', handleToggle);
+        bossaElement.querySelector('.btn-bossa-toggle-view')?.addEventListener('click', handleToggle);
+        bossaElement.querySelector('.bossa-block-header-title')?.addEventListener('click', handleToggle);
+        bossaElement.querySelector('.bossa-compact-title')?.addEventListener('click', handleToggle);
 
-        // Repeat controls
-        const btnBossaRepMinus = bossaContainer.querySelector('.btn-bossa-repeat-minus');
-        const btnBossaRepPlus = bossaContainer.querySelector('.btn-bossa-repeat-plus');
-        const inputBossaRep = bossaContainer.querySelector('.input-bossa-repeat');
+        if (item.collapsed) {
+          bossaElement.addEventListener('dblclick', (e) => {
+            if (e.target.closest('button, input, select, textarea, .repeat-stepper')) return;
+            handleToggle(e);
+          });
+          bossaElement.addEventListener('click', (e) => {
+            if (e.target.closest('button, input, select, textarea, .repeat-stepper, .bossa-drag-handle')) return;
+            const firstM = bossaMeasures[0];
+            const firstIdx = firstM ? measures.indexOf(firstM) : -1;
+            if (firstIdx >= 0) {
+              this.handleMeasureSelected(firstIdx);
+              const t = state.getFirstTimingForMeasure(firstIdx);
+              if (t) this.seekTo(t.startTime);
+            }
+          });
+        }
+
+        // Stepper de repetição
+        const btnBossaRepMinus = bossaElement.querySelector('.btn-bossa-repeat-minus');
+        const btnBossaRepPlus = bossaElement.querySelector('.btn-bossa-repeat-plus');
+        const inputBossaRep = bossaElement.querySelector('.input-bossa-repeat');
         if (inputBossaRep) {
           const updateBossaRep = (newVal) => {
             const val = Math.max(1, Math.min(999, parseInt(newVal, 10) || 1));
@@ -2928,12 +3045,12 @@ class SergioApp {
           });
         }
 
-        bossaContainer.querySelector('.btn-open-bossa-page')?.addEventListener('click', (e) => {
+        bossaElement.querySelector('.btn-open-bossa-page')?.addEventListener('click', (e) => {
           e.stopPropagation();
           this.navigateToBossaOrPiece(item.sourcePieceId, item.sourcePieceName || item.name);
         });
 
-        bossaContainer.querySelector('.btn-move-bossa-left')?.addEventListener('click', (e) => {
+        bossaElement.querySelector('.btn-move-bossa-left')?.addEventListener('click', (e) => {
           e.stopPropagation();
           if (state.moveItemLeft(itemIdx)) {
             this.renderMeasuresList();
@@ -2941,7 +3058,7 @@ class SergioApp {
           }
         });
 
-        bossaContainer.querySelector('.btn-move-bossa-right')?.addEventListener('click', (e) => {
+        bossaElement.querySelector('.btn-move-bossa-right')?.addEventListener('click', (e) => {
           e.stopPropagation();
           if (state.moveItemRight(itemIdx)) {
             this.renderMeasuresList();
@@ -2949,86 +3066,55 @@ class SergioApp {
           }
         });
 
-        bossaContainer.querySelector('.btn-sync-bossa-block')?.addEventListener('click', (e) => {
+        bossaElement.querySelector('.btn-sync-bossa-block')?.addEventListener('click', (e) => {
           e.stopPropagation();
           state.syncLinkedBossa(itemIdx);
           this.renderMeasuresList();
           this.showToast(`Bossa '${item.name}' sincronizada com o original!`, '🔄');
         });
 
-        bossaContainer.querySelector('.btn-unlink-bossa-block')?.addEventListener('click', (e) => {
+        bossaElement.querySelector('.btn-unlink-bossa-block')?.addEventListener('click', (e) => {
           e.stopPropagation();
           state.unlinkBossa(itemIdx);
           this.renderMeasuresList();
           this.showToast(`Bossa '${item.name}' desvinculada! Edições locais permitidas.`, '🔓');
         });
 
-        bossaContainer.querySelector('.btn-del-bossa-block')?.addEventListener('click', (e) => {
+        bossaElement.querySelector('.btn-del-bossa-block')?.addEventListener('click', (e) => {
           e.stopPropagation();
           state.removeItem(itemIdx);
           this.renderMeasuresList();
           this.showToast(`Bossa '${item.name}' removida da peça.`, '🗑️');
         });
 
-        // Content
-        if (item.collapsed) {
-          bossaMeasures.forEach(m => {
-            const mIdx = measures.indexOf(m);
-            if (mIdx >= 0) this.cachedCards[mIdx] = bossaContainer;
-          });
-        } else {
-          const body = document.createElement('div');
-          body.className = 'bossa-container-body';
-
-          if (item.isLinked) {
-            const notice = document.createElement('div');
-            notice.className = 'bossa-linked-notice';
-            notice.innerHTML = `${iconSvg('link', { size: 14 })} Bossa vinculada à <strong>${cleanBossaName}</strong>. Os compassos são sincronizados dinamicamente da bossa original.`;
-            body.appendChild(notice);
-          }
-
-          const innerGrid = document.createElement('div');
-          innerGrid.className = 'bossa-inner-measures-grid';
-
-          bossaMeasures.forEach(m => {
-            const mIdx = measures.indexOf(m);
-            const card = this.createMeasureCardElement(m, mIdx, item);
-            innerGrid.appendChild(card);
-            if (mIdx >= 0) this.cachedCards[mIdx] = card;
-          });
-
-          body.appendChild(innerGrid);
-          bossaContainer.appendChild(body);
-        }
-
-        // Top-level drag & drop on bossaContainer
-        bossaContainer.addEventListener('dragstart', (e) => {
+        // Drag & drop no bossaElement (mover o bloco/card inteiro na peça)
+        bossaElement.addEventListener('dragstart', (e) => {
           if (e.target.closest('input, button, select, textarea')) {
             e.preventDefault();
             return;
           }
           e.dataTransfer.setData('text/item-index', itemIdx);
           e.dataTransfer.setData('text/plain', `item:${itemIdx}`);
-          bossaContainer.classList.add('is-drag-source');
+          bossaElement.classList.add('is-drag-source');
         });
 
-        bossaContainer.addEventListener('dragend', () => {
-          bossaContainer.classList.remove('is-drag-source');
+        bossaElement.addEventListener('dragend', () => {
+          bossaElement.classList.remove('is-drag-source');
           grid.querySelectorAll('.is-drag-target').forEach(el => el.classList.remove('is-drag-target'));
         });
 
-        bossaContainer.addEventListener('dragover', (e) => {
+        bossaElement.addEventListener('dragover', (e) => {
           e.preventDefault();
-          bossaContainer.classList.add('is-drag-target');
+          bossaElement.classList.add('is-drag-target');
         });
 
-        bossaContainer.addEventListener('dragleave', () => {
-          bossaContainer.classList.remove('is-drag-target');
+        bossaElement.addEventListener('dragleave', () => {
+          bossaElement.classList.remove('is-drag-target');
         });
 
-        bossaContainer.addEventListener('drop', (e) => {
+        bossaElement.addEventListener('drop', (e) => {
           e.preventDefault();
-          bossaContainer.classList.remove('is-drag-target');
+          bossaElement.classList.remove('is-drag-target');
           const rawItem = e.dataTransfer.getData('text/item-index') || (e.dataTransfer.getData('text/plain') || '').replace('item:', '');
           const fromIdx = parseInt(rawItem, 10);
           if (!isNaN(fromIdx) && fromIdx !== itemIdx) {
@@ -3037,7 +3123,7 @@ class SergioApp {
           }
         });
 
-        grid.appendChild(bossaContainer);
+        grid.appendChild(bossaElement);
       } else {
         // Compasso normal (item avulso)
         const mIdx = measures.findIndex(m => m._itemIndex === itemIdx);

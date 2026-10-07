@@ -6097,7 +6097,47 @@ kbd {
   border-top: 1px solid var(--border-light);
 }
 
-/* Container de Bloco Bossa de Primeira Classe na Grade */
+/* Card de Bossa Recolhida (quando não expandida, fica como um card de compasso na grade) */
+.measure-card.bossa-card-compact {
+  border-color: rgba(139, 92, 246, 0.42);
+  background: linear-gradient(180deg, rgba(139, 92, 246, 0.08) 0%, var(--bg-card) 100%);
+  border-left: 4.5px solid var(--bossa-color, #8b5cf6);
+  cursor: pointer;
+  position: relative;
+}
+
+.measure-card.bossa-card-compact:hover {
+  border-color: rgba(139, 92, 246, 0.7);
+  background: linear-gradient(180deg, rgba(139, 92, 246, 0.15) 0%, var(--bg-card-hover) 100%);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.measure-card.bossa-card-compact.active-playback {
+  border-color: #a78bfa !important;
+  background: rgba(139, 92, 246, 0.22) !important;
+  box-shadow: 0 0 16px rgba(139, 92, 246, 0.55), inset 0 0 8px rgba(139, 92, 246, 0.2) !important;
+}
+
+.bossa-compact-title {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--white-pure);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  user-select: none;
+  cursor: pointer;
+  transition: color 0.15s ease;
+  display: flex;
+  align-items: center;
+}
+
+.bossa-compact-title:hover {
+  color: #c4b5fd;
+}
+
+/* Container de Bloco Bossa Expandido (ocupa linha inteira com a grade interna) */
 .bossa-block-container {
   grid-column: 1 / -1;
   display: flex;
@@ -6115,18 +6155,6 @@ kbd {
 }
 
 .bossa-block-container:hover {
-  border-color: rgba(139, 92, 246, 0.55);
-}
-
-.bossa-block-container.is-collapsed {
-  background: rgba(139, 92, 246, 0.08);
-  border-color: rgba(139, 92, 246, 0.35);
-  margin-bottom: 8px;
-  padding: 8px 14px;
-}
-
-.bossa-block-container.is-collapsed:hover {
-  background: rgba(139, 92, 246, 0.14);
   border-color: rgba(139, 92, 246, 0.55);
 }
 
@@ -6884,6 +6912,19 @@ kbd {
   background: rgba(16, 185, 129, 0.1);
   border-color: rgba(16, 185, 129, 0.35);
   color: #047857;
+}
+
+[data-theme="light"] .measure-card.bossa-card-compact {
+  background: linear-gradient(180deg, rgba(139, 92, 246, 0.08) 0%, #ffffff 100%);
+  border-color: rgba(139, 92, 246, 0.4);
+}
+
+[data-theme="light"] .bossa-compact-title {
+  color: #1e1b4b;
+}
+
+[data-theme="light"] .bossa-compact-title:hover {
+  color: #7c3aed;
 }
 
 [data-theme="light"] .bossa-card-title {
