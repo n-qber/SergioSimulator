@@ -29,18 +29,18 @@
       <header class="top-header" id="topHeader">
       <div class="header-left">
         <div class="brand">
-          <div class="brand-icon">🥁</div>
+          <div class="brand-icon"><span data-lucide="drum" data-size="20"></span></div>
           <span class="brand-title">SÉRGIO SIMULATOR</span>
         </div>
 
         <!-- Navegação de Páginas no Topo Esquerdo -->
         <nav class="header-left-nav" id="headerLeftNav" aria-label="Navegação Principal">
           <button type="button" id="btnNavSimulator" class="header-nav-pill active" title="Palco do Simulador (Esc)">
-            <span class="nav-pill-icon">🥁</span>
+            <span class="nav-pill-icon" data-lucide="activity" data-size="15"></span>
             <span class="nav-pill-label">Simulador</span>
           </button>
           <button type="button" id="btnNavRepertoire" class="header-nav-pill" title="Biblioteca de Peças & Bossas">
-            <span class="nav-pill-icon">🗂️</span>
+            <span class="nav-pill-icon" data-lucide="library" data-size="15"></span>
             <span class="nav-pill-label">Repertório</span>
           </button>
         </nav>
@@ -56,29 +56,29 @@
           <button type="button" class="btn-tap" id="btnTapTempo" title="Toque no ritmo">TAP</button>
           <div id="bpmPracticeStatus" class="bpm-practice-status" style="display:none">
             <span id="bpmPracticeBadge" class="bpm-mode-tag" title="Andamento de treino local (não afeta o banco de dados nem os outros músicos)">Treino</span>
-            <button type="button" id="btnResetPresentationBpm" class="btn-reset-bpm" title="Restaurar BPM oficial da apresentação">↺ 120</button>
-            <button type="button" id="btnPromotePresentationBpm" class="btn-promote-bpm" title="Definir este BPM como o oficial da apresentação na nuvem"><span class="btn-promote-icon">☁️</span><span class="btn-promote-text"> Salvar</span></button>
+            <button type="button" id="btnResetPresentationBpm" class="btn-reset-bpm" title="Restaurar BPM oficial da apresentação"><span data-lucide="rotate-ccw" data-size="12"></span> 120</button>
+            <button type="button" id="btnPromotePresentationBpm" class="btn-promote-bpm" title="Definir este BPM como o oficial da apresentação na nuvem"><span class="btn-promote-icon" data-lucide="cloud-upload" data-size="13"></span><span class="btn-promote-text"> Salvar</span></button>
           </div>
         </div>
       </div>
 
       <!-- Centro: Nome da Peça, Status de Salvamento e Desfazer/Refazer -->
       <div class="header-center">
-        <div class="mobile-group-title mobile-piece-header-title" style="display:none">🎼 Peça Atual</div>
+        <div class="mobile-group-title mobile-piece-header-title" style="display:none"><span data-lucide="music" data-size="14"></span> Peça Atual</div>
         <div class="piece-title-wrapper">
           <input type="text" id="inputPieceName" class="piece-title-input" value="Estudo de Modulações Rítmicas (3/2 & 4/3)" placeholder="Nome da Peça" title="Clique para editar o título">
           <div id="syncStatusPill" class="sync-status-pill synced" title="Status de salvamento e sincronização">
-            <span id="syncStatusIcon" class="sync-status-icon">☁️</span>
+            <span id="syncStatusIcon" class="sync-status-icon" data-lucide="cloud" data-size="13"></span>
             <span id="syncStatusText" class="sync-status-text">Salvo</span>
           </div>
           <button type="button" id="btnReturnToPreviousPiece" class="btn-return-previous-piece" style="display:none" title="Voltar para a apresentação anterior">
-            <span class="return-icon">↩</span> Voltar para <span id="returnPieceName" class="return-piece-name">Peça</span>
+            <span class="return-icon" data-lucide="corner-down-right" data-size="13"></span> Voltar para <span id="returnPieceName" class="return-piece-name">Peça</span>
           </button>
         </div>
 
         <div class="undo-redo-row" title="Histórico de Edições">
-          <button type="button" id="btnUndo" class="btn-icon-action btn-undo" title="Desfazer (Ctrl+Z)" disabled>↩</button>
-          <button type="button" id="btnRedo" class="btn-icon-action btn-redo" title="Refazer (Ctrl+Y)" disabled>↪</button>
+          <button type="button" id="btnUndo" class="btn-icon-action btn-undo" title="Desfazer (Ctrl+Z)" disabled><span data-lucide="rotate-ccw" data-size="15"></span></button>
+          <button type="button" id="btnRedo" class="btn-icon-action btn-redo" title="Refazer (Ctrl+Y)" disabled><span data-lucide="rotate-cw" data-size="15"></span></button>
         </div>
       </div>
 
@@ -87,18 +87,18 @@
         <div id="presenceRow" class="presence-row" title="Colaboradores Online"></div>
 
         <button type="button" id="btnSharePiece" class="btn-share-highlight" title="Compartilhar Peça e Colaborar em Tempo Real">
-          <span class="btn-icon">🔗</span> Compartilhar
+          <span class="btn-icon" data-lucide="share-2" data-size="15"></span> Compartilhar
         </button>
 
         <!-- Perfil e Autenticação do Usuário (Perfil Único) -->
         <div class="user-auth-wrapper">
           <button type="button" id="btnAuth" class="btn-user-auth" title="Sua Conta ou Fazer Login">
-            <span id="userAuthAvatar" class="user-avatar-tiny">👤</span>
+            <span id="userAuthAvatar" class="user-avatar-tiny" data-lucide="user" data-size="14"></span>
             <span id="userAuthLabel" class="user-auth-name">Entrar</span>
           </button>
           <div id="userMenuDropdown" class="user-menu-dropdown" style="display:none">
             <div class="user-menu-header">
-              <div id="userMenuAvatarLarge" class="user-avatar-circle-sm">👤</div>
+              <div id="userMenuAvatarLarge" class="user-avatar-circle-sm" data-lucide="user" data-size="20"></div>
               <div class="user-menu-info">
                 <div id="userMenuName" class="user-menu-name">Convidado</div>
                 <div id="userMenuEmail" class="user-menu-email">Não conectado</div>
@@ -106,45 +106,45 @@
             </div>
             <div class="user-menu-divider"></div>
             <button type="button" id="btnUserCloudPieces" class="user-menu-item">
-              <span class="menu-item-icon">☁️</span> Minhas Peças na Nuvem
+              <span class="menu-item-icon" data-lucide="cloud" data-size="15"></span> Minhas Peças na Nuvem
             </button>
             <button type="button" id="btnUserManageBossas" class="user-menu-item" title="Gerenciar minhas peças e bossas salvas e sincronizadas">
-              <span class="menu-item-icon">🗂️</span> Minhas Peças & Bossas
+              <span class="menu-item-icon" data-lucide="library" data-size="15"></span> Minhas Peças & Bossas
             </button>
             <div class="user-menu-divider"></div>
             <button type="button" id="btnUserThemeToggle" class="user-menu-item" title="Alternar entre tema claro e escuro">
-              <span class="menu-item-icon" id="userMenuThemeIcon">☀️</span>
+              <span class="menu-item-icon" id="userMenuThemeIcon" data-lucide="sun" data-size="15"></span>
               <span id="userMenuThemeLabel">Mudar para Tema Claro</span>
             </button>
             <div class="user-menu-divider"></div>
             <button type="button" id="btnUserLogout" class="user-menu-item user-menu-logout">
-              <span class="menu-item-icon">🚪</span> Sair da Conta
+              <span class="menu-item-icon" data-lucide="log-out" data-size="15"></span> Sair da Conta
             </button>
           </div>
         </div>
 
-        <!-- Menu de Configurações & Opções (⚙️) -->
+        <!-- Menu de Configurações & Opções -->
         <div class="app-menu-wrapper" id="appMenuWrapper">
           <button type="button" id="btnAppMenu" class="btn-icon-action btn-app-menu" title="Mais Opções e Configurações (Tema, Apagar Peça, Instalar App)" aria-label="Menu de Configurações">
-            <span class="menu-hamburger-icon">⚙️</span>
+            <span class="menu-hamburger-icon" data-lucide="sliders" data-size="16"></span>
           </button>
 
           <div id="appMenuDropdown" class="app-menu-dropdown" style="display:none">
-            <div class="app-menu-section-header">⚙️ Mais Opções</div>
+            <div class="app-menu-section-header"><span data-lucide="sliders" data-size="14"></span> Mais Opções</div>
 
             <button type="button" id="btnAppMenuThemeToggle" class="app-menu-item" title="Alternar entre tema claro e escuro">
-              <span class="menu-item-icon" id="appMenuThemeIcon">☀️</span>
+              <span class="menu-item-icon" id="appMenuThemeIcon" data-lucide="sun" data-size="15"></span>
               <span id="appMenuThemeLabel">Mudar para Tema Claro</span>
             </button>
 
             <button type="button" id="btnInstallPwa" class="app-menu-item app-menu-install" title="Instalar aplicativo para uso offline">
-              <span class="menu-item-icon">📲</span> Instalar Aplicativo
+              <span class="menu-item-icon" data-lucide="download" data-size="15"></span> Instalar Aplicativo
             </button>
 
             <div class="app-menu-divider"></div>
 
             <button type="button" id="btnDeleteCurrentPiece" class="app-menu-item app-menu-danger" title="Apagar a peça atual da biblioteca e da nuvem">
-              <span class="menu-item-icon">🗑️</span> Apagar Esta Peça...
+              <span class="menu-item-icon" data-lucide="trash-2" data-size="15"></span> Apagar Esta Peça...
             </button>
           </div>
         </div>
@@ -157,19 +157,19 @@
         <!-- Grupo 1: Gestão de Peça & Repertório -->
         <div class="toolbar-group">
           <button type="button" id="btnNewPiece" class="toolbar-btn" title="Iniciar Nova Peça em Branco (Ctrl+N)">
-            <span class="toolbar-btn-icon">📄</span>
+            <span class="toolbar-btn-icon" data-lucide="file-plus" data-size="16"></span>
             <span class="toolbar-btn-text">Nova Peça</span>
           </button>
           <button type="button" id="btnSavePieceToLibrary" class="toolbar-btn primary" title="Salvar a peça atual no seu Repertório (Local & Nuvem)">
-            <span class="toolbar-btn-icon">💾</span>
+            <span class="toolbar-btn-icon" data-lucide="save" data-size="16"></span>
             <span class="toolbar-btn-text">Salvar Peça</span>
           </button>
           <button type="button" id="btnMenuManageBossas" class="toolbar-btn" title="Abrir biblioteca de repertório de peças e bossas">
-            <span class="toolbar-btn-icon">🗂️</span>
+            <span class="toolbar-btn-icon" data-lucide="library" data-size="16"></span>
             <span class="toolbar-btn-text">Repertório</span>
           </button>
           <button type="button" id="btnMenuInsertBossa" class="toolbar-btn" title="Inserir outra apresentação ou bossa por referência nesta peça">
-            <span class="toolbar-btn-icon">🔗</span>
+            <span class="toolbar-btn-icon" data-lucide="link" data-size="16"></span>
             <span class="toolbar-btn-text">Inserir Bossa</span>
           </button>
         </div>
@@ -179,7 +179,7 @@
         <!-- Grupo 2: Carregar Modelos & Peças -->
         <div class="toolbar-group toolbar-select-group">
           <label for="selectPreset" class="toolbar-label">
-            <span class="toolbar-label-icon">🎼</span>
+            <span class="toolbar-label-icon" data-lucide="music" data-size="15"></span>
             <span class="toolbar-label-text">Modelos & Peças:</span>
           </label>
           <select id="selectPreset" class="toolbar-select" title="Carregar Exemplo, Modelo ou Peça Salva">
@@ -192,16 +192,16 @@
         <!-- Grupo 3: Histórico & Arquivo -->
         <div class="toolbar-group">
           <button type="button" id="btnOpenHistory" class="toolbar-btn" title="Histórico de Versões na Nuvem">
-            <span class="toolbar-btn-icon">🕒</span>
+            <span class="toolbar-btn-icon" data-lucide="clock" data-size="16"></span>
             <span class="toolbar-btn-text">Histórico</span>
             <span id="historyBadgeCount" class="history-badge">0</span>
           </button>
           <button type="button" id="btnExport" class="toolbar-btn" title="Exportar arquivo .json da peça">
-            <span class="toolbar-btn-icon">⬇️</span>
+            <span class="toolbar-btn-icon" data-lucide="download" data-size="16"></span>
             <span class="toolbar-btn-text">Exportar</span>
           </button>
           <label class="toolbar-btn file-btn" title="Importar arquivo .json de peça">
-            <span class="toolbar-btn-icon">⬆️</span>
+            <span class="toolbar-btn-icon" data-lucide="upload" data-size="16"></span>
             <span class="toolbar-btn-text">Importar</span>
             <input type="file" id="fileImport" accept=".json" style="display:none">
           </label>
@@ -212,7 +212,7 @@
         <!-- Grupo 4: Áudio & Timbre -->
         <div class="toolbar-group toolbar-audio-group">
           <button type="button" id="btnMute" class="btn-icon-mute active" title="Mudo (M)">
-            <span id="muteIcon">🔊</span>
+            <span id="muteIcon" data-lucide="volume-2" data-size="18"></span>
           </button>
           <select id="selectSoundType" class="toolbar-select sound-select" title="Timbre de Percussão">
             <option value="woodblock">Bloco de Madeira</option>
@@ -227,14 +227,14 @@
     <!-- BANNER DE MODO LEITURA / OUVINTE -->
     <div id="readOnlyBanner" class="readonly-banner" style="display:none">
       <div class="readonly-content">
-        <span class="readonly-icon">🎧</span>
+        <span class="readonly-icon" data-lucide="headphones" data-size="20"></span>
         <div class="readonly-text">
           <strong>Modo Ouvinte (Apenas Leitura)</strong>
           <span>Você pode ouvir e praticar livremente com andamento individual. Para editar a partitura, faça uma cópia pessoal.</span>
         </div>
       </div>
       <button type="button" id="btnForkPiece" class="btn-fork-piece" title="Criar uma cópia independente desta peça na sua biblioteca pessoal">
-        <span class="btn-icon">🍴</span> Fazer uma Cópia Pessoal
+        <span class="btn-icon" data-lucide="git-fork" data-size="15"></span> Fazer uma Cópia Pessoal
       </button>
     </div>
 
@@ -291,7 +291,7 @@
         <div class="runner-resizer" id="runnerResizer" title="Arraste para redimensionar a altura da visão corrida (ou dê duplo clique para restaurar)">
           <div class="resizer-handle">
             <span class="resizer-line"></span>
-            <span class="resizer-pill">⠿ Redimensionar</span>
+            <span class="resizer-pill"><span data-lucide="grip-horizontal" data-size="14"></span> Redimensionar</span>
             <span class="resizer-line"></span>
           </div>
         </div>
@@ -303,18 +303,18 @@
             <span class="toolbar-name" id="toolbarMeasureName"></span>
           </div>
           <div class="toolbar-actions">
-            <button type="button" id="btnMoveMeasureLeft" class="btn-toolbar-opt" title="Mover Compasso para Trás (Alt + ←)">◀ Mover</button>
-            <button type="button" id="btnMoveMeasureRight" class="btn-toolbar-opt" title="Mover Compasso para Frente (Alt + →)">Mover ▶</button>
-            <button type="button" id="btnToolbarInsertBossa" class="btn-toolbar-opt" title="Inserir uma Peça ou Bossa como bloco após este compasso">🔗 Inserir Bloco</button>
-            <button type="button" id="btnToolbarSaveAsBossa" class="btn-toolbar-opt" title="Salvar compasso(s) selecionado(s) no repertório">💾 Salvar Seleção</button>
-            <button type="button" id="btnGroupSelectedMeasures" class="btn-toolbar-opt" style="display:none" title="Criar grupo com os compassos selecionados">📁 Agrupar</button>
-            <button type="button" id="btnConfigureSelectedMeasure" class="btn-toolbar-opt primary" title="Configurar Métrica e Andamento">⚙ Configurar</button>
-            <button type="button" id="btnCopySelectedMeasure" class="btn-toolbar-opt" title="Copiar Compasso(s) Selecionado(s) (Ctrl+C)">📋 Copiar</button>
-            <button type="button" id="btnCutSelectedMeasure" class="btn-toolbar-opt" title="Recortar Compasso(s) Selecionado(s) (Ctrl+X)">✂ Recortar</button>
-            <button type="button" id="btnPasteSelectedMeasure" class="btn-toolbar-opt" title="Colar Compasso(s) após a seleção (Ctrl+V)">📥 Colar</button>
-            <button type="button" id="btnDuplicateSelectedMeasure" class="btn-toolbar-opt" title="Duplicar Compasso(s)">⧉ Duplicar</button>
-            <button type="button" id="btnDeleteSelectedMeasure" class="btn-toolbar-opt danger" title="Excluir Compasso(s) Selecionado(s) (Del)">✕ Excluir</button>
-            <button type="button" id="btnCloseToolbar" class="btn-toolbar-close" title="Desmarcar (Esc)">✕</button>
+            <button type="button" id="btnMoveMeasureLeft" class="btn-toolbar-opt" title="Mover Compasso para Trás (Alt + ←)"><span data-lucide="arrow-left" data-size="14"></span> Mover</button>
+            <button type="button" id="btnMoveMeasureRight" class="btn-toolbar-opt" title="Mover Compasso para Frente (Alt + →)">Mover <span data-lucide="arrow-right" data-size="14"></span></button>
+            <button type="button" id="btnToolbarInsertBossa" class="btn-toolbar-opt" title="Inserir uma Peça ou Bossa como bloco após este compasso"><span data-lucide="link" data-size="14"></span> Inserir Bloco</button>
+            <button type="button" id="btnToolbarSaveAsBossa" class="btn-toolbar-opt" title="Salvar compasso(s) selecionado(s) no repertório"><span data-lucide="save" data-size="14"></span> Salvar Seleção</button>
+            <button type="button" id="btnGroupSelectedMeasures" class="btn-toolbar-opt" style="display:none" title="Criar grupo com os compassos selecionados"><span data-lucide="folder-plus" data-size="14"></span> Agrupar</button>
+            <button type="button" id="btnConfigureSelectedMeasure" class="btn-toolbar-opt primary" title="Configurar Métrica e Andamento"><span data-lucide="sliders" data-size="14"></span> Configurar</button>
+            <button type="button" id="btnCopySelectedMeasure" class="btn-toolbar-opt" title="Copiar Compasso(s) Selecionado(s) (Ctrl+C)"><span data-lucide="copy" data-size="14"></span> Copiar</button>
+            <button type="button" id="btnCutSelectedMeasure" class="btn-toolbar-opt" title="Recortar Compasso(s) Selecionado(s) (Ctrl+X)"><span data-lucide="scissors" data-size="14"></span> Recortar</button>
+            <button type="button" id="btnPasteSelectedMeasure" class="btn-toolbar-opt" title="Colar Compasso(s) após a seleção (Ctrl+V)"><span data-lucide="clipboard" data-size="14"></span> Colar</button>
+            <button type="button" id="btnDuplicateSelectedMeasure" class="btn-toolbar-opt" title="Duplicar Compasso(s)"><span data-lucide="copy-plus" data-size="14"></span> Duplicar</button>
+            <button type="button" id="btnDeleteSelectedMeasure" class="btn-toolbar-opt danger" title="Excluir Compasso(s) Selecionado(s) (Del)"><span data-lucide="trash-2" data-size="14"></span> Excluir</button>
+            <button type="button" id="btnCloseToolbar" class="btn-toolbar-close" title="Desmarcar (Esc)"><span data-lucide="x" data-size="16"></span></button>
           </div>
         </div>
 
@@ -326,13 +326,13 @@
         <!-- Barra de Controles de Transporte (Limpa & Direta) -->
         <div class="clean-transport-bar">
           <div class="transport-controls">
-            <button type="button" id="btnPrevMeasure" class="btn-ctrl" title="Compasso Anterior (←)">⏮</button>
+            <button type="button" id="btnPrevMeasure" class="btn-ctrl" title="Compasso Anterior (←)"><span data-lucide="skip-back" data-size="18"></span></button>
             <button type="button" id="btnPlayPause" class="btn-play" title="Tocar / Pausar (Espaço)">
               <svg id="playIcon" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
               <svg id="pauseIcon" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" style="display:none"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
             </button>
-            <button type="button" id="btnStopRewind" class="btn-ctrl" title="Voltar ao Início (R)">⏹</button>
-            <button type="button" id="btnNextMeasure" class="btn-ctrl" title="Próximo Compasso (→)">⏭</button>
+            <button type="button" id="btnStopRewind" class="btn-ctrl" title="Voltar ao Início (R)"><span data-lucide="square" data-size="16"></span></button>
+            <button type="button" id="btnNextMeasure" class="btn-ctrl" title="Próximo Compasso (→)"><span data-lucide="skip-forward" data-size="18"></span></button>
           </div>
 
           <div class="speed-and-loop">
@@ -342,13 +342,13 @@
               <button type="button" class="speed-opt active" data-speed="1.0">100%</button>
               <button type="button" class="speed-opt" data-speed="1.25">125%</button>
             </div>
-            <button type="button" id="btnLoop" class="btn-loop-clean active" title="Repetir peça continuamente (Loop)" aria-label="Loop">🔁</button>
+            <button type="button" id="btnLoop" class="btn-loop-clean active" title="Repetir peça continuamente (Loop)" aria-label="Loop"><span data-lucide="repeat" data-size="16"></span></button>
           </div>
 
           <div class="quick-add-actions">
-            <button type="button" id="btnToggleWideMode" class="btn-action-ghost" title="Alternar Modo Amplo (Toma toda a largura da tela)">⤢ Amplo</button>
-            <button type="button" id="btnAddMeasureQuick" class="btn-action-red">+ Compasso</button>
-            <button type="button" id="btnManageGroups" class="btn-action-ghost">Agrupar...</button>
+            <button type="button" id="btnToggleWideMode" class="btn-action-ghost" title="Alternar Modo Amplo (Toma toda a largura da tela)"><span data-lucide="maximize-2" data-size="14"></span> Amplo</button>
+            <button type="button" id="btnAddMeasureQuick" class="btn-action-red"><span data-lucide="plus" data-size="14"></span> Compasso</button>
+            <button type="button" id="btnManageGroups" class="btn-action-ghost"><span data-lucide="folder" data-size="14"></span> Agrupar...</button>
           </div>
         </div>
 
@@ -362,11 +362,11 @@
             <span id="measureCountBadge" class="count-tag">16 compassos</span>
           </div>
           <div class="section-top-buttons">
-            <button type="button" id="btnClearAllMeasures" class="btn-ghost-sm" title="Remover todos os compassos da peça">Limpar Peça</button>
-            <button type="button" id="btnOpenBossaManager" class="btn-bossa-sm btn-mgr-accent" title="Abrir biblioteca de peças e bossas, ouvir prévias e sincronizar">🗂️ Ver Repertório</button>
-            <button type="button" id="btnOpenInsertBossaModal" class="btn-bossa-sm" title="Inserir outra peça ou bossa por referência nesta peça">🔗 Inserir Bloco</button>
-            <button type="button" id="btnOpenGroupModal" class="btn-ghost-sm">Novo Grupo</button>
-            <button type="button" id="btnAddMeasureBottom" class="btn-red-sm">+ Compasso</button>
+            <button type="button" id="btnClearAllMeasures" class="btn-ghost-sm" title="Remover todos os compassos da peça"><span data-lucide="trash-2" data-size="14"></span> Limpar Peça</button>
+            <button type="button" id="btnOpenBossaManager" class="btn-bossa-sm btn-mgr-accent" title="Abrir biblioteca de peças e bossas, ouvir prévias e sincronizar"><span data-lucide="library" data-size="14"></span> Ver Repertório</button>
+            <button type="button" id="btnOpenInsertBossaModal" class="btn-bossa-sm" title="Inserir outra peça ou bossa por referência nesta peça"><span data-lucide="link" data-size="14"></span> Inserir Bloco</button>
+            <button type="button" id="btnOpenGroupModal" class="btn-ghost-sm"><span data-lucide="folder-plus" data-size="14"></span> Novo Grupo</button>
+            <button type="button" id="btnAddMeasureBottom" class="btn-red-sm"><span data-lucide="plus" data-size="14"></span> Compasso</button>
           </div>
         </div>
 
@@ -389,18 +389,18 @@
       <header class="bossa-page-topbar">
         <div class="bossa-topbar-left">
           <div class="brand bossa-page-brand">
-            <div class="brand-icon">🥁</div>
+            <div class="brand-icon"><span data-lucide="drum" data-size="20"></span></div>
             <span class="brand-title">SÉRGIO SIMULATOR</span>
           </div>
 
           <!-- Navegação na Esquerda da Página de Repertório -->
           <nav class="header-left-nav bossa-left-nav" aria-label="Navegação Principal">
             <button type="button" id="btnBackToSimulator" class="header-nav-pill" title="Voltar ao Simulador Principal (Esc)">
-              <span class="nav-pill-icon">← 🥁</span>
+              <span class="nav-pill-icon"><span data-lucide="arrow-left" data-size="15"></span></span>
               <span class="nav-pill-label">Simulador</span>
             </button>
             <button type="button" class="header-nav-pill active" title="Repertório de Peças & Bossas">
-              <span class="nav-pill-icon">🗂️</span>
+              <span class="nav-pill-icon" data-lucide="library" data-size="16"></span>
               <span class="nav-pill-label">Repertório</span>
             </button>
           </nav>
@@ -408,7 +408,7 @@
 
         <div class="bossa-topbar-center">
           <div class="bossa-topbar-badge">
-            <span class="bossa-tag-icon">🗂️</span>
+            <span class="bossa-tag-icon" data-lucide="library" data-size="14"></span>
             <span class="bossa-tag-text">Repertório Musical</span>
           </div>
           <h1 class="bossa-topbar-heading">Biblioteca de Peças & Bossas</h1>
@@ -423,7 +423,7 @@
 
           <!-- Alternar Tema Claro / Escuro -->
           <button type="button" id="btnThemeToggleBossaMgr" class="btn-icon-action" title="Alternar Tema Claro / Escuro">
-            <span id="themeIconBossaMgr">☀️</span>
+            <span id="themeIconBossaMgr" data-lucide="sun" data-size="18"></span>
           </button>
         </div>
       </header>
@@ -442,16 +442,16 @@
             </div>
             <div class="bossa-hero-actions">
               <button type="button" id="btnMgrCreateNewBlankPiece" class="btn-bossa-hero-primary" title="Iniciar uma nova peça em branco para compor">
-                <span class="btn-icon">✨</span> Nova Peça em Branco
+                <span class="btn-icon" data-lucide="sparkles" data-size="15"></span> Nova Peça em Branco
               </button>
               <button type="button" id="btnMgrSaveCurrentPiece" class="btn-bossa-hero-secondary" title="Salvar a peça atualmente aberta no repertório">
-                <span class="btn-icon">💾</span> Salvar Peça Atual
+                <span class="btn-icon" data-lucide="save" data-size="15"></span> Salvar Peça Atual
               </button>
               <button type="button" id="btnMgrNewBossaFromCurrent" class="btn-bossa-hero-secondary" title="Extrair compassos da peça aberta como nova bossa ou peça">
-                <span class="btn-icon">✂️</span> Extrair Trecho
+                <span class="btn-icon" data-lucide="scissors" data-size="15"></span> Extrair Trecho
               </button>
               <label class="btn-bossa-hero-secondary file-btn" title="Importar arquivo JSON de peça ou bossa">
-                <span class="btn-icon">📂</span> Importar JSON
+                <span class="btn-icon" data-lucide="folder-open" data-size="15"></span> Importar JSON
                 <input type="file" id="fileImportBossa" accept=".json" style="display:none">
               </label>
             </div>
@@ -465,22 +465,22 @@
             </div>
             <div class="bossa-stat-box">
               <span class="stat-number" id="statMyPieces">0</span>
-              <span class="stat-title">Minhas Peças 📜</span>
+              <span class="stat-title" style="display:flex; align-items:center; justify-content:center; gap:5px;"><span data-lucide="file-text" data-size="13"></span> Minhas Peças</span>
             </div>
             <div class="bossa-stat-box">
               <span class="stat-number" id="statMyBossas">0</span>
-              <span class="stat-title">Minhas Bossas 🥁</span>
+              <span class="stat-title" style="display:flex; align-items:center; justify-content:center; gap:5px;"><span data-lucide="drum" data-size="13"></span> Minhas Bossas</span>
             </div>
             <div class="bossa-stat-box">
               <span class="stat-number" id="statCloudBossas">0</span>
-              <span class="stat-title">Na Nuvem ☁️</span>
+              <span class="stat-title" style="display:flex; align-items:center; justify-content:center; gap:5px;"><span data-lucide="cloud" data-size="13"></span> Na Nuvem</span>
             </div>
           </section>
 
           <!-- Barra de Pesquisa e Filtros -->
           <section class="bossa-page-toolbar">
             <div class="bossa-search-box">
-              <span class="bossa-search-icon">🔍</span>
+              <span class="bossa-search-icon" data-lucide="search" data-size="16"></span>
               <input type="text" id="inputSearchBossas" class="clean-input bossa-search-input" placeholder="Buscar por nome, andamento ou compassos...">
               <button type="button" id="btnClearSearchBossas" class="btn-clear-search" style="display:none" title="Limpar busca">&times;</button>
             </div>
@@ -489,15 +489,15 @@
               <button type="button" class="bossa-filter-pill active" data-filter="all">Todas (<span id="countFilterAll">0</span>)</button>
               <button type="button" class="bossa-filter-pill" data-filter="pieces">Peças (<span id="countFilterPieces">0</span>)</button>
               <button type="button" class="bossa-filter-pill" data-filter="bossas">Bossas (<span id="countFilterBossas">0</span>)</button>
-              <button type="button" class="bossa-filter-pill" data-filter="cloud">Na Nuvem ☁️ (<span id="countFilterCloud">0</span>)</button>
-              <button type="button" class="bossa-filter-pill" data-filter="presets">Modelos ⭐ (<span id="countFilterPresets">0</span>)</button>
+              <button type="button" class="bossa-filter-pill" data-filter="cloud" style="display:inline-flex; align-items:center; gap:5px;"><span data-lucide="cloud" data-size="13"></span> Na Nuvem (<span id="countFilterCloud">0</span>)</button>
+              <button type="button" class="bossa-filter-pill" data-filter="presets" style="display:inline-flex; align-items:center; gap:5px;"><span data-lucide="sparkles" data-size="13"></span> Modelos (<span id="countFilterPresets">0</span>)</button>
 
               <div class="bossa-presets-actions" style="margin-left: auto; display: flex; gap: 6px;">
                 <button type="button" id="btnClearAllPresets" class="btn-clear-presets" title="Limpar todos os modelos de exemplo do repertório">
-                  <span class="btn-icon">🧹</span> Limpar Modelos
+                  <span class="btn-icon" data-lucide="trash-2" data-size="13"></span> Limpar Modelos
                 </button>
                 <button type="button" id="btnRestorePresets" class="btn-clear-presets btn-restore-presets" title="Restaurar todos os modelos de exemplo padrão" style="display:none">
-                  <span class="btn-icon">↺</span> Restaurar Modelos
+                  <span class="btn-icon" data-lucide="rotate-ccw" data-size="13"></span> Restaurar Modelos
                 </button>
               </div>
             </div>
@@ -511,8 +511,8 @@
           <!-- Barra Inferior de Informações -->
           <div class="bossa-page-bottom-info">
             <span id="bossaMgrStats">Carregando bossas...</span>
-            <button type="button" id="btnBackToSimulatorBottom" class="btn-link-action">
-              ← Voltar ao Simulador
+            <button type="button" id="btnBackToSimulatorBottom" class="btn-link-action" style="display:inline-flex; align-items:center; gap:5px;">
+              <span data-lucide="arrow-left" data-size="14"></span> Voltar ao Simulador
             </button>
           </div>
 
@@ -524,20 +524,20 @@
     <!-- BARRA DE NAVEGAÇÃO MOBILE FIXA (RODAPÉ) -->
     <nav class="mobile-bottom-nav" id="mobileBottomNav" aria-label="Navegação Mobile">
       <button type="button" class="mobile-nav-btn active" data-tab="stage" id="tabNavStage">
-        <span class="nav-btn-icon">🥁</span>
+        <span class="nav-btn-icon" data-lucide="drum" data-size="20"></span>
         <span class="nav-btn-label">Tocar</span>
       </button>
       <button type="button" class="mobile-nav-btn" data-tab="measures" id="tabNavMeasures">
-        <span class="nav-btn-icon">🎼</span>
+        <span class="nav-btn-icon" data-lucide="music" data-size="20"></span>
         <span class="nav-btn-label">Compassos</span>
         <span class="nav-btn-badge" id="tabMeasuresBadge">0</span>
       </button>
       <button type="button" class="mobile-nav-btn" data-tab="bossas" id="tabNavBossas">
-        <span class="nav-btn-icon">🗂️</span>
+        <span class="nav-btn-icon" data-lucide="library" data-size="20"></span>
         <span class="nav-btn-label">Repertório</span>
       </button>
       <button type="button" class="mobile-nav-btn" data-tab="piece" id="tabNavPiece">
-        <span class="nav-btn-icon">⚙️</span>
+        <span class="nav-btn-icon" data-lucide="sliders" data-size="20"></span>
         <span class="nav-btn-label">Peça & Nuvem</span>
       </button>
     </nav>
@@ -547,26 +547,32 @@
       <div class="modal-window">
         <div class="modal-top">
           <span class="modal-measure-tag" id="modalMeasureIdx">c. 1</span>
-          <h3 class="modal-heading">Configurar Compasso</h3>
-          <button type="button" class="modal-x" id="btnModalClose">&times;</button>
+          <h3 class="modal-heading" id="modalMeasureHeading">Configurar Compasso</h3>
+          <button type="button" class="modal-x" id="btnModalClose" title="Fechar (Esc)"><span data-lucide="x" data-size="18"></span></button>
         </div>
 
         <form id="formMeasureEdit" class="modal-body-clean">
           <input type="hidden" id="editMeasureIndex" value="-1">
 
+          <!-- Banner Informativo de Edição em Lote (Múltiplos Compassos Selecionados) -->
+          <div id="modalBatchEditBanner" class="modal-batch-edit-banner" style="display:none">
+            <span class="batch-edit-icon" data-lucide="sparkles" data-size="16"></span>
+            <span class="batch-edit-text" id="batchEditText">Edição em Lote: As alterações serão aplicadas a todos os compassos selecionados.</span>
+          </div>
+
           <!-- Banner Informativo de Compasso Vinculado à Bossa -->
           <div id="measureBossaBanner" class="measure-bossa-banner" style="display:none">
             <div class="bossa-banner-header">
-              <span class="bossa-banner-badge">🔗 Bossa Vinculada</span>
+              <span class="bossa-banner-badge" style="display:inline-flex; align-items:center; gap:5px;"><span data-lucide="link" data-size="12"></span> Bossa Vinculada</span>
               <span id="bossaBannerName" class="bossa-banner-name">Bossa 1</span>
             </div>
             <p class="bossa-banner-desc">
               Este compasso puxa informações por referência da bossa original. Você pode editar qualquer valor livremente; suas alterações serão salvas nesta apresentação como personalização local sem afetar a original.
             </p>
             <div class="bossa-banner-actions">
-              <button type="button" id="btnMeasureOpenBossaModal" class="btn-bossa-banner-action primary" title="Abrir esta bossa para edição completa da sua página">↗️ Abrir Página da Bossa</button>
-              <button type="button" id="btnMeasureUnlinkModal" class="btn-bossa-banner-action" title="Desvincular este compasso da bossa original">🔓 Desvincular Agora</button>
-              <button type="button" id="btnMeasureRestoreModal" class="btn-bossa-banner-action ghost" style="display:none" title="Restaurar valores da bossa original">↺ Restaurar da Bossa</button>
+              <button type="button" id="btnMeasureOpenBossaModal" class="btn-bossa-banner-action primary" title="Abrir esta bossa para edição completa da sua página"><span data-lucide="external-link" data-size="14"></span> Abrir Página da Bossa</button>
+              <button type="button" id="btnMeasureUnlinkModal" class="btn-bossa-banner-action" title="Desvincular este compasso da bossa original"><span data-lucide="unlink" data-size="14"></span> Desvincular Agora</button>
+              <button type="button" id="btnMeasureRestoreModal" class="btn-bossa-banner-action ghost" style="display:none" title="Restaurar valores da bossa original"><span data-lucide="rotate-ccw" data-size="14"></span> Restaurar da Bossa</button>
             </div>
           </div>
 
@@ -581,17 +587,17 @@
             <div class="field-group">
               <label for="editBeats" class="field-label">Quantidade de Tempos (Pulsos)</label>
               <div class="modal-number-stepper">
-                <button type="button" class="btn-modal-step btn-step-down" id="btnEditBeatsMinus" aria-label="Diminuir tempos" title="Diminuir tempos">▼</button>
+                <button type="button" class="btn-modal-step btn-step-down" id="btnEditBeatsMinus" aria-label="Diminuir tempos" title="Diminuir tempos"><span data-lucide="chevron-down" data-size="14"></span></button>
                 <input type="number" id="editBeats" class="clean-input modal-step-input" min="1" max="32" value="4" required>
-                <button type="button" class="btn-modal-step btn-step-up" id="btnEditBeatsPlus" aria-label="Aumentar tempos" title="Aumentar tempos">▲</button>
+                <button type="button" class="btn-modal-step btn-step-up" id="btnEditBeatsPlus" aria-label="Aumentar tempos" title="Aumentar tempos"><span data-lucide="chevron-up" data-size="14"></span></button>
               </div>
             </div>
             <div class="field-group">
               <label for="editRepeat" class="field-label" title="Quantas vezes este compasso se repete continuamente">Repetições (x)</label>
               <div class="modal-number-stepper">
-                <button type="button" class="btn-modal-step btn-step-down" id="btnEditRepeatMinus" aria-label="Diminuir repetições" title="Diminuir repetições">▼</button>
+                <button type="button" class="btn-modal-step btn-step-down" id="btnEditRepeatMinus" aria-label="Diminuir repetições" title="Diminuir repetições"><span data-lucide="chevron-down" data-size="14"></span></button>
                 <input type="number" id="editRepeat" class="clean-input modal-step-input" min="1" max="999" value="1" required>
-                <button type="button" class="btn-modal-step btn-step-up" id="btnEditRepeatPlus" aria-label="Aumentar repetições" title="Aumentar repetições">▲</button>
+                <button type="button" class="btn-modal-step btn-step-up" id="btnEditRepeatPlus" aria-label="Aumentar repetições" title="Aumentar repetições"><span data-lucide="chevron-up" data-size="14"></span></button>
               </div>
             </div>
           </div>
@@ -600,10 +606,10 @@
           <details id="detailsTempoModulation" class="modal-accordion">
             <summary class="modal-accordion-summary">
               <div class="modal-accordion-header">
-                <span class="modal-accordion-title">🎵 Andamento / Modulação Métrica</span>
+                <span class="modal-accordion-title" style="display:inline-flex; align-items:center; gap:6px;"><span data-lucide="music" data-size="14"></span> Andamento / Modulação Métrica</span>
                 <span id="accordionTempoSummary" class="modal-accordion-badge">120 BPM (1/1)</span>
               </div>
-              <span class="modal-accordion-arrow">▼</span>
+              <span class="modal-accordion-arrow"><span data-lucide="chevron-down" data-size="14"></span></span>
             </summary>
             <div class="modal-accordion-body">
               <div class="mode-switch">
@@ -634,7 +640,7 @@
                   <input type="number" id="editRatioNum" class="clean-input frac-num" min="1" max="64" value="1">
                   <span class="frac-div">/</span>
                   <input type="number" id="editRatioDen" class="clean-input frac-num" min="1" max="64" value="1">
-                  <span class="arrow-sym">➔</span>
+                  <span class="arrow-sym" style="display:inline-flex; align-items:center;"><span data-lucide="arrow-right" data-size="14"></span></span>
                   <span id="calcEffectiveBpm" class="eff-bpm-tag">120 BPM</span>
                 </div>
               </div>
@@ -679,12 +685,12 @@
 
           <!-- Footer do Modal -->
           <div class="modal-bottom-row">
-            <button type="button" id="btnDeleteMeasureModal" class="btn-del" title="Excluir este compasso">Excluir</button>
+            <button type="button" id="btnDeleteMeasureModal" class="btn-del" title="Excluir este compasso"><span data-lucide="trash-2" data-size="14"></span> Excluir</button>
             <div class="modal-bottom-right">
-              <button type="button" id="btnDuplicateMeasureModal" class="btn-ghost-sm" title="Duplicar este compasso">Duplicar</button>
+              <button type="button" id="btnDuplicateMeasureModal" class="btn-ghost-sm" title="Duplicar este compasso"><span data-lucide="copy-plus" data-size="14"></span> Duplicar</button>
               <button type="submit" id="btnSaveMeasureEdit" class="btn-modal-save">
-                <span class="btn-modal-save-icon">💾</span>
-                <span>Salvar</span>
+                <span class="btn-modal-save-icon" data-lucide="save" data-size="16"></span>
+                <span id="btnSaveMeasureEditText">Salvar</span>
               </button>
             </div>
           </div>
@@ -698,7 +704,7 @@
         <div class="modal-top">
           <span class="modal-measure-tag">Agrupamentos</span>
           <h3 class="modal-heading">Agrupar Compassos Vizinhos</h3>
-          <button type="button" class="modal-x" id="btnGroupModalClose">&times;</button>
+          <button type="button" class="modal-x" id="btnGroupModalClose" title="Fechar (Esc)"><span data-lucide="x" data-size="18"></span></button>
         </div>
 
         <div class="modal-body-clean">
@@ -716,6 +722,10 @@
               <div class="field-group">
                 <label for="newGroupEnd" class="field-label">Compasso Final</label>
                 <select id="newGroupEnd" class="clean-select-field"></select>
+              </div>
+              <div class="field-group" style="max-width: 105px;">
+                <label for="newGroupRepeat" class="field-label">Repetições</label>
+                <input type="number" id="newGroupRepeat" class="clean-input" min="1" max="999" value="1" placeholder="1" style="text-align:center;">
               </div>
             </div>
 
@@ -746,7 +756,7 @@
               </div>
             </div>
 
-            <button type="submit" class="btn-red-sm" style="width:100%; padding:9px;">+ Criar / Atualizar Grupo</button>
+            <button type="submit" class="btn-red-sm" style="width:100%; padding:9px; display:flex; align-items:center; justify-content:center; gap:6px;"><span data-lucide="plus" data-size="14"></span> Criar / Atualizar Grupo</button>
           </form>
 
           <div class="existing-groups-wrap">
@@ -761,9 +771,9 @@
     <div id="modalInsertBossa" class="modal-overlay" style="display:none">
       <div class="modal-window modal-bossa-window">
         <div class="modal-top">
-          <span class="modal-measure-tag" style="background: rgba(139, 92, 246, 0.15); color: #a78bfa; border: 1px solid rgba(139, 92, 246, 0.3);">🔗 Apresentação Embutida</span>
+          <span class="modal-measure-tag" style="background: rgba(139, 92, 246, 0.15); color: #a78bfa; border: 1px solid rgba(139, 92, 246, 0.3); display:inline-flex; align-items:center; gap:5px;"><span data-lucide="link" data-size="12"></span> Apresentação Embutida</span>
           <h3 class="modal-heading">Inserir Bossa ou Peça</h3>
-          <button type="button" class="modal-x" id="btnInsertBossaClose">&times;</button>
+          <button type="button" class="modal-x" id="btnInsertBossaClose" title="Fechar (Esc)"><span data-lucide="x" data-size="18"></span></button>
         </div>
 
         <div class="modal-body-clean bossa-modal-body">
@@ -777,9 +787,16 @@
               <button type="button" class="bossa-tab-btn active" id="tabBossaLibrary" data-tab="library">Minhas Peças & Bossas</button>
               <button type="button" class="bossa-tab-btn" id="tabBossaPresets" data-tab="presets">Bossas & Modelos Prontos</button>
             </div>
-            <button type="button" id="btnOpenManagerFromInsert" class="btn-link-action btn-mgr-link" title="Abrir Gerenciador de Bossas para renomear, excluir ou sincronizar">
-              🥁 Gerenciar Bossas
+            <button type="button" id="btnOpenManagerFromInsert" class="btn-link-action btn-mgr-link" title="Abrir Gerenciador de Bossas para renomear, excluir ou sincronizar" style="display:inline-flex; align-items:center; gap:5px;">
+              <span data-lucide="library" data-size="14"></span> Gerenciar Bossas
             </button>
+          </div>
+
+          <!-- Campo de Busca em Tempo Real no Modal de Inserção -->
+          <div class="bossa-search-box modal-insert-search-box">
+            <span class="bossa-search-icon" data-lucide="search" data-size="15"></span>
+            <input type="text" id="inputSearchInsertBossa" class="clean-input bossa-search-input" placeholder="Buscar bossa ou peça por nome, andamento ou compassos..." autocomplete="off">
+            <button type="button" id="btnClearSearchInsertBossa" class="btn-clear-search" style="display:none" title="Limpar busca">&times;</button>
           </div>
 
           <!-- Lista de Peças/Bossas Disponíveis -->
@@ -811,11 +828,11 @@
               <div class="bossa-radio-row">
                 <label class="bossa-radio-label">
                   <input type="radio" name="bossaMode" value="linked" checked id="radioBossaModeLinked">
-                  <span>🔗 <strong>Vinculada por Referência</strong> (Recomendado: atualiza automaticamente se a bossa original mudar)</span>
+                  <span style="display:inline-flex; align-items:center; gap:6px;"><span data-lucide="link" data-size="14"></span> <strong>Vinculada por Referência</strong> (Recomendado: atualiza automaticamente se a bossa original mudar)</span>
                 </label>
                 <label class="bossa-radio-label">
                   <input type="radio" name="bossaMode" value="unlinked" id="radioBossaModeUnlinked">
-                  <span>📋 <strong>Cópia Independente</strong> (Insere compassos estáticos sem vínculo à peça original)</span>
+                  <span style="display:inline-flex; align-items:center; gap:6px;"><span data-lucide="copy" data-size="14"></span> <strong>Cópia Independente</strong> (Insere compassos estáticos sem vínculo à peça original)</span>
                 </label>
               </div>
             </div>
@@ -824,8 +841,8 @@
 
         <div class="modal-bottom bossa-modal-bottom">
           <button type="button" class="btn-clean-ghost" id="btnCancelInsertBossa">Cancelar</button>
-          <button type="button" class="btn-clean-primary" id="btnConfirmInsertBossa" disabled>
-            <span class="btn-icon">🔗</span> Inserir Bossa na Peça
+          <button type="button" class="btn-clean-primary" id="btnConfirmInsertBossa" disabled style="display:inline-flex; align-items:center; gap:6px;">
+            <span class="btn-icon" data-lucide="link" data-size="16"></span> Inserir Bossa na Peça
           </button>
         </div>
       </div>
@@ -835,9 +852,9 @@
     <div id="modalRenameBossa" class="modal-overlay" style="display:none">
       <div class="modal-window modal-confirm-window">
         <div class="modal-top">
-          <span class="modal-measure-tag" style="background: rgba(139, 92, 246, 0.15); color: #c4b5fd;">✏️ Renomear</span>
+          <span class="modal-measure-tag" style="background: rgba(139, 92, 246, 0.15); color: #c4b5fd; display:inline-flex; align-items:center; gap:5px;"><span data-lucide="pencil" data-size="12"></span> Renomear</span>
           <h3 class="modal-heading">Renomear Bossa</h3>
-          <button type="button" class="modal-x" id="btnRenameBossaClose">&times;</button>
+          <button type="button" class="modal-x" id="btnRenameBossaClose" title="Fechar (Esc)"><span data-lucide="x" data-size="18"></span></button>
         </div>
         <form id="formRenameBossa" class="modal-body-clean confirm-body" onsubmit="return false;">
           <input type="hidden" id="renameBossaId" value="">
@@ -859,7 +876,7 @@
         <div class="modal-top">
           <span class="modal-measure-tag" style="background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3);">Exportar Repertório</span>
           <h3 class="modal-heading" id="modalSaveAsBossaHeading">Salvar no Repertório</h3>
-          <button type="button" class="modal-x" id="btnSaveAsBossaClose">&times;</button>
+          <button type="button" class="modal-x" id="btnSaveAsBossaClose" title="Fechar (Esc)"><span data-lucide="x" data-size="18"></span></button>
         </div>
 
         <div class="modal-body-clean confirm-body">
@@ -873,7 +890,7 @@
               <label class="save-type-option">
                 <input type="radio" name="saveItemType" id="radioSaveTypeBossa" value="bossa" checked>
                 <div class="save-type-card">
-                  <span class="save-type-icon">🥁</span>
+                  <span class="save-type-icon"><span data-lucide="drum" data-size="20"></span></span>
                   <div class="save-type-info">
                     <strong>Bossa / Paradinha</strong>
                     <small>Convenção modular para inserir em outras músicas</small>
@@ -883,7 +900,7 @@
               <label class="save-type-option">
                 <input type="radio" name="saveItemType" id="radioSaveTypePiece" value="piece">
                 <div class="save-type-card">
-                  <span class="save-type-icon">📜</span>
+                  <span class="save-type-icon"><span data-lucide="file-text" data-size="20"></span></span>
                   <div class="save-type-info">
                     <strong>Peça Completa</strong>
                     <small>Música própria independente na biblioteca</small>
@@ -901,8 +918,8 @@
 
         <div class="modal-bottom confirm-bottom">
           <button type="button" class="btn-clean-ghost" id="btnCancelSaveAsBossa">Cancelar</button>
-          <button type="button" class="btn-clean-primary" id="btnConfirmSaveAsBossa" style="background: #10b981; border-color: #10b981;">
-            <span class="btn-icon">💾</span> <span id="btnConfirmSaveAsBossaText">Salvar no Repertório</span>
+          <button type="button" class="btn-clean-primary" id="btnConfirmSaveAsBossa" style="background: #10b981; border-color: #10b981; display:inline-flex; align-items:center; gap:6px;">
+            <span class="btn-icon" data-lucide="save" data-size="16"></span> <span id="btnConfirmSaveAsBossaText">Salvar no Repertório</span>
           </button>
         </div>
       </div>
@@ -914,12 +931,12 @@
         <div class="modal-top">
           <span class="modal-measure-tag" style="background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3);">Nova Composição</span>
           <h3 class="modal-heading">Criar Nova Peça</h3>
-          <button type="button" class="modal-x" id="btnConfirmNewClose">&times;</button>
+          <button type="button" class="modal-x" id="btnConfirmNewClose" title="Fechar (Esc)"><span data-lucide="x" data-size="18"></span></button>
         </div>
 
         <div class="modal-body-clean confirm-body">
           <div class="confirm-icon-box" style="background: rgba(59, 130, 246, 0.12); color: #60a5fa;">
-            <span class="confirm-emoji">✨</span>
+            <span class="confirm-emoji"><span data-lucide="sparkles" data-size="24"></span></span>
           </div>
           <div class="confirm-content">
             <h4 class="confirm-title">Iniciar uma nova peça?</h4>
@@ -930,8 +947,8 @@
               <label for="inputNewPieceName" class="form-label-clean" style="font-size: 0.82rem; font-weight: 600;">Título da Nova Peça:</label>
               <input type="text" id="inputNewPieceName" class="input-clean" placeholder="Ex: Minha Nova Composição" value="Nova Peça">
             </div>
-            <div class="confirm-alert-box" style="background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.22);">
-              <span class="confirm-alert-icon">💾</span>
+            <div class="confirm-alert-box" style="background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.22); display:flex; align-items:center; gap:8px;">
+              <span class="confirm-alert-icon" data-lucide="save" data-size="16"></span>
               <span class="confirm-alert-text" style="color: var(--text-primary, #e2e8f0);">Você poderá alternar e voltar para a peça anterior a qualquer momento pelo repertório ou seletor.</span>
             </div>
           </div>
@@ -950,7 +967,7 @@
         <div class="modal-top">
           <span class="modal-measure-tag tag-collab">Sessão Compartilhada</span>
           <h3 class="modal-heading">Entrar na Peça</h3>
-          <button type="button" class="modal-x" id="btnJoinModalClose" title="Fechar e continuar">&times;</button>
+          <button type="button" class="modal-x" id="btnJoinModalClose" title="Fechar e continuar"><span data-lucide="x" data-size="18"></span></button>
         </div>
 
         <form id="formJoinCollab" class="modal-body-clean join-modal-body">
@@ -978,13 +995,13 @@
           </div>
 
           <div class="join-actions-row">
-            <button type="submit" id="btnJoinConfirm" class="btn-red-action btn-join-submit">
-              <span>Entrar na Peça</span> <span class="btn-arrow">→</span>
+            <button type="submit" id="btnJoinConfirm" class="btn-red-action btn-join-submit" style="display:inline-flex; align-items:center; justify-content:center; gap:6px;">
+              <span>Entrar na Peça</span> <span class="btn-arrow"><span data-lucide="arrow-right" data-size="14"></span></span>
             </button>
           </div>
 
-          <p class="join-footer-hint">
-            💾 Seu nome e cor serão salvos no LocalStorage deste navegador para as próximas sessões.
+          <p class="join-footer-hint" style="display:flex; align-items:center; gap:6px;">
+            <span data-lucide="save" data-size="14"></span> Seu nome e cor serão salvos no LocalStorage deste navegador para as próximas sessões.
           </p>
         </form>
       </div>
@@ -996,7 +1013,7 @@
         <div class="modal-top">
           <span class="modal-measure-tag tag-collab">Colaboração em Tempo Real</span>
           <h3 class="modal-heading">Compartilhar Peça / Modelo</h3>
-          <button type="button" class="modal-x" id="btnShareModalClose">&times;</button>
+          <button type="button" class="modal-x" id="btnShareModalClose" title="Fechar (Esc)"><span data-lucide="x" data-size="18"></span></button>
         </div>
 
         <div class="modal-body-clean">
@@ -1005,8 +1022,8 @@
             <label for="inputShareUrl" class="field-label" id="labelShareUrl">Link Compartilhável da Peça</label>
             <div class="share-url-row">
               <input type="text" id="inputShareUrl" class="clean-input share-input" readonly spellcheck="false">
-              <button type="button" id="btnCopyShareUrl" class="btn-red-sm btn-copy-link">
-                <span id="copyIcon">📋</span> <span id="copyText">Copiar Link</span>
+              <button type="button" id="btnCopyShareUrl" class="btn-red-sm btn-copy-link" style="display:inline-flex; align-items:center; gap:6px;">
+                <span id="copyIcon" data-lucide="clipboard" data-size="16"></span> <span id="copyText">Copiar Link</span>
               </button>
             </div>
             <span class="field-hint" id="hintShareUrl">Compartilhe este link com outros músicos ou alunos.</span>
@@ -1019,7 +1036,7 @@
               <label class="access-radio-item" id="labelAccessPrivate">
                 <input type="radio" name="pieceAccessChoice" value="private" id="radioAccessPrivate">
                 <div class="access-item-text">
-                  <strong>🔒 Privada (Somente Eu)</strong>
+                  <strong style="display:inline-flex; align-items:center; gap:6px;"><span data-lucide="lock" data-size="14"></span> Privada (Somente Eu)</strong>
                   <span>Apenas você conectado na sua conta tem acesso a esta partitura.</span>
                 </div>
               </label>
@@ -1027,7 +1044,7 @@
               <label class="access-radio-item" id="labelAccessView">
                 <input type="radio" name="pieceAccessChoice" value="view_link" id="radioAccessView">
                 <div class="access-item-text">
-                  <strong>🎧 Link de Ouvinte (Não Listada)</strong>
+                  <strong style="display:inline-flex; align-items:center; gap:6px;"><span data-lucide="headphones" data-size="14"></span> Link de Ouvinte (Não Listada)</strong>
                   <span>Qualquer pessoa com o link pode ouvir, ver o runner e treinar. Alterações na partitura bloqueadas.</span>
                 </div>
               </label>
@@ -1035,13 +1052,13 @@
               <label class="access-radio-item" id="labelAccessEdit">
                 <input type="radio" name="pieceAccessChoice" value="edit_link" id="radioAccessEdit">
                 <div class="access-item-text">
-                  <strong>✏️ Link de Colaboração (Não Listada)</strong>
+                  <strong style="display:inline-flex; align-items:center; gap:6px;"><span data-lucide="edit-2" data-size="14"></span> Link de Colaboração (Não Listada)</strong>
                   <span>Qualquer pessoa com o link pode compor e editar em tempo real com você estilo Google Docs.</span>
                 </div>
               </label>
             </div>
             <div id="accessLoginRequiredNotice" class="access-notice" style="display:none">
-              <span>💡 Para criar ou manter peças <strong>Privadas</strong>, entre na sua conta Google ou faça cadastro com e-mail.</span>
+              <span style="display:inline-flex; align-items:center; gap:6px;"><span data-lucide="info" data-size="15"></span> Para criar ou manter peças <strong>Privadas</strong>, entre na sua conta Google ou faça cadastro com e-mail.</span>
               <button type="button" id="btnNoticeLogin" class="btn-notice-action">Fazer Login</button>
             </div>
           </div>
@@ -1066,7 +1083,7 @@
         <div class="modal-top">
           <span class="modal-measure-tag" style="background:#2563eb; color:#fff;">Sua Conta</span>
           <h3 class="modal-heading" id="authModalTitle">Entrar na Conta</h3>
-          <button type="button" class="modal-x" id="btnAuthModalClose">&times;</button>
+          <button type="button" class="modal-x" id="btnAuthModalClose" title="Fechar (Esc)"><span data-lucide="x" data-size="18"></span></button>
         </div>
 
         <div class="modal-body-clean">
@@ -1135,8 +1152,8 @@
           <p style="margin: 8px 0 16px; color: var(--text-secondary); line-height: 1.5;">
             Esta composição foi configurada como <strong>Privada</strong> pelo autor e não está disponível para acesso público.
           </p>
-          <div class="cloud-info-box" style="border-left: 3px solid #dc2626;">
-            <span class="cloud-info-icon">🔒</span>
+          <div class="cloud-info-box" style="border-left: 3px solid #dc2626; display:flex; align-items:center; gap:10px;">
+            <span class="cloud-info-icon" data-lucide="lock" data-size="18"></span>
             <div class="cloud-info-text">
               <span>Se você é o proprietário desta peça, faça login com sua conta Google ou e-mail para editá-la.</span>
             </div>
@@ -1156,7 +1173,7 @@
           <span class="modal-measure-tag">Nuvem</span>
           <h3 class="modal-heading">Histórico de Alterações</h3>
           <span id="historyTotalCount" class="history-count-tag">0 alterações</span>
-          <button type="button" class="modal-x" id="btnHistoryModalClose">&times;</button>
+          <button type="button" class="modal-x" id="btnHistoryModalClose" title="Fechar (Esc)"><span data-lucide="x" data-size="18"></span></button>
         </div>
 
         <div class="modal-body-clean history-body-clean">
@@ -1167,7 +1184,7 @@
           <div id="historyListContainer" class="history-timeline-list">
             <!-- Itens de histórico gerados dinamicamente -->
             <div class="history-empty-state">
-              <span>🕒</span>
+              <span data-lucide="clock" data-size="32"></span>
               <p>Nenhuma alteração registrada ainda para esta peça.</p>
             </div>
           </div>
@@ -1177,28 +1194,28 @@
 
     <!-- TOAST NOTIFICATION FLUTUANTE -->
     <div id="toastNotification" class="toast-notification" style="display:none">
-      <span id="toastIcon">✓</span>
+      <span id="toastIcon" data-lucide="check" data-size="18"></span>
       <span id="toastMessage">Link copiado para a área de transferência!</span>
     </div>
 
     <!-- MENU DE CONTEXTO PARA COMPASSOS NA VISÃO CORRIDA -->
     <div id="runnerContextMenu" class="runner-context-menu" style="display:none">
       <div class="context-menu-header" id="ctxMenuHeader">Compasso 1</div>
-      <button type="button" class="ctx-item" id="ctxEdit">⚙ Configurar Compasso</button>
-      <button type="button" class="ctx-item" id="ctxMoveLeft">◀ Mover para a Esquerda</button>
-      <button type="button" class="ctx-item" id="ctxMoveRight">▶ Mover para a Direita</button>
+      <button type="button" class="ctx-item" id="ctxEdit"><span data-lucide="sliders" data-size="14"></span> Configurar Compasso</button>
+      <button type="button" class="ctx-item" id="ctxMoveLeft"><span data-lucide="arrow-left" data-size="14"></span> Mover para a Esquerda</button>
+      <button type="button" class="ctx-item" id="ctxMoveRight"><span data-lucide="arrow-right" data-size="14"></span> Mover para a Direita</button>
       <div class="ctx-divider"></div>
-      <button type="button" class="ctx-item" id="ctxCopy">📋 Copiar (Ctrl+C)</button>
-      <button type="button" class="ctx-item" id="ctxCut">✂ Recortar (Ctrl+X)</button>
-      <button type="button" class="ctx-item" id="ctxPaste">📥 Colar após (Ctrl+V)</button>
-      <button type="button" class="ctx-item" id="ctxDuplicate">⧉ Duplicar</button>
+      <button type="button" class="ctx-item" id="ctxCopy"><span data-lucide="copy" data-size="14"></span> Copiar (Ctrl+C)</button>
+      <button type="button" class="ctx-item" id="ctxCut"><span data-lucide="scissors" data-size="14"></span> Recortar (Ctrl+X)</button>
+      <button type="button" class="ctx-item" id="ctxPaste"><span data-lucide="clipboard" data-size="14"></span> Colar após (Ctrl+V)</button>
+      <button type="button" class="ctx-item" id="ctxDuplicate"><span data-lucide="copy-plus" data-size="14"></span> Duplicar</button>
       <div class="ctx-divider"></div>
-      <button type="button" class="ctx-item danger" id="ctxDelete">✕ Excluir Compasso</button>
+      <button type="button" class="ctx-item danger" id="ctxDelete"><span data-lucide="trash-2" data-size="14"></span> Excluir Compasso</button>
     </div>
 
     <!-- RODAPÉ COMPACTO -->
     <footer class="app-footer">
-      <span>🥁 Sérgio Simulator — Simulador Rítmico de Modulação Métrica para Percussão</span>
+      <span style="display:inline-flex; align-items:center; gap:6px;"><span data-lucide="drum" data-size="15"></span> Sérgio Simulator — Simulador Rítmico de Modulação Métrica para Percussão</span>
       <span class="shortcuts-hint"><kbd>Espaço</kbd> Play/Pause &nbsp; <kbd>R</kbd> Início &nbsp; <kbd>←</kbd> <kbd>→</kbd> Navegar &nbsp; <kbd>Alt</kbd>+<kbd>←</kbd>/<kbd>→</kbd> Mover &nbsp; <kbd>Ctrl</kbd>+<kbd>C</kbd>/<kbd>X</kbd>/<kbd>V</kbd> Copiar/Recortar/Colar</span>
     </footer>
 

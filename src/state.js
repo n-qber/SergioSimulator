@@ -11,6 +11,7 @@ const LIBRARY_KEY = 'sergio_pieces_library';
 class PieceState {
   constructor() {
     this.listeners = new Set();
+    this.libraryListeners = new Set();
     this.presentationBpm = 120;
     this.isCustomPracticeBpm = false;
     this.undoStack = [];
@@ -31,7 +32,7 @@ class PieceState {
       if (saved) {
         const parsed = JSON.parse(saved);
         const pieceData = parsed.piece || parsed;
-        if (pieceData && Array.isArray(pieceData.measures)) {
+        if (pieceData && (Array.isArray(pieceData.items) || Array.isArray(pieceData.measures))) {
           this.loadPieceData(pieceData);
           return;
         }
@@ -80,47 +81,113 @@ class PieceState {
       this.baseBpm = this.presentationBpm;
     }
     
-    this.measures = (data.measures || []).map((m, idx) => ({
-      id: m.id || `m-${Date.now()}-${idx}-${Math.random().toString(36).substr(2, 4)}`,
-      nickname: (m.nickname || "").trim(),
-      beats: Math.max(1, Math.min(32, parseInt(m.beats, 10) || 4)),
-      beatUnit: [2, 4, 8, 16].includes(parseInt(m.beatUnit, 10)) ? parseInt(m.beatUnit, 10) : 4,
-      tempoMode: m.tempoMode === "fixed" ? "fixed" : "ratio",
-      ratioNum: Math.max(1, parseInt(m.ratioNum, 10) || 1),
-      ratioDen: Math.max(1, parseInt(m.ratioDen, 10) || 1),
-      customBpm: Math.max(20, Math.min(500, Number(m.customBpm) || this.baseBpm)),
-      color: m.color || "#ff334b",
-      repeat: Math.max(1, Math.min(999, parseInt(m.repeat, 10) || 1)),
-      sourcePieceId: m.sourcePieceId || null,
-      sourcePieceName: m.sourcePieceName || null,
-      sourceMeasureId: m.sourceMeasureId || null,
-      isLinked: m.isLinked === undefined ? (!!m.sourcePieceId) : !!m.isLinked,
-      isLocallyModified: !!m.isLocallyModified
-    }));
+    if (Array.isArray(data.items)) {
+      this.items = data.items.map((it, idx) => {
+        if (it.type === 'bossa') {
+          let bossaMs = Array.isArray(it.measures) ? it.measures : [];
+          // Se as medidas do bossaItem vieram vazias mas temos data.measures legados, recupera-os!
+          if (bossaMs.length === 0 && Array.isArray(data.measures) && data.measures.length > 0) {
+            const matched = data.measures.filter(m => m.sourcePieceId && m.sourcePieceId === it.sourcePieceId);
+            if (matched.length > 0) bossaMs = matched;
+          }
+          return {
+            type: 'bossa',
+            id: it.id || `bossa-${Date.now()}-${idx}`,
+            name: (it.name || it.sourcePieceName || 'Bossa').replace(/^[🔗📦✏️🔓\s]+/, '').trim(),
+            color: it.color || '#8b5cf6',
+            repeat: Math.max(1, Math.min(999, parseInt(it.repeat, 10) || 1)),
+            collapsed: it.collapsed !== undefined ? Boolean(it.collapsed) : true,
+            isLinked: it.isLinked !== undefined ? Boolean(it.isLinked) : Boolean(it.sourcePieceId),
+            sourcePieceId: it.sourcePieceId || null,
+            sourcePieceName: it.sourcePieceName || it.name || 'Bossa',
+            measures: bossaMs
+          };
+        }
+        return {
+          type: 'measure',
+          id: it.id || `m-${Date.now()}-${idx}`,
+          nickname: (it.nickname || '').trim(),
+          beats: Math.max(1, Math.min(32, parseInt(it.beats, 10) || 4)),
+          beatUnit: [2, 4, 8, 16].includes(parseInt(it.beatUnit, 10)) ? parseInt(it.beatUnit, 10) : 4,
+          tempoMode: it.tempoMode === 'fixed' ? 'fixed' : 'ratio',
+          ratioNum: Math.max(1, parseInt(it.ratioNum, 10) || 1),
+          ratioDen: Math.max(1, parseInt(it.ratioDen, 10) || 1),
+          customBpm: Math.max(20, Math.min(500, Number(it.customBpm) || this.baseBpm)),
+          color: it.color || '#ff334b',
+          repeat: Math.max(1, Math.min(999, parseInt(it.repeat, 10) || 1))
+        };
+      });
+    } else {
+      // Migração on-the-fly de dados legados (measures + groups)
+      const rawMeasures = data.measures || [];
+      const rawGroups = data.groups || [];
+      const migratedItems = [];
+      let mIdx = 0;
+      while (mIdx < rawMeasures.length) {
+        let bossaGrp = rawGroups.find(g => (g.isBossaBlock || g.sourcePieceId || (g.name && /bossa/i.test(g.name))) && g.startMeasure === mIdx && g.endMeasure >= mIdx && g.endMeasure < rawMeasures.length);
+        const curM = rawMeasures[mIdx];
 
-    const maxIdx = this.measures.length > 0 ? this.measures.length - 1 : -1;
-    this.groups = (data.groups || [])
-      .filter(() => this.measures.length > 0)
-      .map((g, idx) => ({
-        id: g.id || `grp-${Date.now()}-${idx}`,
-        name: g.name || `Grupo ${idx + 1}`,
-        color: g.color || "#3b82f6",
-        startMeasure: Math.max(0, Math.min(maxIdx, parseInt(g.startMeasure, 10) || 0)),
-        endMeasure: Math.max(0, Math.min(maxIdx, parseInt(g.endMeasure, 10) || 0)),
-        isBossaBlock: !!g.isBossaBlock,
-        sourcePieceId: g.sourcePieceId || null,
-        sourcePieceName: g.sourcePieceName || null,
-        isLinked: g.isLinked === undefined ? (!!g.sourcePieceId) : !!g.isLinked
-      }))
-      .filter(g => g.startMeasure <= g.endMeasure);
+        // Se houver compassos com sourcePieceId mesmo sem match exato de startMeasure no grupo
+        if (!bossaGrp && curM && (curM.sourcePieceId || (curM.nickname && /bossa/i.test(curM.nickname)))) {
+          bossaGrp = rawGroups.find(g => (g.isBossaBlock || (curM.sourcePieceId && g.sourcePieceId === curM.sourcePieceId) || (g.name && /bossa/i.test(g.name))));
+          let endIdx = mIdx;
+          while (endIdx + 1 < rawMeasures.length && (
+            (curM.sourcePieceId && rawMeasures[endIdx + 1].sourcePieceId === curM.sourcePieceId) ||
+            (!curM.sourcePieceId && rawMeasures[endIdx + 1].nickname && /bossa/i.test(rawMeasures[endIdx + 1].nickname))
+          )) {
+            endIdx++;
+          }
+          const bossaMs = rawMeasures.slice(mIdx, endIdx + 1);
+          const isLinked = curM.isLinked !== undefined ? Boolean(curM.isLinked) : (bossaGrp?.isLinked !== undefined ? Boolean(bossaGrp.isLinked) : Boolean(curM.sourcePieceId || bossaGrp?.sourcePieceId));
+          migratedItems.push({
+            type: 'bossa',
+            id: bossaGrp?.id || `bossa-${Date.now()}-${migratedItems.length}`,
+            name: (curM.sourcePieceName || bossaGrp?.name || curM.nickname || 'Bossa').replace(/^[🔗📦✏️🔓\s]+/, '').trim(),
+            color: curM.color || bossaGrp?.color || '#8b5cf6',
+            repeat: Math.max(1, Math.min(999, parseInt(bossaGrp?.repeat || 1, 10))),
+            collapsed: bossaGrp?.collapsed !== undefined ? Boolean(bossaGrp.collapsed) : true,
+            isLinked: isLinked,
+            sourcePieceId: curM.sourcePieceId || bossaGrp?.sourcePieceId || null,
+            sourcePieceName: curM.sourcePieceName || bossaGrp?.sourcePieceName || bossaGrp?.name || curM.nickname || 'Bossa',
+            measures: bossaMs
+          });
+          mIdx = endIdx + 1;
+          continue;
+        }
 
-    // Sincronização automática silenciosa de bossas vinculadas
-    if (!isRemote) {
-      try {
-        this.syncLinkedBossas();
-      } catch (err) {
-        console.warn("Aviso ao sincronizar bossas vinculadas:", err);
+        if (bossaGrp) {
+          const bossaMs = rawMeasures.slice(bossaGrp.startMeasure, bossaGrp.endMeasure + 1);
+          migratedItems.push({
+            type: 'bossa',
+            id: bossaGrp.id || `bossa-${Date.now()}-${migratedItems.length}`,
+            name: (bossaGrp.name || bossaGrp.sourcePieceName || 'Bossa').replace(/^[🔗📦✏️🔓\s]+/, '').trim(),
+            color: bossaGrp.color || '#8b5cf6',
+            repeat: Math.max(1, Math.min(999, parseInt(bossaGrp.repeat, 10) || 1)),
+            collapsed: bossaGrp.collapsed !== undefined ? Boolean(bossaGrp.collapsed) : true,
+            isLinked: bossaGrp.isLinked !== undefined ? Boolean(bossaGrp.isLinked) : Boolean(bossaGrp.sourcePieceId),
+            sourcePieceId: bossaGrp.sourcePieceId || null,
+            sourcePieceName: bossaGrp.sourcePieceName || bossaGrp.name || 'Bossa',
+            measures: bossaMs
+          });
+          mIdx = bossaGrp.endMeasure + 1;
+        } else {
+          migratedItems.push({
+            type: 'measure',
+            id: curM.id || `m-${Date.now()}-${mIdx}`,
+            nickname: (curM.nickname || '').trim(),
+            beats: Math.max(1, Math.min(32, parseInt(curM.beats, 10) || 4)),
+            beatUnit: [2, 4, 8, 16].includes(parseInt(curM.beatUnit, 10)) ? parseInt(curM.beatUnit, 10) : 4,
+            tempoMode: curM.tempoMode === 'fixed' ? 'fixed' : 'ratio',
+            ratioNum: Math.max(1, parseInt(curM.ratioNum, 10) || 1),
+            ratioDen: Math.max(1, parseInt(curM.ratioDen, 10) || 1),
+            customBpm: Math.max(20, Math.min(500, Number(curM.customBpm) || this.baseBpm)),
+            color: curM.color || '#ff334b',
+            repeat: Math.max(1, Math.min(999, parseInt(curM.repeat, 10) || 1))
+          });
+          mIdx++;
+        }
       }
+      this.items = migratedItems;
     }
 
     this.recalculateTimings();
@@ -196,12 +263,118 @@ class PieceState {
     return this.measures.reduce((acc, m) => acc + (m.repeat || 1), 0);
   }
 
-  // Adicionar compasso
+  // =========================================================================
+  // OPERAÇÕES DE ITENS E COMPASSOS NA PARTITURA
+  // =========================================================================
+
+  // Mover qualquer item da partitura (compasso avulso ou bloco bossa inteiro)
+  moveItem(fromIndex, toIndex) {
+    if (fromIndex < 0 || fromIndex >= this.items.length) return false;
+    if (toIndex < 0 || toIndex >= this.items.length) return false;
+    if (fromIndex === toIndex) return false;
+
+    const [moved] = this.items.splice(fromIndex, 1);
+    this.items.splice(toIndex, 0, moved);
+
+    this.recalculateTimings();
+    const label = moved.type === 'bossa' ? `bossa '${moved.name}'` : `compasso`;
+    this.notify(`Moveu ${label} para a posição ${toIndex + 1}`);
+    return true;
+  }
+
+  // Mover item para a esquerda / trás
+  moveItemLeft(itemIndex) {
+    if (itemIndex <= 0) return false;
+    return this.moveItem(itemIndex, itemIndex - 1);
+  }
+
+  // Mover item para a direita / frente
+  moveItemRight(itemIndex) {
+    if (itemIndex >= this.items.length - 1) return false;
+    return this.moveItem(itemIndex, itemIndex + 1);
+  }
+
+  // Remover item por índice
+  removeItem(index) {
+    if (index < 0 || index >= this.items.length) return;
+    const [removed] = this.items.splice(index, 1);
+    this.recalculateTimings();
+    const label = removed.type === 'bossa' ? `bossa '${removed.name}'` : `compasso`;
+    this.notify(`Removeu ${label}`);
+  }
+
+  // Remover múltiplos itens por índices
+  removeItems(indices) {
+    if (!indices || indices.length === 0) return;
+    const sorted = Array.from(new Set(indices))
+      .filter(i => typeof i === 'number' && i >= 0 && i < this.items.length)
+      .sort((a, b) => b - a);
+    if (sorted.length === 0) return;
+    sorted.forEach(idx => this.items.splice(idx, 1));
+    this.recalculateTimings();
+    this.notify(`Removeu ${sorted.length} item(ns)`);
+  }
+
+  // Atualizar propriedades de um item de primeira classe
+  updateItem(index, updates) {
+    const item = this.items[index];
+    if (!item) return false;
+    Object.assign(item, updates);
+    this.recalculateTimings();
+    this.notify(`Atualizou ${item.type === 'bossa' ? 'bossa' : 'compasso'}`);
+    return true;
+  }
+
+  // Alternar recolher/expandir bloco de bossa
+  toggleBossaCollapse(itemIndex) {
+    const item = this.items[itemIndex];
+    if (!item || item.type !== 'bossa') return false;
+    item.collapsed = !item.collapsed;
+    this.recalculateTimings();
+    this.notify(`${item.collapsed ? 'Recolheu' : 'Expandiu'} bossa '${item.name}'`, false);
+    return true;
+  }
+
+  // Desvincular bloco de bossa (torna cópia local com compassos independentes)
+  unlinkBossa(itemIndex) {
+    const item = this.items[itemIndex];
+    if (!item || item.type !== 'bossa') return false;
+    const measures = this.getBossaMeasures(item);
+    item.measures = measures.map((m, idx) => ({
+      ...m,
+      id: `m-unlinked-${Date.now()}-${idx}`,
+      isLinked: false
+    }));
+    item.isLinked = false;
+    this.recalculateTimings();
+    this.notify(`Desvinculou bossa '${item.name}'`);
+    return true;
+  }
+
+  // Sincronizar bossa vinculada com a original
+  syncLinkedBossa(itemIndex) {
+    const item = this.items[itemIndex];
+    if (!item || item.type !== 'bossa') return false;
+    if (item.sourcePieceId) {
+      const orig = this.getLibraryPieces().find(p => p.id === item.sourcePieceId)
+        || PRESETS.find(p => p.id === item.sourcePieceId);
+      if (orig) {
+        item.name = orig.name;
+        item.sourcePieceName = orig.name;
+      }
+    }
+    this.recalculateTimings();
+    this.notify(`Sincronizou bossa '${item.name}'`);
+    return true;
+  }
+
+  // Adicionar compasso avulso à peça
   addMeasure(index = -1, template = null) {
-    const newIdx = index === -1 ? this.measures.length : index;
-    const prevMeasure = this.measures[Math.max(0, newIdx - 1)] || null;
+    const newIdx = (index === -1 || index > this.items.length) ? this.items.length : index;
+    const prevMeasure = this.measures[this.measures.length - 1] || null;
 
     const newMeasure = {
+      type: 'measure',
       id: `m-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
       nickname: template?.nickname ? template.nickname.trim() : "",
       beats: template?.beats || prevMeasure?.beats || 4,
@@ -214,17 +387,7 @@ class PieceState {
       repeat: Math.max(1, Math.min(999, parseInt(template?.repeat, 10) || 1))
     };
 
-    if (index === -1 || index >= this.measures.length) {
-      this.measures.push(newMeasure);
-    } else {
-      this.measures.splice(index, 0, newMeasure);
-      // Ajusta índices dos grupos
-      this.groups.forEach(g => {
-        if (g.startMeasure >= index) g.startMeasure++;
-        if (g.endMeasure >= index) g.endMeasure++;
-      });
-    }
-
+    this.items.splice(newIdx, 0, newMeasure);
     this.recalculateTimings();
     this.notify(`Adicionou compasso (${newMeasure.beats}T)`);
     return newMeasure;
@@ -232,232 +395,121 @@ class PieceState {
 
   // Duplicar compasso
   duplicateMeasure(index) {
-    if (index < 0 || index >= this.measures.length) return;
-    const target = this.measures[index];
-    this.addMeasure(index + 1, {
-      ...target,
-      nickname: target.nickname || "",
-      repeat: target.repeat || 1
-    });
+    const m = this.measures[index];
+    if (!m) return;
+    if (m._isBossa && m._parentItem) {
+      const bossa = m._parentItem;
+      if (bossa.isLinked) this.unlinkBossa(m._itemIndex);
+      if (Array.isArray(bossa.measures)) {
+        const copy = { ...bossa.measures[m._subIndex], id: `m-${Date.now()}` };
+        bossa.measures.splice(m._subIndex + 1, 0, copy);
+        this.recalculateTimings();
+        this.notify(`Duplicou compasso na bossa '${bossa.name}'`);
+      }
+      return;
+    }
+    const target = this.items[m._itemIndex];
+    if (target) {
+      const copy = JSON.parse(JSON.stringify(target));
+      copy.id = `m-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
+      this.items.splice(m._itemIndex + 1, 0, copy);
+      this.recalculateTimings();
+      this.notify(`Duplicou compasso`);
+    }
   }
 
-  // Mover / reordenar compasso
+  // Mover compasso ou bloco
   moveMeasure(fromIndex, toIndex) {
-    if (fromIndex === toIndex) return false;
-    if (fromIndex < 0 || fromIndex >= this.measures.length) return false;
-    if (toIndex < 0 || toIndex >= this.measures.length) return false;
-
-    // Vincula cada compasso ao seu ID de grupo atual antes de mover
-    this.measures.forEach((m, idx) => {
-      const grp = this.groups.find(g => idx >= g.startMeasure && idx <= g.endMeasure);
-      m._assignedGroupId = grp ? grp.id : null;
-    });
-
-    const [moved] = this.measures.splice(fromIndex, 1);
-    this.measures.splice(toIndex, 0, moved);
-
-    // Atualiza limites dos grupos conforme a nova distribuição dos compassos
-    this.groups.forEach(grp => {
-      const indices = [];
-      this.measures.forEach((m, idx) => {
-        if (m._assignedGroupId === grp.id) {
-          indices.push(idx);
-        }
-      });
-      if (indices.length > 0) {
-        grp.startMeasure = Math.min(...indices);
-        grp.endMeasure = Math.max(...indices);
+    const fromM = this.measures[fromIndex];
+    const toM = this.measures[toIndex];
+    if (!fromM || !toM) return false;
+    if (fromM._itemIndex !== undefined && toM._itemIndex !== undefined) {
+      if (fromM._itemIndex !== toM._itemIndex) {
+        return this.moveItem(fromM._itemIndex, toM._itemIndex);
       }
-    });
-
-    // Remove tags temporárias
-    this.measures.forEach(m => delete m._assignedGroupId);
-
-    this.recalculateTimings();
-    this.notify(`Moveu compasso ${fromIndex + 1} para posição ${toIndex + 1}`);
-    return true;
+    }
+    return false;
   }
 
-  // Mover bloco de bossa ou grupo inteiro para uma nova posição
+  // Mover grupo / bloco de bossa (compatibilidade com chamadas existentes)
   moveGroup(groupId, targetIndex) {
-    const grp = this.groups.find(g => g.id === groupId);
-    if (!grp) return false;
-    const fromStart = grp.startMeasure;
-    const fromEnd = grp.endMeasure;
-    const count = (fromEnd - fromStart) + 1;
-    if (count <= 0 || fromStart < 0 || fromEnd >= this.measures.length) return false;
-
-    // Se o destino estiver dentro do próprio grupo, não precisa mover
-    if (targetIndex >= fromStart && targetIndex <= fromEnd) {
-      return false;
+    const itemIdx = this.items.findIndex(it => it.id === groupId);
+    if (itemIdx < 0) return false;
+    let targetItemIdx = targetIndex;
+    const targetM = this.measures[targetIndex];
+    if (targetM && targetM._itemIndex !== undefined) {
+      targetItemIdx = targetM._itemIndex;
     }
+    return this.moveItem(itemIdx, targetItemIdx);
+  }
 
-    // Vincula cada compasso ao seu ID de grupo atual antes de mover
-    this.measures.forEach((m, idx) => {
-      const g = this.groups.find(x => idx >= x.startMeasure && idx <= x.endMeasure);
-      m._assignedGroupId = g ? g.id : null;
-    });
+  moveGroupLeft(groupId) {
+    const itemIdx = this.items.findIndex(it => it.id === groupId);
+    if (itemIdx <= 0) return false;
+    return this.moveItem(itemIdx, itemIdx - 1);
+  }
 
-    // Remove o bloco de compassos
-    const movedMeasures = this.measures.splice(fromStart, count);
+  moveGroupRight(groupId) {
+    const itemIdx = this.items.findIndex(it => it.id === groupId);
+    if (itemIdx < 0 || itemIdx >= this.items.length - 1) return false;
+    return this.moveItem(itemIdx, itemIdx + 1);
+  }
 
-    // Calcula a posição real de inserção na lista restante
-    let insertIndex = targetIndex;
-    if (targetIndex > fromEnd) {
-      insertIndex = targetIndex - count + 1;
-    }
-    insertIndex = Math.max(0, Math.min(this.measures.length, insertIndex));
-
-    // Insere os compassos na nova posição
-    this.measures.splice(insertIndex, 0, ...movedMeasures);
-
-    // Atualiza limites de todos os grupos conforme nova distribuição
-    this.groups.forEach(g => {
-      const indices = [];
-      this.measures.forEach((m, idx) => {
-        if (m._assignedGroupId === g.id) {
-          indices.push(idx);
+  // Remover compasso (suporta compassos avulsos e sub-compassos de bossas)
+  removeMeasure(index) {
+    const m = this.measures[index];
+    if (!m) return;
+    if (m._isBossa && m._parentItem) {
+      const bossa = m._parentItem;
+      if (bossa.isLinked) this.unlinkBossa(m._itemIndex);
+      if (Array.isArray(bossa.measures)) {
+        bossa.measures.splice(m._subIndex, 1);
+        if (bossa.measures.length === 0) {
+          this.removeItem(m._itemIndex);
+          return;
         }
-      });
-      if (indices.length > 0) {
-        g.startMeasure = Math.min(...indices);
-        g.endMeasure = Math.max(...indices);
+      }
+      this.recalculateTimings();
+      this.notify(`Excluiu compasso da bossa`);
+      return;
+    }
+    if (m._itemIndex !== undefined) {
+      this.removeItem(m._itemIndex);
+    }
+  }
+
+  // Remover múltiplos compassos
+  removeMeasures(indices) {
+    if (!indices || indices.length === 0) return;
+    const itemIndicesToRemove = new Set();
+    indices.forEach(idx => {
+      const m = this.measures[idx];
+      if (m && !m._isBossa && m._itemIndex !== undefined) {
+        itemIndicesToRemove.add(m._itemIndex);
       }
     });
+    if (itemIndicesToRemove.size > 0) {
+      this.removeItems(Array.from(itemIndicesToRemove));
+    }
+  }
 
-    // Remove tags temporárias
-    this.measures.forEach(m => delete m._assignedGroupId);
-
-    this.recalculateTimings();
-    this.notify(`Moveu bossa '${grp.name}' para c. ${grp.startMeasure + 1}`);
+  // Duplicar múltiplos compassos
+  duplicateMeasures(indices) {
+    if (!indices || indices.length === 0) return null;
+    const unique = Array.from(new Set(indices)).sort((a, b) => a - b);
+    unique.forEach(idx => this.duplicateMeasure(idx));
     return true;
   }
 
-  // Mover bloco de bossa para trás (←)
-  moveGroupLeft(groupId) {
-    const grp = this.groups.find(g => g.id === groupId);
-    if (!grp || grp.startMeasure <= 0) return false;
-    return this.moveGroup(groupId, grp.startMeasure - 1);
-  }
-
-  // Mover bloco de bossa para frente (→)
-  moveGroupRight(groupId) {
-    const grp = this.groups.find(g => g.id === groupId);
-    if (!grp || grp.endMeasure >= this.measures.length - 1) return false;
-    return this.moveGroup(groupId, grp.endMeasure + 1);
-  }
-
-  // Remover compasso (permite ficar com 0 compassos)
-  removeMeasure(index) {
-    if (this.measures.length === 0) return;
-    if (index < 0 || index >= this.measures.length) return;
-
-    this.measures.splice(index, 1);
-
-    if (this.measures.length === 0) {
-      this.groups = [];
-    } else {
-      // Ajusta grupos após remoção
-      this.groups = this.groups.filter(g => {
-        if (index >= g.startMeasure && index <= g.endMeasure) {
-          // Se o grupo tinha 1 compasso e foi removido
-          if (g.startMeasure === g.endMeasure) return false;
-          g.endMeasure--;
-        } else if (index < g.startMeasure) {
-          g.startMeasure--;
-          g.endMeasure--;
-        }
-        return g.startMeasure <= g.endMeasure && g.startMeasure < this.measures.length;
-      });
-    }
-
-    this.recalculateTimings();
-    this.notify(`Excluiu compasso ${index + 1}`);
-  }
-
-  // Remover múltiplos compassos de uma vez (seleção múltipla)
-  removeMeasures(indices) {
-    if (!indices || indices.length === 0 || this.measures.length === 0) return;
-    
-    // Converte para Set para eliminar duplicatas e ordena em ordem decrescente
-    const uniqueSorted = Array.from(new Set(indices))
-      .filter(idx => typeof idx === 'number' && idx >= 0 && idx < this.measures.length)
-      .sort((a, b) => b - a);
-
-    if (uniqueSorted.length === 0) return;
-
-    for (const index of uniqueSorted) {
-      this.measures.splice(index, 1);
-      
-      if (this.measures.length === 0) {
-        this.groups = [];
-      } else {
-        this.groups = this.groups.filter(g => {
-          if (index >= g.startMeasure && index <= g.endMeasure) {
-            if (g.startMeasure === g.endMeasure) return false;
-            g.endMeasure--;
-          } else if (index < g.startMeasure) {
-            g.startMeasure--;
-            g.endMeasure--;
-          }
-          return g.startMeasure <= g.endMeasure && g.startMeasure < this.measures.length;
-        });
-      }
-    }
-
-    this.recalculateTimings();
-    this.notify(`Excluiu ${uniqueSorted.length} compasso${uniqueSorted.length > 1 ? 's' : ''}`);
-  }
-
-  // Duplicar múltiplos compassos de uma vez
-  duplicateMeasures(indices) {
-    if (!indices || indices.length === 0 || this.measures.length === 0) return null;
-    const sorted = Array.from(new Set(indices))
-      .filter(idx => typeof idx === 'number' && idx >= 0 && idx < this.measures.length)
-      .sort((a, b) => a - b);
-
-    if (sorted.length === 0) return null;
-
-    const insertIndex = sorted[sorted.length - 1] + 1;
-    const copies = sorted.map(idx => {
-      const target = this.measures[idx];
-      return {
-        id: `m-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-        nickname: target.nickname || "",
-        beats: target.beats,
-        beatUnit: target.beatUnit,
-        tempoMode: target.tempoMode,
-        ratioNum: target.ratioNum,
-        ratioDen: target.ratioDen,
-        customBpm: target.customBpm,
-        color: target.color,
-        repeat: target.repeat || 1
-      };
-    });
-
-    this.measures.splice(insertIndex, 0, ...copies);
-
-    // Ajusta grupos após inserção em bloco
-    const count = copies.length;
-    this.groups.forEach(g => {
-      if (g.startMeasure >= insertIndex) g.startMeasure += count;
-      if (g.endMeasure >= insertIndex) g.endMeasure += count;
-    });
-
-    this.recalculateTimings();
-    this.notify(`Duplicou ${copies.length} compasso${copies.length > 1 ? 's' : ''}`);
-    return { start: insertIndex, end: insertIndex + count - 1 };
-  }
-
-  // Inserir múltiplos compassos (ex: colar da área de transferência com Ctrl+V)
+  // Inserir múltiplos compassos
   insertMeasures(targetIndex, measuresList) {
     if (!measuresList || measuresList.length === 0) return null;
-
-    let insertIdx = (targetIndex === -1 || targetIndex === undefined || targetIndex === null || targetIndex > this.measures.length)
-      ? this.measures.length
+    let insertIdx = (targetIndex === -1 || targetIndex === undefined || targetIndex === null || targetIndex > this.items.length)
+      ? this.items.length
       : Math.max(0, targetIndex);
 
     const copies = measuresList.map((target, i) => ({
+      type: 'measure',
       id: `m-${Date.now()}-${i}-${Math.random().toString(36).substr(2, 5)}`,
       nickname: target.nickname ? target.nickname.trim() : "",
       beats: parseInt(target.beats, 10) || 4,
@@ -470,28 +522,15 @@ class PieceState {
       repeat: Math.max(1, Math.min(999, parseInt(target.repeat, 10) || 1))
     }));
 
-    this.measures.splice(insertIdx, 0, ...copies);
-
-    // Ajusta grupos após inserção em bloco
-    const count = copies.length;
-    this.groups.forEach(g => {
-      if (g.startMeasure >= insertIdx) {
-        g.startMeasure += count;
-        g.endMeasure += count;
-      } else if (g.endMeasure >= insertIdx) {
-        g.endMeasure += count;
-      }
-    });
-
+    this.items.splice(insertIdx, 0, ...copies);
     this.recalculateTimings();
     this.notify(`Colou ${copies.length} compasso${copies.length > 1 ? 's' : ''}`);
-    return { start: insertIdx, end: insertIdx + count - 1 };
+    return { start: insertIdx, end: insertIdx + copies.length - 1 };
   }
 
   // Esvazia todos os compassos da peça
   clearAllMeasures() {
-    this.measures = [];
-    this.groups = [];
+    this.items = [];
     this.recalculateTimings();
     this.notify("Limpou todos os compassos");
   }
@@ -516,6 +555,7 @@ class PieceState {
         ownerName: this.ownerName || null,
         access: this.access || 'edit_link',
         isBossa: isBossaVal,
+        items: (this.items || []).map(it => ({ ...it })),
         measures: this.measures.map(m => ({ ...m })),
         groups: this.groups.map(g => ({ ...g })),
         updatedAt: Date.now()
@@ -575,7 +615,7 @@ class PieceState {
       if (!Array.isArray(library)) return;
       if (library.length > 100) library = library.slice(0, 100);
       localStorage.setItem(LIBRARY_KEY, JSON.stringify(library));
-      this.notify('Biblioteca de peças e bossas atualizada');
+      this.notifyLibraryChange();
     } catch (e) {
       console.warn("Erro ao atualizar biblioteca local:", e);
     }
@@ -595,6 +635,11 @@ class PieceState {
     return true;
   }
 
+  // Define um resolver externo para peças (ex: cache da nuvem/Firestore)
+  setExternalPieceResolver(resolverFn) {
+    this.externalPieceResolver = resolverFn;
+  }
+
   // Busca uma bossa ou peça na biblioteca ou presets por ID ou nome
   findBossaOrPiece(pieceId, pieceName) {
     const library = this.getLibraryPieces();
@@ -607,6 +652,12 @@ class PieceState {
       const found = library.find(p => p.name && p.name.replace(/^[🔗📦✏️🔓\s]+/, '').trim().toLowerCase() === clean)
         || PRESETS.find(p => p.name && p.name.replace(/^[🔗📦✏️🔓\s]+/, '').trim().toLowerCase() === clean);
       if (found) return found;
+    }
+    if (typeof this.externalPieceResolver === 'function') {
+      try {
+        const ext = this.externalPieceResolver(pieceId, pieceName);
+        if (ext) return ext;
+      } catch (_) {}
     }
     return null;
   }
@@ -630,7 +681,6 @@ class PieceState {
         item.groups[0].name = cleanName;
       }
       this.setLibraryPieces(library);
-      this.notify(`Bossa renomeada para '${cleanName}'`);
       return true;
     }
     return false;
@@ -645,7 +695,7 @@ class PieceState {
       if (!Array.isArray(library)) return;
       library = library.filter(p => p.id !== pieceId);
       localStorage.setItem(LIBRARY_KEY, JSON.stringify(library));
-      this.notify('Item removido da biblioteca');
+      this.notifyLibraryChange();
     } catch (_) {}
   }
 
@@ -669,8 +719,9 @@ class PieceState {
     } catch (_) {}
 
     // 3. Inicializa com 1 compasso padrão 4/4 pronto para tocar
-    this.measures = [
+    this.items = [
       {
+        type: 'measure',
         id: `m-${Date.now()}-0-${Math.random().toString(36).substr(2, 4)}`,
         nickname: "Compasso 1",
         beats: 4,
@@ -683,7 +734,6 @@ class PieceState {
         repeat: 1
       }
     ];
-    this.groups = [];
     this.recalculateTimings();
     this.currentSnapshot = this.getSnapshot();
     this.undoStack = [];
@@ -698,7 +748,7 @@ class PieceState {
 
   // Clona a peça atual criando uma cópia independente (Fork / Fazer Cópia)
   duplicateCurrentPiece(customName = null) {
-    if (this.measures && this.measures.length > 0) {
+    if (this.items && this.items.length > 0) {
       this.saveCurrentPieceToLibrary();
     }
 
@@ -708,17 +758,23 @@ class PieceState {
     this.ownerId = null;
     this.access = 'edit_link';
 
-    // Gera novos IDs para os compassos
-    this.measures = this.measures.map((m, idx) => ({
-      ...m,
-      id: `m-${Date.now()}-${idx}-${Math.random().toString(36).substr(2, 4)}`
-    }));
-
-    // Gera novos IDs para os grupos
-    this.groups = this.groups.map((g, idx) => ({
-      ...g,
-      id: `g-${Date.now()}-${idx}-${Math.random().toString(36).substr(2, 4)}`
-    }));
+    // Gera novos IDs para os itens
+    this.items = (this.items || []).map((it, idx) => {
+      if (it.type === 'bossa') {
+        return {
+          ...it,
+          id: `bossa-${Date.now()}-${idx}-${Math.random().toString(36).substr(2, 4)}`,
+          measures: Array.isArray(it.measures) ? it.measures.map((bm, bi) => ({
+            ...bm,
+            id: `m-bossa-${Date.now()}-${idx}-${bi}`
+          })) : []
+        };
+      }
+      return {
+        ...it,
+        id: `m-${Date.now()}-${idx}-${Math.random().toString(36).substr(2, 4)}`
+      };
+    });
 
     this.recalculateTimings();
     this.currentSnapshot = this.getSnapshot();
@@ -731,56 +787,67 @@ class PieceState {
     return newId;
   }
 
-  // Atualizar compasso existente
-  updateMeasure(index, updates) {
-    if (index < 0 || index >= this.measures.length) return;
-    const m = this.measures[index];
-    
-    if (updates.nickname !== undefined) m.nickname = (updates.nickname || "").trim();
-    if (updates.beats !== undefined) m.beats = Math.max(1, Math.min(32, parseInt(updates.beats, 10) || 4));
-    if (updates.beatUnit !== undefined) m.beatUnit = parseInt(updates.beatUnit, 10) || 4;
-    if (updates.tempoMode !== undefined) m.tempoMode = updates.tempoMode;
-    if (updates.ratioNum !== undefined) m.ratioNum = Math.max(1, parseInt(updates.ratioNum, 10) || 1);
-    if (updates.ratioDen !== undefined) m.ratioDen = Math.max(1, parseInt(updates.ratioDen, 10) || 1);
-    if (updates.customBpm !== undefined) m.customBpm = Math.max(20, Math.min(500, Number(updates.customBpm) || this.baseBpm));
-    if (updates.color !== undefined) m.color = updates.color;
-    if (updates.repeat !== undefined) m.repeat = Math.max(1, Math.min(999, parseInt(updates.repeat, 10) || 1));
+  // Atualizar múltiplos compassos de uma vez (edição em lote atômica)
+  updateMeasures(indices, updates) {
+    if (!Array.isArray(indices) || indices.length === 0 || this.measures.length === 0) return null;
+    const sorted = Array.from(new Set(indices))
+      .filter(idx => typeof idx === 'number' && idx >= 0 && idx < this.measures.length)
+      .sort((a, b) => a - b);
 
-    // Suporte a metadados de Bossa e cópia na escrita (copy-on-write)
-    if (updates.isLinked !== undefined) {
-      m.isLinked = !!updates.isLinked;
-    }
-    if (updates.isLocallyModified !== undefined) {
-      m.isLocallyModified = !!updates.isLocallyModified;
-    }
-    if (updates.sourcePieceId !== undefined) {
-      m.sourcePieceId = updates.sourcePieceId;
-    }
-    if (updates.sourcePieceName !== undefined) {
-      m.sourcePieceName = updates.sourcePieceName;
-    }
+    if (sorted.length === 0) return null;
 
-    // Se o compasso faz parte de uma bossa vinculada e sofreu edição sem passar isLinked explicitamente,
-    // marca automaticamente como personalização local para não ser sobrescrito pelo auto-sync
-    if (m.sourcePieceId && m.isLinked && updates.isLinked === undefined && (
-      updates.nickname !== undefined ||
-      updates.beats !== undefined ||
-      updates.tempoMode !== undefined ||
-      updates.ratioNum !== undefined ||
-      updates.ratioDen !== undefined ||
-      updates.customBpm !== undefined ||
-      updates.repeat !== undefined
-    )) {
-      m.isLinked = false;
-      m.isLocallyModified = true;
-    }
+    sorted.forEach(idx => {
+      const m = this.measures[idx];
+      if (!m) return;
+
+      if (m._isBossa && m._parentItem) {
+        const bossa = m._parentItem;
+        if (bossa.isLinked) {
+          this.unlinkBossa(m._itemIndex);
+        }
+        if (Array.isArray(bossa.measures) && bossa.measures[m._subIndex]) {
+          const target = bossa.measures[m._subIndex];
+          if (updates.nickname !== undefined) target.nickname = (updates.nickname || "").trim();
+          if (updates.beats !== undefined) target.beats = Math.max(1, Math.min(32, parseInt(updates.beats, 10) || 4));
+          if (updates.beatUnit !== undefined) target.beatUnit = parseInt(updates.beatUnit, 10) || 4;
+          if (updates.tempoMode !== undefined) target.tempoMode = updates.tempoMode;
+          if (updates.ratioNum !== undefined) target.ratioNum = Math.max(1, parseInt(updates.ratioNum, 10) || 1);
+          if (updates.ratioDen !== undefined) target.ratioDen = Math.max(1, parseInt(updates.ratioDen, 10) || 1);
+          if (updates.customBpm !== undefined) target.customBpm = Math.max(20, Math.min(500, Number(updates.customBpm) || this.baseBpm));
+          if (updates.color !== undefined) target.color = updates.color;
+          if (updates.repeat !== undefined) target.repeat = Math.max(1, Math.min(999, parseInt(updates.repeat, 10) || 1));
+        }
+      } else if (m._itemIndex !== undefined && this.items[m._itemIndex]) {
+        const target = this.items[m._itemIndex];
+        if (updates.nickname !== undefined) target.nickname = (updates.nickname || "").trim();
+        if (updates.beats !== undefined) target.beats = Math.max(1, Math.min(32, parseInt(updates.beats, 10) || 4));
+        if (updates.beatUnit !== undefined) target.beatUnit = parseInt(updates.beatUnit, 10) || 4;
+        if (updates.tempoMode !== undefined) target.tempoMode = updates.tempoMode;
+        if (updates.ratioNum !== undefined) target.ratioNum = Math.max(1, parseInt(updates.ratioNum, 10) || 1);
+        if (updates.ratioDen !== undefined) target.ratioDen = Math.max(1, parseInt(updates.ratioDen, 10) || 1);
+        if (updates.customBpm !== undefined) target.customBpm = Math.max(20, Math.min(500, Number(updates.customBpm) || this.baseBpm));
+        if (updates.color !== undefined) target.color = updates.color;
+        if (updates.repeat !== undefined) target.repeat = Math.max(1, Math.min(999, parseInt(updates.repeat, 10) || 1));
+      }
+    });
 
     this.recalculateTimings();
-    this.notify(`Atualizou compasso ${index + 1}`);
+    if (sorted.length === 1) {
+      this.notify(`Atualizou compasso ${sorted[0] + 1}`);
+    } else {
+      this.notify(`Atualizou ${sorted.length} compassos`);
+    }
+
+    return { count: sorted.length };
+  }
+
+  // Atualizar compasso individual existente
+  updateMeasure(index, updates) {
+    return this.updateMeasures([index], updates);
   }
 
   // Agrupamento: criar ou atualizar grupo
-  addGroup(name, color, startMeasure, endMeasure) {
+  addGroup(name, color, startMeasure, endMeasure, repeat = 1) {
     if (this.measures.length === 0) return null;
     const start = Math.max(0, Math.min(startMeasure, endMeasure));
     const end = Math.min(this.measures.length - 1, Math.max(startMeasure, endMeasure));
@@ -790,29 +857,41 @@ class PieceState {
       name: (name || "Novo Grupo").trim(),
       color: color || "#3b82f6",
       startMeasure: start,
-      endMeasure: end
+      endMeasure: end,
+      repeat: Math.max(1, Math.min(999, parseInt(repeat, 10) || 1))
     };
 
     this.groups.push(newGroup);
+    this.recalculateTimings();
     this.notify(`Criou grupo '${newGroup.name}'`);
     return newGroup;
   }
 
-  updateGroup(groupId, updates) {
+  updateGroup(groupId, updates, isLocalOnly = false) {
+    const item = this.items.find(it => it.id === groupId);
+    if (item && item.type === 'bossa') {
+      if (updates.name !== undefined) item.name = updates.name.trim() || item.name;
+      if (updates.color !== undefined) item.color = updates.color;
+      if (updates.repeat !== undefined) item.repeat = Math.max(1, Math.min(999, parseInt(updates.repeat, 10) || 1));
+      if (updates.collapsed !== undefined) item.collapsed = Boolean(updates.collapsed);
+      this.recalculateTimings();
+      this.notify(`Atualizou bossa '${item.name}'`, isLocalOnly);
+      return;
+    }
     const grp = this.groups.find(g => g.id === groupId);
     if (!grp) return;
 
     if (updates.name !== undefined) grp.name = updates.name.trim() || "Grupo";
     if (updates.color !== undefined) grp.color = updates.color;
-    if (updates.startMeasure !== undefined && updates.endMeasure !== undefined && this.measures.length > 0) {
-      grp.startMeasure = Math.max(0, Math.min(updates.startMeasure, updates.endMeasure));
-      grp.endMeasure = Math.min(this.measures.length - 1, Math.max(updates.startMeasure, updates.endMeasure));
-    }
-    this.notify(`Atualizou grupo '${grp.name}'`);
+    if (updates.repeat !== undefined) grp.repeat = Math.max(1, Math.min(999, parseInt(updates.repeat, 10) || 1));
+    if (updates.collapsed !== undefined) grp.collapsed = Boolean(updates.collapsed);
+    this.recalculateTimings();
+    this.notify(`Atualizou grupo '${grp.name}'`, isLocalOnly);
   }
 
   removeGroup(groupId) {
     this.groups = this.groups.filter(g => g.id !== groupId);
+    this.recalculateTimings();
     this.notify("Removeu grupo");
   }
 
@@ -900,33 +979,22 @@ class PieceState {
     return updatedCount;
   }
 
-  // Insere uma Bossa / Peça completa na partitura (por referência vinculada ou cópia estática)
+  // Insere uma Bossa como item estrutural de primeira classe na partitura
   insertBossa(bossaPiece, targetIndex = -1, isLinked = true) {
     if (!bossaPiece) return null;
 
-    const sourceMeasures = Array.isArray(bossaPiece.measures) && bossaPiece.measures.length > 0
-      ? bossaPiece.measures
-      : [
-          {
-            id: `m-bossa-default`,
-            nickname: bossaPiece.name || "Bossa",
-            beats: 4,
-            beatUnit: 4,
-            tempoMode: "ratio",
-            ratioNum: 1,
-            ratioDen: 1,
-            customBpm: bossaPiece.baseBpm || this.baseBpm,
-            color: "#8b5cf6",
-            repeat: 1
-          }
-        ];
+    let insertPos = this.items.length;
+    if (targetIndex >= 0 && targetIndex <= this.items.length) {
+      insertPos = targetIndex;
+    } else {
+      // Se targetIndex veio como índice de compasso na lista linear, acha o item correspondente
+      const targetM = this.measures[targetIndex];
+      if (targetM && targetM._itemIndex !== undefined) {
+        insertPos = targetM._itemIndex + 1;
+      }
+    }
+    insertPos = Math.max(0, Math.min(this.items.length, insertPos));
 
-    // Posição de inserção
-    const insertPos = (targetIndex >= 0 && targetIndex < this.measures.length)
-      ? targetIndex + 1
-      : this.measures.length;
-
-    // Cores temáticas para blocos de bossas
     const bossaColors = [
       "#8b5cf6", // Violeta
       "#06b6d4", // Ciano
@@ -935,126 +1003,52 @@ class PieceState {
       "#ec4899", // Rosa choque
       "#3b82f6"  // Azul royal
     ];
-    const colorIdx = this.groups.filter(g => g.isBossaBlock).length % bossaColors.length;
-    const bossaColor = bossaPiece.color || bossaColors[colorIdx];
+    const bossaCount = this.items.filter(it => it.type === 'bossa').length;
+    const bossaColor = bossaPiece.color || bossaColors[bossaCount % bossaColors.length];
 
-    // Clona compassos e atribui metadados de referência
-    const bossaMeasures = sourceMeasures.map((om, idx) => ({
-      id: `m-${Date.now()}-${idx}-${Math.random().toString(36).substr(2, 4)}`,
-      nickname: (om.nickname || "").trim() || `${bossaPiece.name} (${idx + 1})`,
-      beats: Math.max(1, Math.min(32, parseInt(om.beats, 10) || 4)),
-      beatUnit: [2, 4, 8, 16].includes(parseInt(om.beatUnit, 10)) ? parseInt(om.beatUnit, 10) : 4,
-      tempoMode: om.tempoMode === "fixed" ? "fixed" : "ratio",
-      ratioNum: Math.max(1, parseInt(om.ratioNum, 10) || 1),
-      ratioDen: Math.max(1, parseInt(om.ratioDen, 10) || 1),
-      customBpm: Math.max(20, Math.min(500, Number(om.customBpm) || bossaPiece.baseBpm || this.baseBpm)),
-      color: bossaColor,
-      repeat: Math.max(1, Math.min(999, parseInt(om.repeat, 10) || 1)),
+    const cleanName = (bossaPiece.name || "Bossa").replace(/^[🔗📦✏️🔓\s]+/, '').trim();
+
+    const bossaItem = {
+      type: 'bossa',
+      id: `bossa-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
       sourcePieceId: bossaPiece.id || null,
-      sourcePieceName: bossaPiece.name || "Bossa",
-      sourceMeasureId: om.id || null,
-      isLinked: !!isLinked,
-      isLocallyModified: false
-    }));
-
-    const count = bossaMeasures.length;
-
-    // Ajusta índices de grupos existentes que estejam após o ponto de inserção
-    this.groups.forEach(g => {
-      if (g.startMeasure >= insertPos) g.startMeasure += count;
-      if (g.endMeasure >= insertPos) g.endMeasure += count;
-    });
-
-    // Insere os compassos na partitura
-    this.measures.splice(insertPos, 0, ...bossaMeasures);
-
-    // Cria o Grupo da Bossa (com identificação de bloco)
-    const bossaGroup = {
-      id: `grp-bossa-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-      name: isLinked ? `🔗 ${bossaPiece.name || "Bossa"}` : `${bossaPiece.name || "Bossa"}`,
+      sourcePieceName: cleanName,
+      name: cleanName,
       color: bossaColor,
-      startMeasure: insertPos,
-      endMeasure: insertPos + count - 1,
-      isBossaBlock: true,
-      sourcePieceId: bossaPiece.id || null,
-      sourcePieceName: bossaPiece.name || "Bossa",
-      isLinked: !!isLinked
+      repeat: 1,
+      collapsed: true,
+      isLinked: Boolean(isLinked),
+      measures: Array.isArray(bossaPiece.measures)
+        ? JSON.parse(JSON.stringify(bossaPiece.measures))
+        : []
     };
-    this.groups.push(bossaGroup);
 
+    this.items.splice(insertPos, 0, bossaItem);
     this.recalculateTimings();
-    this.notify(`Inseriu ${isLinked ? 'bossa vinculada' : 'cópia da bossa'} '${bossaPiece.name}' (${count} comp.)`);
+    this.notify(`Inseriu bossa '${cleanName}' (${isLinked ? 'vinculada' : 'cópia'})`);
     return {
-      group: bossaGroup,
-      measures: bossaMeasures,
-      startIndex: insertPos,
-      count: count
+      item: bossaItem,
+      itemIndex: insertPos,
+      startIndex: Math.max(0, this.measures.findIndex(m => m._itemIndex === insertPos))
     };
   }
 
   // Sincroniza manualmente um bloco específico de bossa
   syncBossaBlock(groupId) {
-    const grp = this.groups.find(g => g.id === groupId);
-    if (!grp || !grp.sourcePieceId) return false;
-
-    const library = this.getLibraryPieces();
-    const origPiece = library.find(p => p.id === grp.sourcePieceId) 
-      || PRESETS.find(p => p.id === grp.sourcePieceId);
-
-    if (!origPiece || !Array.isArray(origPiece.measures)) return false;
-
-    let updated = 0;
-    const start = Math.max(0, grp.startMeasure);
-    const end = Math.min(this.measures.length - 1, grp.endMeasure);
-
-    for (let i = start; i <= end; i++) {
-      const m = this.measures[i];
-      if (m && m.sourcePieceId === grp.sourcePieceId && m.isLinked && !m.isLocallyModified) {
-        const origM = origPiece.measures.find(om => om.id === m.sourceMeasureId) 
-          || origPiece.measures[i - start];
-        if (origM) {
-          m.nickname = origM.nickname || m.nickname;
-          m.beats = origM.beats;
-          m.beatUnit = origM.beatUnit;
-          m.tempoMode = origM.tempoMode;
-          m.ratioNum = origM.ratioNum;
-          m.ratioDen = origM.ratioDen;
-          m.customBpm = origM.customBpm;
-          m.repeat = origM.repeat || 1;
-          updated++;
-        }
-      }
+    const itemIdx = this.items.findIndex(it => it.id === groupId);
+    if (itemIdx >= 0) {
+      return this.syncLinkedBossa(itemIdx);
     }
-
-    if (updated > 0) {
-      this.recalculateTimings();
-      this.notify(`Sincronizou ${updated} compassos da bossa '${origPiece.name}'`);
-    }
-    return true;
+    return false;
   }
 
   // Desvincula todos os compassos de um bloco de bossa (torna 100% locais e independentes)
   unlinkBossaBlock(groupId) {
-    const grp = this.groups.find(g => g.id === groupId);
-    if (!grp) return false;
-
-    const start = Math.max(0, grp.startMeasure);
-    const end = Math.min(this.measures.length - 1, grp.endMeasure);
-
-    for (let i = start; i <= end; i++) {
-      const m = this.measures[i];
-      if (m) {
-        m.isLinked = false;
-        m.isLocallyModified = true;
-      }
+    const itemIdx = this.items.findIndex(it => it.id === groupId);
+    if (itemIdx >= 0) {
+      return this.unlinkBossa(itemIdx);
     }
-
-    grp.name = grp.name.replace(/^🔗\s*/, '');
-    grp.isLinked = false;
-    grp.isBossaBlock = false;
-
-    this.notify(`Desvinculou bossa '${grp.name}' (agora é independente)`);
-    return true;
+    return false;
   }
 
   // Desvincula um único compasso para edição local livre
@@ -1157,7 +1151,6 @@ class PieceState {
     if (library.length > 100) library = library.slice(0, 100);
     this.setLibraryPieces(library);
 
-    this.notify(`Criou e salvou ${isBossa ? 'nova bossa' : 'nova peça'} '${name}'`);
     return itemData;
   }
 
@@ -1167,15 +1160,19 @@ class PieceState {
   }
 
   // Calcula timings detalhados para qualquer lista de compassos (usado em prévias de áudio)
-  calculateTimingsForMeasures(measures, baseBpm = 120) {
+  // Calcula timings detalhados para qualquer lista de compassos (usado em prévias de áudio)
+  calculateTimingsForMeasures(measures, baseBpm = 120, groups = []) {
     if (!Array.isArray(measures) || measures.length === 0) {
       return { timings: [], totalDuration: 0 };
     }
     let accumulatedTime = 0;
     const timings = [];
     let globalTimingIndex = 0;
+    const measuresCount = measures.length;
 
-    measures.forEach((m, idx) => {
+    const pushMeasureTimings = (idx, groupContext = null) => {
+      const m = measures[idx];
+      if (!m) return;
       const repeat = Math.max(1, Math.min(999, parseInt(m.repeat, 10) || 1));
       let effectiveBpm = baseBpm;
       if (m.tempoMode === "ratio") {
@@ -1192,6 +1189,9 @@ class PieceState {
           measureIndex: idx,
           repeatIteration: r,
           repeatCount: repeat,
+          groupId: groupContext ? groupContext.id : null,
+          groupRepeatIteration: groupContext ? groupContext.iteration : 0,
+          groupRepeatCount: groupContext ? groupContext.repeatCount : 1,
           startTime: accumulatedTime,
           endTime: accumulatedTime + measureDuration,
           duration: measureDuration,
@@ -1202,7 +1202,27 @@ class PieceState {
         });
         accumulatedTime += measureDuration;
       }
-    });
+    };
+
+    let idx = 0;
+    while (idx < measuresCount) {
+      const grp = Array.isArray(groups) ? groups.find(g => g.startMeasure === idx && g.endMeasure >= idx && g.endMeasure < measuresCount) : null;
+      if (grp) {
+        const grpRepeat = Math.max(1, Math.min(999, parseInt(grp.repeat, 10) || 1));
+        const start = grp.startMeasure;
+        const end = grp.endMeasure;
+        for (let gr = 0; gr < grpRepeat; gr++) {
+          const groupContext = { id: grp.id, iteration: gr, repeatCount: grpRepeat };
+          for (let mIdx = start; mIdx <= end; mIdx++) {
+            pushMeasureTimings(mIdx, groupContext);
+          }
+        }
+        idx = end + 1;
+      } else {
+        pushMeasureTimings(idx, null);
+        idx++;
+      }
+    }
 
     return { timings, totalDuration: accumulatedTime };
   }
@@ -1232,62 +1252,185 @@ class PieceState {
     return match || this.getFirstTimingForMeasure(measureIndex);
   }
 
-  // Recálculo matemático de tempos precisos considerando repetições
+  // Obtém os compassos de um bloco de Bossa (da bossa original se vinculada, ou de measures locais como fallback)
+  getBossaMeasures(bossaItem) {
+    if (!bossaItem) return [];
+    if (bossaItem.isLinked && (bossaItem.sourcePieceId || bossaItem.sourcePieceName)) {
+      const orig = this.findBossaOrPiece(bossaItem.sourcePieceId, bossaItem.sourcePieceName);
+      if (orig && Array.isArray(orig.measures) && orig.measures.length > 0) {
+        return orig.measures.map((m, idx) => ({
+          ...m,
+          id: `${bossaItem.id}-${m.id || idx}`,
+          sourceMeasureId: m.id || null,
+          sourcePieceId: bossaItem.sourcePieceId || orig.id,
+          sourcePieceName: orig.name || bossaItem.name,
+          color: m.color || bossaItem.color || '#8b5cf6',
+          isLinked: true
+        }));
+      }
+    }
+    // Fallback gracioso: usa as measures locais/armazenadas dentro do bossaItem
+    return (bossaItem.measures || []).map((m, idx) => ({
+      ...m,
+      id: m.id || `${bossaItem.id}-sub-${idx}`,
+      sourcePieceId: bossaItem.sourcePieceId || null,
+      sourcePieceName: bossaItem.sourcePieceName || bossaItem.name,
+      color: m.color || bossaItem.color || '#8b5cf6',
+      isLinked: Boolean(bossaItem.isLinked)
+    }));
+  }
+
+  // Recálculo matemático de tempos precisos considerando estrutura em blocos de itens (compassos e bossas)
   recalculateTimings() {
     let accumulatedTime = 0;
     this.measureTimings = [];
     this.firstTimingByMeasure = new Map();
     this.lastTimingByMeasure = new Map();
 
-    if (this.measures.length === 0) {
+    if (!Array.isArray(this.items) || this.items.length === 0) {
+      this.measures = [];
+      this.groups = [];
       this.totalDuration = 0;
       return;
     }
 
+    const flattenedMeasures = [];
+    const computedGroups = [];
     let globalTimingIndex = 0;
 
-    this.measures.forEach((m, idx) => {
-      // Garante repetição válida (padrão 1, mínimo 1, máximo 999)
-      m.repeat = Math.max(1, Math.min(999, parseInt(m.repeat, 10) || 1));
+    this.items.forEach((item, itemIdx) => {
+      if (item.type === 'bossa') {
+        const bossaMs = this.getBossaMeasures(item);
+        const startMeasureIdx = flattenedMeasures.length;
+        bossaMs.forEach((bm, subIdx) => {
+          flattenedMeasures.push({
+            ...bm,
+            _itemIndex: itemIdx,
+            _subIndex: subIdx,
+            _parentItem: item,
+            _isBossa: true
+          });
+        });
+        const endMeasureIdx = flattenedMeasures.length - 1;
+        const repeatCount = Math.max(1, Math.min(999, parseInt(item.repeat, 10) || 1));
 
-      // Cálculo do BPM efetivo para a semínima
-      let effectiveBpm = this.baseBpm;
-      if (m.tempoMode === "ratio") {
-        effectiveBpm = this.baseBpm * (m.ratioNum / m.ratioDen);
-      } else {
-        effectiveBpm = m.customBpm;
-      }
+        if (endMeasureIdx >= startMeasureIdx) {
+          const grp = {
+            id: item.id,
+            name: item.name,
+            color: item.color || '#8b5cf6',
+            startMeasure: startMeasureIdx,
+            endMeasure: endMeasureIdx,
+            repeat: repeatCount,
+            isBossaBlock: true,
+            isLinked: Boolean(item.isLinked),
+            sourcePieceId: item.sourcePieceId || null,
+            sourcePieceName: item.sourcePieceName || item.name,
+            collapsed: Boolean(item.collapsed)
+          };
+          computedGroups.push(grp);
 
-      // Duração de um tempo (pulso) em segundos:
-      // O andamento (BPM) define diretamente a frequência dos tempos/pulsos.
-      const beatDuration = 60 / effectiveBpm;
-      const measureDuration = m.beats * beatDuration;
+          for (let r = 0; r < repeatCount; r++) {
+            const groupContext = {
+              id: item.id,
+              iteration: r,
+              repeatCount: repeatCount
+            };
 
-      for (let r = 0; r < m.repeat; r++) {
-        const timing = {
-          timingIndex: globalTimingIndex++,
-          measureIndex: idx,
-          repeatIteration: r,
-          repeatCount: m.repeat,
-          startTime: accumulatedTime,
-          endTime: accumulatedTime + measureDuration,
-          duration: measureDuration,
-          effectiveBpm: effectiveBpm,
-          beatDuration: beatDuration,
-          beats: m.beats,
-          beatUnit: m.beatUnit
-        };
+            for (let mIdx = startMeasureIdx; mIdx <= endMeasureIdx; mIdx++) {
+              const m = flattenedMeasures[mIdx];
+              const mRepeat = Math.max(1, Math.min(999, parseInt(m.repeat, 10) || 1));
 
-        this.measureTimings.push(timing);
-        if (!this.firstTimingByMeasure.has(idx)) {
-          this.firstTimingByMeasure.set(idx, timing);
+              let effectiveBpm = this.baseBpm;
+              if (m.tempoMode === "ratio") {
+                effectiveBpm = this.baseBpm * ((m.ratioNum || 1) / (m.ratioDen || 1));
+              } else {
+                effectiveBpm = m.customBpm || this.baseBpm;
+              }
+
+              const beatDuration = 60 / effectiveBpm;
+              const measureDuration = (m.beats || 4) * beatDuration;
+
+              for (let mr = 0; mr < mRepeat; mr++) {
+                const timing = {
+                  timingIndex: globalTimingIndex++,
+                  measureIndex: mIdx,
+                  repeatIteration: mr,
+                  repeatCount: mRepeat,
+                  groupId: item.id,
+                  groupRepeatIteration: r,
+                  groupRepeatCount: repeatCount,
+                  startTime: accumulatedTime,
+                  endTime: accumulatedTime + measureDuration,
+                  duration: measureDuration,
+                  effectiveBpm: effectiveBpm,
+                  beatDuration: beatDuration,
+                  beats: m.beats || 4,
+                  beatUnit: m.beatUnit || 4
+                };
+
+                this.measureTimings.push(timing);
+                if (!this.firstTimingByMeasure.has(mIdx)) {
+                  this.firstTimingByMeasure.set(mIdx, timing);
+                }
+                this.lastTimingByMeasure.set(mIdx, timing);
+                accumulatedTime += measureDuration;
+              }
+            }
+          }
         }
-        this.lastTimingByMeasure.set(idx, timing);
+      } else {
+        // Compasso avulso
+        const mIdx = flattenedMeasures.length;
+        flattenedMeasures.push({
+          ...item,
+          _itemIndex: itemIdx,
+          _subIndex: 0,
+          _parentItem: null,
+          _isBossa: false
+        });
 
-        accumulatedTime += measureDuration;
+        const mRepeat = Math.max(1, Math.min(999, parseInt(item.repeat, 10) || 1));
+        let effectiveBpm = this.baseBpm;
+        if (item.tempoMode === "ratio") {
+          effectiveBpm = this.baseBpm * ((item.ratioNum || 1) / (item.ratioDen || 1));
+        } else {
+          effectiveBpm = item.customBpm || this.baseBpm;
+        }
+
+        const beatDuration = 60 / effectiveBpm;
+        const measureDuration = (item.beats || 4) * beatDuration;
+
+        for (let mr = 0; mr < mRepeat; mr++) {
+          const timing = {
+            timingIndex: globalTimingIndex++,
+            measureIndex: mIdx,
+            repeatIteration: mr,
+            repeatCount: mRepeat,
+            groupId: null,
+            groupRepeatIteration: 0,
+            groupRepeatCount: 1,
+            startTime: accumulatedTime,
+            endTime: accumulatedTime + measureDuration,
+            duration: measureDuration,
+            effectiveBpm: effectiveBpm,
+            beatDuration: beatDuration,
+            beats: item.beats || 4,
+            beatUnit: item.beatUnit || 4
+          };
+
+          this.measureTimings.push(timing);
+          if (!this.firstTimingByMeasure.has(mIdx)) {
+            this.firstTimingByMeasure.set(mIdx, timing);
+          }
+          this.lastTimingByMeasure.set(mIdx, timing);
+          accumulatedTime += measureDuration;
+        }
       }
     });
 
+    this.measures = flattenedMeasures;
+    this.groups = computedGroups;
     this.totalDuration = accumulatedTime;
   }
 
@@ -1398,10 +1541,34 @@ class PieceState {
     return timing.startTime + (Math.max(0, Math.min(timing.beats - 1, beatIndex)) * timing.beatDuration);
   }
 
-  // Inscrição de ouvintes para atualização de interface
+  // Inscrição de ouvintes para atualização de interface da partitura
   subscribe(callback) {
     this.listeners.add(callback);
     return () => this.listeners.delete(callback);
+  }
+
+  // Inscrição de ouvintes para alterações da biblioteca de peças e bossas (repertório salvo)
+  subscribeLibrary(callback) {
+    if (!this.libraryListeners) {
+      this.libraryListeners = new Set();
+    }
+    this.libraryListeners.add(callback);
+    return () => this.libraryListeners.delete(callback);
+  }
+
+  // Notifica ouvintes de que a biblioteca local foi modificada (sem alterar a peça aberta)
+  notifyLibraryChange() {
+    if (!this.libraryListeners) {
+      this.libraryListeners = new Set();
+    }
+    const library = this.getLibraryPieces();
+    for (const cb of this.libraryListeners) {
+      try {
+        cb(library);
+      } catch (err) {
+        console.error("Erro no ouvinte de biblioteca:", err);
+      }
+    }
   }
 
   // Salvar no localStorage automaticamente
@@ -1410,7 +1577,7 @@ class PieceState {
     try {
       const data = {
         app: "Sérgio Simulator",
-        version: "1.0.0",
+        version: "2.0.0",
         savedAt: new Date().toISOString(),
         piece: {
           id: this.id,
@@ -1419,12 +1586,13 @@ class PieceState {
           presentationBpm: this.presentationBpm,
           baseBpm: this.presentationBpm,
           practiceBpm: this.baseBpm,
+          items: (this.items || []).map(it => ({ ...it })),
           groups: this.groups,
           measures: this.measures
         }
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-      if (this.id && this.measures && this.measures.length > 0) {
+      if (this.id && this.items && this.items.length > 0) {
         this.saveCurrentPieceToLibrary();
       }
       window.dispatchEvent(new CustomEvent('sergio:saved', { 
@@ -1444,8 +1612,7 @@ class PieceState {
       presentationBpm: this.presentationBpm,
       baseBpm: this.baseBpm,
       isCustomPracticeBpm: this.isCustomPracticeBpm,
-      measures: this.measures.map(m => ({ ...m })),
-      groups: this.groups.map(g => ({ ...g }))
+      items: JSON.parse(JSON.stringify(this.items || []))
     };
   }
 
@@ -1458,8 +1625,7 @@ class PieceState {
     this.presentationBpm = snapshot.presentationBpm || 120;
     this.baseBpm = snapshot.baseBpm || this.presentationBpm;
     this.isCustomPracticeBpm = Boolean(snapshot.isCustomPracticeBpm);
-    this.measures = (snapshot.measures || []).map(m => ({ ...m }));
-    this.groups = (snapshot.groups || []).map(g => ({ ...g }));
+    this.items = JSON.parse(JSON.stringify(snapshot.items || []));
     this.recalculateTimings();
   }
 
@@ -1512,8 +1678,8 @@ class PieceState {
   }
 
   notify(action = "Alteração na peça", isRemote = false, isLocalOnly = false) {
-    // Grava histórico de Desfazer se for alteração local e não for chamada durante undo/redo
-    if (!isRemote && !this.isUndoingOrRedoing) {
+    // Grava histórico de Desfazer se for alteração local e não for chamada durante undo/redo e não for ação local exclusiva
+    if (!isRemote && !isLocalOnly && !this.isUndoingOrRedoing) {
       if (this.currentSnapshot) {
         this.undoStack.push({
           action: action,

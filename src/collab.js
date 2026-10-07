@@ -60,10 +60,13 @@ class CollabService {
     this.onPermissionChange = null;
     this.onAccessDenied = null;
 
-    // Flag para evitar eco de alterações locais
+    // Flag para evitar eco de alterações locais e loops infinitos
     this.isApplyingRemote = false;
     this.lastSentPayloadHash = null;
+    this.lastCommittedContentHash = null;
     this.pendingCommitTimer = null;
+    this.isSyncingLibrary = false;
+    this.librarySyncDebounce = null;
 
     // Integração automática com o Auth
     authService.onUserChange((user, isLoggedIn) => {
@@ -307,6 +310,7 @@ class CollabService {
         this.currentPieceAccess = initialAccess;
         this.evaluateCurrentPermissions();
 
+        this.lastCommittedContentHash = this.computeContentHash(initialData);
         await setDoc(pieceRef, initialData);
         // Cria primeira entrada no histórico
         await this.addHistoryEntry(pieceId, "Peça inicializada na nuvem", initialData);
@@ -330,6 +334,7 @@ class CollabService {
 
         this.currentPieceId = pieceId;
         this.updateUrlPieceId(pieceId);
+        this.lastCommittedContentHash = this.computeContentHash(data);
 
         if (this.onRemoteStateChange) {
           this.isApplyingRemote = true;
@@ -362,10 +367,11 @@ class CollabService {
           return;
         }
 
-        const remoteHash = this.computeHash(remoteData);
-        if (remoteHash === this.lastSentPayloadHash) {
+        const remoteHash = this.computeContentHash(remoteData);
+        if (remoteHash && remoteHash === this.lastCommittedContentHash) {
           return;
         }
+        this.lastCommittedContentHash = remoteHash;
 
         this.setSyncStatus('syncing', `${remoteData.updatedBy?.name || 'Alguém'} fez uma alteração`);
         
@@ -423,11 +429,17 @@ class CollabService {
     }
   }
 
-  // Envia alteração local para o Firestore (com debounce inteligente para evitar spam)
+  // Envia alteração local para o Firestore (com debounce inteligente para evitar spam e loops)
   commitLocalChange(actionDescription, stateData) {
     if (!db || !this.currentPieceId || this.isApplyingRemote) return;
     if (this.isReadOnly) {
       console.warn("Alteração local não enviada: peça está em Modo Ouvinte (Apenas Leitura).");
+      return;
+    }
+
+    // Se o conteúdo real da partitura for exatamente idêntico ao já sincronizado, evita qualquer envio
+    const contentHash = this.computeContentHash(stateData);
+    if (contentHash && contentHash === this.lastCommittedContentHash) {
       return;
     }
 
@@ -436,6 +448,12 @@ class CollabService {
 
     this.pendingCommitTimer = setTimeout(async () => {
       try {
+        const freshHash = this.computeContentHash(stateData);
+        if (freshHash && freshHash === this.lastCommittedContentHash) {
+          this.setSyncStatus('synced', 'Salvo na nuvem');
+          return;
+        }
+
         const pieceRef = doc(db, 'pieces', this.currentPieceId);
         const payload = {
           id: this.currentPieceId,
@@ -446,6 +464,37 @@ class CollabService {
           ownerId: this.currentPieceOwnerId || authService.getUid() || null,
           ownerName: authService.getDisplayName(),
           access: this.currentPieceAccess || 'edit_link',
+          items: (stateData.items || []).map(it => {
+            if (it.type === 'bossa') {
+              return {
+                type: 'bossa',
+                id: it.id,
+                name: (it.name || it.sourcePieceName || 'Bossa').replace(/^[🔗📦✏️🔓\s]+/, '').trim(),
+                color: it.color || '#8b5cf6',
+                repeat: Math.max(1, Math.min(999, parseInt(it.repeat, 10) || 1)),
+                collapsed: it.collapsed !== undefined ? Boolean(it.collapsed) : true,
+                isLinked: Boolean(it.isLinked),
+                sourcePieceId: it.sourcePieceId || null,
+                sourcePieceName: it.sourcePieceName || it.name || 'Bossa',
+                measures: (it.measures && it.measures.length > 0)
+                  ? it.measures
+                  : (stateData.getBossaMeasures ? stateData.getBossaMeasures(it) : [])
+              };
+            }
+            return {
+              type: 'measure',
+              id: it.id,
+              nickname: it.nickname || "",
+              beats: it.beats,
+              beatUnit: it.beatUnit,
+              tempoMode: it.tempoMode,
+              ratioNum: it.ratioNum,
+              ratioDen: it.ratioDen,
+              customBpm: it.customBpm,
+              color: it.color,
+              repeat: it.repeat || 1
+            };
+          }),
           measures: stateData.measures.map(m => ({
             id: m.id,
             nickname: m.nickname || "",
@@ -456,22 +505,46 @@ class CollabService {
             ratioDen: m.ratioDen,
             customBpm: m.customBpm,
             color: m.color,
-            repeat: m.repeat || 1
+            repeat: m.repeat || 1,
+            sourcePieceId: m.sourcePieceId || null,
+            sourcePieceName: m.sourcePieceName || null,
+            sourceMeasureId: m.sourceMeasureId || null,
+            isLinked: m.isLinked === undefined ? Boolean(m.sourcePieceId) : Boolean(m.isLinked),
+            isLocallyModified: Boolean(m.isLocallyModified)
           })),
           groups: stateData.groups.map(g => ({
             id: g.id,
             name: g.name,
             color: g.color,
             startMeasure: g.startMeasure,
-            endMeasure: g.endMeasure
+            endMeasure: g.endMeasure,
+            repeat: Math.max(1, Math.min(999, parseInt(g.repeat, 10) || 1)),
+            isBossaBlock: Boolean(g.isBossaBlock),
+            sourcePieceId: g.sourcePieceId || null,
+            sourcePieceName: g.sourcePieceName || null,
+            isLinked: g.isLinked === undefined ? Boolean(g.sourcePieceId) : Boolean(g.isLinked),
+            collapsed: Boolean(g.collapsed)
           })),
           updatedAt: Date.now(),
           updatedBy: this.localUser,
           lastAction: actionDescription || "Alteração na peça"
         };
 
-        this.lastSentPayloadHash = this.computeHash(payload);
+        this.lastCommittedContentHash = freshHash;
         await setDoc(pieceRef, payload);
+
+        // Atualiza timestamp na biblioteca local para evitar falso-positivo de "nuvem mais nova"
+        try {
+          const raw = localStorage.getItem('sergio_pieces_library');
+          if (raw) {
+            const lib = JSON.parse(raw);
+            const item = lib.find(p => p.id === this.currentPieceId);
+            if (item) {
+              item.updatedAt = payload.updatedAt;
+              localStorage.setItem('sergio_pieces_library', JSON.stringify(lib));
+            }
+          }
+        } catch (_) {}
 
         // Adiciona ao histórico na nuvem (limite de 500 itens)
         await this.addHistoryEntry(this.currentPieceId, actionDescription, payload);
@@ -481,7 +554,7 @@ class CollabService {
         console.error("Erro ao salvar alteração no Firestore:", err);
         this.setSyncStatus('error', 'Erro ao salvar na nuvem');
       }
-    }, 350);
+    }, 450);
   }
 
   // Atualiza visibilidade de acesso da peça ('private' | 'view_link' | 'edit_link')
@@ -622,15 +695,35 @@ class CollabService {
 
   // Sincroniza bidirecionalmente a biblioteca local com a nuvem
   // (Migra peças e bossas criadas no celular para a conta do usuário e baixa no desktop)
-  async syncUserLibraryWithCloud(stateInstance) {
+  // Single-flight + throttle: chamadas simultâneas compartilham a mesma sincronização,
+  // e chamadas repetidas dentro da janela reaproveitam o resultado (evita rajada de requests).
+  async syncUserLibraryWithCloud(stateInstance, { force = false } = {}) {
     const uid = authService.getUid();
     if (!db || !uid || !stateInstance) {
       return stateInstance ? stateInstance.getLibraryPieces() : [];
     }
 
+    if (this._librarySyncPromise) return this._librarySyncPromise;
+
+    const MIN_INTERVAL_MS = 15000;
+    const now = Date.now();
+    if (!force && this._lastLibrarySyncAt && (now - this._lastLibrarySyncAt) < MIN_INTERVAL_MS) {
+      return stateInstance.getLibraryPieces();
+    }
+
+    this._librarySyncPromise = this._doSyncUserLibraryWithCloud(stateInstance, uid)
+      .finally(() => {
+        this._lastLibrarySyncAt = Date.now();
+        this._librarySyncPromise = null;
+      });
+    return this._librarySyncPromise;
+  }
+
+  async _doSyncUserLibraryWithCloud(stateInstance, uid) {
     try {
       // 1. Busca todas as peças e bossas do usuário no Firestore
       const cloudPieces = await this.getUserCloudPieces(uid);
+      this.cloudPiecesCache = cloudPieces;
       const cloudMap = new Map();
       cloudPieces.forEach(p => {
         if (p && p.id) cloudMap.set(p.id, p);
@@ -704,6 +797,21 @@ class CollabService {
     }
   }
 
+  // Busca uma peça ou bossa no cache da nuvem por ID ou nome
+  findPiece(pieceId, pieceName) {
+    if (!Array.isArray(this.cloudPiecesCache)) return null;
+    if (pieceId) {
+      const match = this.cloudPiecesCache.find(p => p.id === pieceId);
+      if (match) return match;
+    }
+    if (pieceName) {
+      const clean = pieceName.replace(/^[🔗📦✏️🔓\s]+/, '').trim().toLowerCase();
+      const match = this.cloudPiecesCache.find(p => p.name && p.name.replace(/^[🔗📦✏️🔓\s]+/, '').trim().toLowerCase() === clean);
+      if (match) return match;
+    }
+    return null;
+  }
+
   // Escuta em tempo real todas as alterações na nuvem do usuário (Google Docs style)
   listenToUserLibrary(stateInstance, onChangeCallback) {
     if (this.unsubUserLibrary) {
@@ -718,15 +826,40 @@ class CollabService {
       const piecesCol = collection(db, 'pieces');
       const q = query(piecesCol, where('ownerId', '==', uid));
 
-      this.unsubUserLibrary = onSnapshot(q, async (snap) => {
-        try {
-          const updatedLib = await this.syncUserLibraryWithCloud(stateInstance);
-          if (typeof onChangeCallback === 'function') {
-            onChangeCallback(updatedLib);
-          }
-        } catch (err) {
-          console.warn("Aviso na sincronização automática em tempo real:", err);
+      let isFirstSnapshot = true;
+      this.unsubUserLibrary = onSnapshot(q, (snap) => {
+        // O primeiro snapshot é o estado inicial: quem chamou já faz a sincronização inicial
+        if (isFirstSnapshot) {
+          isFirstSnapshot = false;
+          return;
         }
+
+        // Ignora escritas locais pendentes e dados vindos só do cache
+        if (snap.metadata.hasPendingWrites || snap.metadata.fromCache) {
+          return;
+        }
+
+        // Ignora alterações feitas por esta própria aba/dispositivo (ex: autosave da peça aberta)
+        const changes = snap.docChanges();
+        const hasForeignChange = changes.some(ch => {
+          const d = ch.doc.data();
+          return !d || d.updatedBy?.id !== this.localUser.id;
+        });
+        if (changes.length === 0 || !hasForeignChange) {
+          return;
+        }
+
+        clearTimeout(this.librarySyncDebounce);
+        this.librarySyncDebounce = setTimeout(async () => {
+          try {
+            const updatedLib = await this.syncUserLibraryWithCloud(stateInstance, { force: true });
+            if (typeof onChangeCallback === 'function') {
+              onChangeCallback(updatedLib);
+            }
+          } catch (err) {
+            console.warn("Aviso na sincronização automática em tempo real:", err);
+          }
+        }, 1000);
       }, (err) => {
         console.warn("Aviso no listener em tempo real da biblioteca:", err);
       });
@@ -874,8 +1007,39 @@ class CollabService {
     }
   }
 
+  // Computa hash do conteúdo real da partitura (ignora timestamp, autor e lastAction)
+  computeContentHash(pieceData) {
+    if (!pieceData) return '';
+    try {
+      const name = (pieceData.name || '').trim();
+      const bpm = pieceData.presentationBpm || pieceData.baseBpm || 120;
+      const desc = (pieceData.description || '').trim();
+      let itemsStr = '';
+      if (pieceData.items && pieceData.items.length > 0) {
+        itemsStr = pieceData.items.map(it => {
+          if (it.type === 'bossa') {
+            const innerMeasures = (it.measures || []).map(m => `${m.id || ''}:${m.beats || 4}:${m.beatUnit || 4}`).join(',');
+            return `B:${it.id || ''}:${it.name || ''}:${it.sourcePieceId || ''}:${it.isLinked ? 1 : 0}:${it.repeat || 1}:${innerMeasures}`;
+          } else {
+            const m = it.measure || it;
+            return `M:${m.id || ''}:${m.nickname || ''}:${m.beats || 4}:${m.beatUnit || 4}:${m.tempoMode || 'ratio'}:${m.ratioNum || 1}/${m.ratioDen || 1}:${m.customBpm || 120}:${m.color || ''}:${m.repeat || 1}`;
+          }
+        }).join('|');
+      }
+      const measures = (pieceData.measures || []).map(m => 
+        `${m.id || ''}:${m.nickname || ''}:${m.beats || 4}:${m.beatUnit || 4}:${m.tempoMode || 'ratio'}:${m.ratioNum || 1}/${m.ratioDen || 1}:${m.customBpm || 120}:${m.color || ''}:${m.repeat || 1}:${m.sourcePieceId || ''}:${m.isLinked ? 1 : 0}`
+      ).join('|');
+      const groups = (pieceData.groups || []).map(g => 
+        `${g.id || ''}:${g.name || ''}:${g.color || ''}:${g.startMeasure || 0}-${g.endMeasure || 0}:${g.repeat || 1}:${g.isBossaBlock ? 1 : 0}:${g.sourcePieceId || ''}`
+      ).join('|');
+      return `${name}#${bpm}#${desc}#${access}#${itemsStr}#${measures}#${groups}`;
+    } catch (_) {
+      return '';
+    }
+  }
+
   computeHash(obj) {
-    return `${obj.name}-${obj.baseBpm}-${obj.measures?.length}-${obj.groups?.length}-${obj.updatedAt}`;
+    return this.computeContentHash(obj);
   }
 
   disconnect() {
@@ -885,6 +1049,9 @@ class CollabService {
     this.stopListeningToUserLibrary();
     if (this.heartbeatTimer) { clearInterval(this.heartbeatTimer); this.heartbeatTimer = null; }
     clearTimeout(this.pendingCommitTimer);
+    clearTimeout(this.librarySyncDebounce);
+    this.lastCommittedContentHash = null;
+    this.isSyncingLibrary = false;
   }
 }
 

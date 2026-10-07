@@ -3,7 +3,7 @@
  * Permite que o app funcione completamente offline em salas de ensaio e estantes sem sinal.
  */
 
-const CACHE_NAME = 'sergio-simulator-v1';
+const CACHE_NAME = 'sergio-simulator-v2';
 
 // Recursos essenciais para pré-cache imediato
 const PRECACHE_ASSETS = [
@@ -76,7 +76,28 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Recursos estáticos (JS, CSS, Fontes, Imagens): Stale-While-Revalidate
+  // Para scripts e estilos (.js, .css), Network-First garante que atualizações do app
+  // sejam aplicadas imediatamente sem prender o usuário em bundles antigos.
+  if (url.pathname.endsWith('.js') || url.pathname.endsWith('.css')) {
+    event.respondWith(
+      fetch(event.request)
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            const clone = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+          }
+          return networkResponse;
+        })
+        .catch(async () => {
+          const cached = await caches.match(event.request);
+          if (cached) return cached;
+          return new Response('', { status: 503, statusText: 'Offline' });
+        })
+    );
+    return;
+  }
+
+  // Demais recursos estáticos (Fontes, Imagens): Stale-While-Revalidate
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       const fetchPromise = fetch(event.request)
@@ -89,7 +110,6 @@ self.addEventListener('fetch', (event) => {
         })
         .catch(() => null);
 
-      // Retorna do cache se existir, ou espera a rede se ainda não estiver em cache
       return cachedResponse || fetchPromise;
     })
   );

@@ -414,33 +414,55 @@ export class DJRunnerRenderer {
     // 1. Faixas de Grupos (apenas os visíveis)
     const groups = this.state.groups || [];
     if (groups.length > 0) {
-      const bannerHeight = 22;
-      ctx.font = "600 10.5px 'Outfit', sans-serif";
+      const bannerHeight = 18;
+      ctx.font = "bold 9.5px 'JetBrains Mono', monospace";
       ctx.textAlign = "left";
       ctx.textBaseline = "middle";
 
       for (let g = 0; g < groups.length; g++) {
         const grp = groups[g];
-        const startTiming = this.state.getFirstTimingForMeasure(grp.startMeasure);
-        const endTiming = this.state.getLastTimingForMeasure(grp.endMeasure);
-        if (!startTiming || !endTiming) continue;
+        const grpRepeat = grp.repeat || 1;
 
-        if (endTiming.endTime < visibleTimeStart || startTiming.startTime > visibleTimeEnd) continue;
+        for (let it = 0; it < grpRepeat; it++) {
+          // Busca o primeiro e último timing desta iteração do grupo
+          let startTiming = null;
+          let endTiming = null;
 
-        const grpX1 = playheadX + (startTiming.startTime - currentTime) * this.pixelsPerSecond;
-        const grpX2 = playheadX + (endTiming.endTime - currentTime) * this.pixelsPerSecond;
-        const grpW = grpX2 - grpX1;
+          for (let ti = 0; ti < timings.length; ti++) {
+            const t = timings[ti];
+            if (t.groupId === grp.id && (t.groupRepeatIteration || 0) === it) {
+              if (!startTiming) startTiming = t;
+              endTiming = t;
+            }
+          }
 
-        ctx.fillStyle = `${grp.color}18`;
-        ctx.fillRect(grpX1, 3, grpW, bannerHeight);
+          // Fallback para grupos legados ou com repetição padrão 1
+          if (!startTiming || !endTiming) {
+            if (it === 0) {
+              startTiming = this.state.getFirstTimingForMeasure(grp.startMeasure);
+              endTiming = this.state.getLastTimingForMeasure(grp.endMeasure);
+            }
+          }
 
-        ctx.fillStyle = grp.color;
-        ctx.fillRect(grpX1, 3, grpW, 2.5);
+          if (!startTiming || !endTiming) continue;
+          if (endTiming.endTime < visibleTimeStart || startTiming.startTime > visibleTimeEnd) continue;
 
-        ctx.fillStyle = isLight ? "#0f172a" : "#ffffff";
-        const textX = Math.max(grpX1 + 8, 12);
-        if (textX < grpX2 - 16) {
-          ctx.fillText(`⯈ ${grp.name}`, textX, 3 + bannerHeight / 2);
+          const grpX1 = playheadX + (startTiming.startTime - currentTime) * this.pixelsPerSecond;
+          const grpX2 = playheadX + (endTiming.endTime - currentTime) * this.pixelsPerSecond;
+          const grpW = grpX2 - grpX1;
+
+          ctx.fillStyle = `${grp.color}18`;
+          ctx.fillRect(grpX1, 3, grpW, bannerHeight);
+
+          ctx.fillStyle = grp.color;
+          ctx.fillRect(grpX1, 3, grpW, 2.5);
+
+          ctx.fillStyle = isLight ? "#0f172a" : "#ffffff";
+          const textX = Math.max(grpX1 + 8, 12);
+          if (textX < grpX2 - 16) {
+            const repTag = grpRepeat > 1 ? ` [${it + 1}/${grpRepeat}]` : '';
+            ctx.fillText(`⯈ ${grp.name}${repTag}`, textX, 3 + bannerHeight / 2);
+          }
         }
       }
     }
@@ -512,20 +534,32 @@ export class DJRunnerRenderer {
         ctx.fillRect(mX, topY, mW, 38);
       }
 
-      // Sinalização musical de repetição (pontos de repetição nas bordas do bloco)
-      if (t.repeatCount > 1) {
+      // Sinalização musical de repetição (pontos de repetição nas bordas do bloco ou grupo)
+      const grp = this.state.getGroupByMeasureIndex ? this.state.getGroupByMeasureIndex(t.measureIndex) : null;
+      const isGroupStart = grp && grp.startMeasure === t.measureIndex && (t.repeatIteration === 0);
+      const isGroupEnd = grp && grp.endMeasure === t.measureIndex && (t.repeatIteration === t.repeatCount - 1);
+      const showGroupRepeatLeft = isGroupStart && (t.groupRepeatCount > 1);
+      const showGroupRepeatRight = isGroupEnd && (t.groupRepeatCount > 1);
+
+      if (t.repeatCount > 1 || showGroupRepeatLeft || showGroupRepeatRight) {
         ctx.fillStyle = mColor;
-        if (t.repeatIteration === 0) {
+        if (t.repeatIteration === 0 || showGroupRepeatLeft) {
           ctx.beginPath();
           ctx.arc(mX + 8, midY - 6, 2.2, 0, Math.PI * 2);
           ctx.arc(mX + 8, midY + 6, 2.2, 0, Math.PI * 2);
           ctx.fill();
+          if (showGroupRepeatLeft) {
+            ctx.fillRect(mX + 2, topY, 2, blockH);
+          }
         }
-        if (t.repeatIteration === t.repeatCount - 1) {
+        if (t.repeatIteration === t.repeatCount - 1 || showGroupRepeatRight) {
           ctx.beginPath();
           ctx.arc(mX + mW - 8, midY - 6, 2.2, 0, Math.PI * 2);
           ctx.arc(mX + mW - 8, midY + 6, 2.2, 0, Math.PI * 2);
           ctx.fill();
+          if (showGroupRepeatRight) {
+            ctx.fillRect(mX + mW - 4, topY, 2, blockH);
+          }
         }
       }
 
@@ -575,7 +609,9 @@ export class DJRunnerRenderer {
       ctx.textBaseline = "middle";
 
       const hasNickname = !!(m.nickname && m.nickname.trim());
-      const repeatTag = (t.repeatCount > 1) ? ` [${t.repeatIteration + 1}/${t.repeatCount}]` : '';
+      const repeatTag = (t.repeatCount > 1) 
+        ? ` [${t.repeatIteration + 1}/${t.repeatCount}]` 
+        : (t.groupRepeatCount > 1 ? ` [${t.groupRepeatIteration + 1}/${t.groupRepeatCount}]` : '');
 
       if (hasNickname) {
         // Tag c. X discreta com repetição acima
@@ -634,7 +670,9 @@ export class DJRunnerRenderer {
       const showTrackBpm = (isFirstMeasure || isBpmDiff || isRatioDiff || isModeDiff) && t.repeatIteration === 0;
 
       const tempoFoot = showTrackBpm ? ` • ${tempoText}` : '';
-      const repFootText = (t.repeatCount > 1) ? ` • rep. ${t.repeatIteration + 1}/${t.repeatCount}` : '';
+      const repFootText = (t.repeatCount > 1) 
+        ? ` • rep. ${t.repeatIteration + 1}/${t.repeatCount}` 
+        : (t.groupRepeatCount > 1 ? ` • grp ${t.groupRepeatIteration + 1}/${t.groupRepeatCount}` : '');
 
       if (tempoFoot || repFootText) {
         ctx.fillStyle = isLight ? "rgba(15, 23, 42, 0.55)" : "rgba(255, 255, 255, 0.4)";
@@ -741,14 +779,34 @@ export class DJRunnerRenderer {
       const groups = this.state.groups || [];
       for (let g = 0; g < groups.length; g++) {
         const grp = groups[g];
-        const st = this.state.getFirstTimingForMeasure(grp.startMeasure);
-        const et = this.state.getLastTimingForMeasure(grp.endMeasure);
-        if (!st || !et) continue;
+        const grpRepeat = grp.repeat || 1;
 
-        const gx1 = (st.startTime / totalDuration) * w;
-        const gx2 = (et.endTime / totalDuration) * w;
-        ctx.fillStyle = grp.color;
-        ctx.fillRect(gx1, 0, gx2 - gx1, 2.5);
+        for (let it = 0; it < grpRepeat; it++) {
+          let startTiming = null;
+          let endTiming = null;
+
+          for (let ti = 0; ti < timings.length; ti++) {
+            const t = timings[ti];
+            if (t.groupId === grp.id && (t.groupRepeatIteration || 0) === it) {
+              if (!startTiming) startTiming = t;
+              endTiming = t;
+            }
+          }
+
+          if (!startTiming || !endTiming) {
+            if (it === 0) {
+              startTiming = this.state.getFirstTimingForMeasure(grp.startMeasure);
+              endTiming = this.state.getLastTimingForMeasure(grp.endMeasure);
+            }
+          }
+
+          if (!startTiming || !endTiming) continue;
+
+          const gx1 = (startTiming.startTime / totalDuration) * w;
+          const gx2 = (endTiming.endTime / totalDuration) * w;
+          ctx.fillStyle = grp.color;
+          ctx.fillRect(gx1, 0, Math.max(1.5, gx2 - gx1), 2.5);
+        }
       }
     }
 
