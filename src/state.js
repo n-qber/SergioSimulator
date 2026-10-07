@@ -19,6 +19,11 @@ class PieceState {
     this.maxUndoSteps = 150;
     this.isUndoingOrRedoing = false;
     this.currentSnapshot = null;
+    this.items = [];
+    this.measures = [];
+    this.groups = [];
+    this.computedGroups = [];
+    this.measureTimings = [];
     this.loadInitialState();
   }
 
@@ -1564,7 +1569,7 @@ class PieceState {
   // Retorna o grupo ao qual pertence o compasso, se houver
   getGroupByMeasureIndex(measureIndex) {
     if (measureIndex < 0 || this.measures.length === 0) return null;
-    return this.groups.find(g => measureIndex >= g.startMeasure && measureIndex <= g.endMeasure) || null;
+    return (this.groups || []).find(g => typeof g.startMeasure === 'number' && g.startMeasure >= 0 && measureIndex >= g.startMeasure && measureIndex <= g.endMeasure) || null;
   }
 
   // Retorna o primeiro timing (repetição 0) de um compasso (O(1))
@@ -1754,6 +1759,7 @@ class PieceState {
     if (!Array.isArray(this.items) || this.items.length === 0) {
       this.measures = [];
       this.groups = [];
+      this.computedGroups = [];
       this.totalDuration = 0;
       return;
     }
@@ -1845,14 +1851,15 @@ class PieceState {
       const blockEndMeasureIdx = flattenedMeasures.length - 1;
 
       // Se este bloco possui uma seção identificadora
-      if (block.section && blockEndMeasureIdx >= blockStartMeasureIdx) {
+      if (block.section) {
+        const hasBlockMeasures = blockEndMeasureIdx >= blockStartMeasureIdx;
         const secRepeat = Math.max(1, Math.min(999, parseInt(block.section.repeat, 10) || 1));
         computedGroups.push({
           id: block.section.id,
           name: block.section.name || 'Seção',
           color: block.section.color || '#3b82f6',
-          startMeasure: blockStartMeasureIdx,
-          endMeasure: blockEndMeasureIdx,
+          startMeasure: hasBlockMeasures ? blockStartMeasureIdx : -1,
+          endMeasure: hasBlockMeasures ? blockEndMeasureIdx : -1,
           repeat: secRepeat,
           repeatVariable: block.section.repeatVariable || null,
           isBossaBlock: false
@@ -2051,6 +2058,7 @@ class PieceState {
 
     this.measures = flattenedMeasures;
     this.groups = computedGroups;
+    this.computedGroups = computedGroups;
     this.totalDuration = accumulatedTime;
   }
 

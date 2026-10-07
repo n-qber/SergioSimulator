@@ -2536,13 +2536,14 @@ class SergioApp {
   // =========================================================================
 
   createSectionHeaderElement(sec, itemIdx) {
-    const grp = state.computedGroups.find(g => g.id === sec.id);
-    const hasMeasures = (grp && grp.startMeasure <= grp.endMeasure);
+    const groupsList = state.groups || state.computedGroups || [];
+    const grp = groupsList.find(g => g.id === sec.id);
+    const hasMeasures = Boolean(grp && typeof grp.startMeasure === 'number' && typeof grp.endMeasure === 'number' && grp.startMeasure >= 0 && grp.startMeasure <= grp.endMeasure);
     const count = hasMeasures ? (grp.endMeasure - grp.startMeasure + 1) : 0;
     const secColor = sec.color || '#3b82f6';
 
     let secDurationSec = 0;
-    if (grp) {
+    if (grp && Array.isArray(state.measureTimings)) {
       const timings = state.measureTimings.filter(t => t.groupId === sec.id);
       if (timings.length > 0) {
         timings.forEach(t => secDurationSec += t.duration);
