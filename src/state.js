@@ -141,7 +141,8 @@ class PieceState {
             name: (it.name || 'Seção').trim(),
             color: it.color || '#3b82f6',
             repeat: Math.max(1, Math.min(999, parseInt(it.repeat, 10) || 1)),
-            repeatVariable: it.repeatVariable ? String(it.repeatVariable).trim() : null
+            repeatVariable: it.repeatVariable ? String(it.repeatVariable).trim() : null,
+            collapsed: Boolean(it.collapsed)
           };
         }
         return {
@@ -1112,7 +1113,8 @@ class PieceState {
       name: defaultName,
       color: defaultColor,
       repeat: repeat,
-      repeatVariable: options.repeatVariable ? String(options.repeatVariable).trim() : null
+      repeatVariable: options.repeatVariable ? String(options.repeatVariable).trim() : null,
+      collapsed: Boolean(options.collapsed)
     };
 
     const insertIdx = (itemIndex === -1 || itemIndex === undefined || itemIndex > this.items.length)
@@ -1134,9 +1136,20 @@ class PieceState {
     if (updates.color !== undefined) sec.color = updates.color;
     if (updates.repeat !== undefined) sec.repeat = Math.max(1, Math.min(999, parseInt(updates.repeat, 10) || 1));
     if (updates.repeatVariable !== undefined) sec.repeatVariable = updates.repeatVariable ? String(updates.repeatVariable).trim() : null;
+    if (updates.collapsed !== undefined) sec.collapsed = Boolean(updates.collapsed);
 
     this.recalculateTimings();
     this.notify(`Atualizou seção '${sec.name}'`, isLocalOnly);
+  }
+
+  // Alternar recolher/expandir divisor de seção
+  toggleSectionCollapse(sectionId) {
+    const sec = this.items.find(it => it.id === sectionId && it.type === 'section');
+    if (!sec) return false;
+    sec.collapsed = !sec.collapsed;
+    this.recalculateTimings();
+    this.notify(`${sec.collapsed ? 'Recolheu' : 'Expandiu'} seção '${sec.name}'`, false);
+    return true;
   }
 
   // Remover apenas a linha divisória da seção (desagrupar mantendo os compassos na peça)
@@ -1862,6 +1875,7 @@ class PieceState {
           endMeasure: hasBlockMeasures ? blockEndMeasureIdx : -1,
           repeat: secRepeat,
           repeatVariable: block.section.repeatVariable || null,
+          collapsed: Boolean(block.section.collapsed),
           isBossaBlock: false
         });
       }

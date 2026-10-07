@@ -2218,7 +2218,7 @@ button {
 /* Grade de Cartões */
 .measures-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
   gap: 10px;
 }
 
@@ -2292,6 +2292,9 @@ button {
   cursor: pointer;
   box-shadow: var(--shadow-sm);
   transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+  box-sizing: border-box;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .measure-card:hover {
@@ -2614,27 +2617,36 @@ button {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 6px;
+  flex-wrap: wrap;
+  row-gap: 6px;
+  column-gap: 4px;
   padding-top: 6px;
   border-top: 1px solid var(--border-light);
   margin-top: 2px;
+  box-sizing: border-box;
+  width: 100%;
 }
 
 .card-actions-secondary {
   display: flex;
   align-items: center;
-  gap: 3px;
+  flex-wrap: wrap;
+  gap: 2px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .btn-card-icon {
-  font-size: 0.74rem;
-  padding: 4px 6px;
+  font-size: 0.72rem;
+  padding: 3px 5px;
   border-radius: 4px;
   color: var(--white-muted);
   background: transparent;
   border: 1px solid transparent;
   transition: all 0.15s ease;
   line-height: 1;
+  box-sizing: border-box;
+  flex-shrink: 0;
 }
 
 .btn-card-icon:hover {
@@ -2647,17 +2659,26 @@ button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 5px;
+  gap: 4px;
   background: rgba(244, 63, 94, 0.14);
   color: var(--red-primary);
   font-weight: 700;
-  font-size: 0.78rem;
-  padding: 5px 11px;
+  font-size: 0.74rem;
+  padding: 4px 8px;
   border-radius: 6px;
   border: 1.5px solid rgba(244, 63, 94, 0.38);
   box-shadow: 0 1px 4px rgba(244, 63, 94, 0.12);
   transition: all 0.18s ease;
   cursor: pointer;
+  white-space: nowrap;
+  box-sizing: border-box;
+  max-width: 100%;
+  margin-left: auto;
+}
+
+.btn-card-edit-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -6271,7 +6292,7 @@ kbd {
 
 .bossa-inner-measures-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 10px;
 }
 
@@ -6757,6 +6778,44 @@ kbd {
   box-shadow: var(--shadow-sm);
   transition: all 0.2s ease;
   user-select: none;
+}
+
+/* Seção recolhida (contraída para economizar espaço) */
+.section-block-header.is-collapsed {
+  background: rgba(59, 130, 246, 0.08);
+  border-color: rgba(59, 130, 246, 0.35);
+  margin-bottom: 8px;
+  padding: 8px 14px;
+}
+
+.section-block-header.is-collapsed:hover {
+  background: rgba(59, 130, 246, 0.14);
+  border-color: rgba(59, 130, 246, 0.55);
+}
+
+.section-block-header.active-playback {
+  border-color: var(--section-color, #3b82f6) !important;
+  box-shadow: 0 0 16px rgba(59, 130, 246, 0.55), inset 0 0 8px rgba(59, 130, 246, 0.2) !important;
+}
+
+.btn-toggle-sec-collapse {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 5px;
+  color: var(--white-muted);
+  cursor: pointer;
+  padding: 3px 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.18s ease;
+  line-height: 1;
+}
+
+.btn-toggle-sec-collapse:hover {
+  background: rgba(59, 130, 246, 0.25);
+  color: var(--white-pure);
+  border-color: #3b82f6;
 }
 
 .section-block-header.is-drag-source {
@@ -7519,6 +7578,23 @@ kbd {
 [data-theme="light"] .section-block-header {
   background: #ffffff;
   border-color: #e2e8f0;
+}
+
+[data-theme="light"] .section-block-header.is-collapsed {
+  background: rgba(59, 130, 246, 0.06);
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+[data-theme="light"] .btn-toggle-sec-collapse {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  color: #475569;
+}
+
+[data-theme="light"] .btn-toggle-sec-collapse:hover {
+  background: rgba(59, 130, 246, 0.15);
+  color: #1e40af;
+  border-color: #3b82f6;
 }
 
 [data-theme="light"] .input-section-name {

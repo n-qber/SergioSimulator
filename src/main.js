@@ -2560,7 +2560,7 @@ class SergioApp {
       : '';
 
     const el = document.createElement('div');
-    el.className = 'section-block-header';
+    el.className = `section-block-header ${sec.collapsed ? 'is-collapsed' : ''}`;
     el.setAttribute('draggable', 'true');
     el.setAttribute('data-section-id', sec.id);
     el.setAttribute('data-item-index', itemIdx);
@@ -2569,6 +2569,9 @@ class SergioApp {
     el.innerHTML = `
       <div class="section-header-left">
         <span class="section-drag-handle" title="Arraste para reposicionar esta seção inteira na peça">⠿</span>
+        <button type="button" class="btn-toggle-sec-collapse" title="${sec.collapsed ? 'Expandir seção' : 'Recolher seção'}">
+          ${iconSvg(sec.collapsed ? 'chevron-right' : 'chevron-down', { size: 14 })}
+        </button>
         <label class="section-color-label" title="Alterar cor da seção">
           <input type="color" class="input-section-color" value="${secColor}">
           <span class="section-color-pip" style="background:${secColor}"></span>
@@ -2580,6 +2583,10 @@ class SergioApp {
         ${repeatTagHtml}
       </div>
       <div class="section-header-actions">
+        <button type="button" class="btn-sec-action btn-sec-toggle-collapse" title="${sec.collapsed ? 'Expandir compassos desta seção' : 'Recolher compassos desta seção'}">
+          ${iconSvg(sec.collapsed ? 'chevron-down' : 'chevron-up', { size: 13 })}
+          <span>${sec.collapsed ? `Expandir (${count})` : 'Recolher'}</span>
+        </button>
         <div class="section-repeat-stepper-wrap" title="Número de vezes que esta seção se repete na peça">
           <span class="card-stepper-label">Repetir:</span>
           <div class="repeat-stepper">
@@ -2698,6 +2705,31 @@ class SergioApp {
       this.renderMeasuresList();
       this.showToast(`Divisor de seção '${sec.name}' removido.`, '✕');
     });
+
+    // Alternar recolher/expandir seção
+    const handleToggleCollapse = (e) => {
+      e.stopPropagation();
+      state.toggleSectionCollapse(sec.id);
+      this.renderMeasuresList();
+    };
+
+    el.querySelector('.btn-toggle-sec-collapse')?.addEventListener('click', handleToggleCollapse);
+    el.querySelector('.btn-sec-toggle-collapse')?.addEventListener('click', handleToggleCollapse);
+
+    // Duplo clique na barra da seção alterna recolhimento
+    el.addEventListener('dblclick', (e) => {
+      if (e.target.closest('input, button, select, textarea, .repeat-stepper, .section-color-label')) return;
+      handleToggleCollapse(e);
+    });
+
+    if (sec.collapsed && hasMeasures) {
+      el.addEventListener('click', (e) => {
+        if (e.target.closest('input, button, select, textarea, .repeat-stepper, .section-color-label, .section-drag-handle')) return;
+        this.handleMeasureSelected(grp.startMeasure);
+        const t = state.getFirstTimingForMeasure(grp.startMeasure);
+        if (t) this.seekTo(t.startTime);
+      });
+    }
 
     // Drag & Drop no divisor de seção
     el.addEventListener('dragstart', (e) => {
@@ -3167,9 +3199,34 @@ class SergioApp {
       return;
     }
 
+    let activeSection = null;
+    let activeSectionHeaderEl = null;
+
     items.forEach((item, itemIdx) => {
       if (item.type === 'section') {
-        grid.appendChild(this.createSectionHeaderElement(item, itemIdx));
+        activeSection = item;
+        activeSectionHeaderEl = this.createSectionHeaderElement(item, itemIdx);
+        grid.appendChild(activeSectionHeaderEl);
+        return;
+      }
+
+      // Se a seção atual está recolhida, oculta os cartões dos compassos / bossas desta seção,
+      // mas mapeia seus índices para o cabeçalho da seção no cache de playback para feedback visual
+      if (activeSection && activeSection.collapsed) {
+        if (item.type === 'bossa') {
+          const bossaMeasures = measures.filter(m => m._itemIndex === itemIdx);
+          bossaMeasures.forEach(m => {
+            const mIdx = measures.indexOf(m);
+            if (mIdx >= 0 && activeSectionHeaderEl) {
+              this.cachedCards[mIdx] = activeSectionHeaderEl;
+            }
+          });
+        } else {
+          const mIdx = measures.findIndex(m => m._itemIndex === itemIdx);
+          if (mIdx >= 0 && activeSectionHeaderEl) {
+            this.cachedCards[mIdx] = activeSectionHeaderEl;
+          }
+        }
         return;
       }
 
@@ -3725,117 +3782,6 @@ class SergioApp {
         const mIdx = measures.findIndex(m => m._itemIndex === itemIdx);
         const actualIdx = (mIdx >= 0 ? mIdx : 0);
         const m = (mIdx >= 0 ? measures[mIdx] : null) || item;
-
-        // Seção / Grupo comum (se houver)
-        const grp = state.getGroupByMeasureIndex(actualIdx);
-        if (grp && !grp.isBossaBlock && grp.startMeasure === actualIdx) {
-          const groupBlockHeader = document.createElement('div');
-          groupBlockHeader.className = 'group-block-header';
-          groupBlockHeader.setAttribute('draggable', 'true');
-          groupBlockHeader.setAttribute('data-group-id', grp.id);
-          const gColor = grp.color || '#3b82f6';
-          groupBlockHeader.style.setProperty('--group-color', gColor);
-          const count = (grp.endMeasure - grp.startMeasure) + 1;
-
-          let groupDurationSec = 0;
-          const groupTimings = state.measureTimings.filter(t => t.groupId === grp.id);
-          if (groupTimings.length > 0) {
-            groupTimings.forEach(t => groupDurationSec += t.duration);
-          } else {
-            for (let gi = grp.startMeasure; gi <= grp.endMeasure; gi++) {
-              const mTimings = state.measureTimings.filter(t => t.measureIndex === gi);
-              mTimings.forEach(t => groupDurationSec += t.duration);
-            }
-          }
-          const groupDurationStr = this.formatFriendlyDuration(groupDurationSec);
-          const groupRepeatTagHtml = (grp.repeat || 1) > 1
-            ? `<span class="measure-card-repeat-tag" title="Esta seção se repete ${grp.repeat} vezes na peça">×${grp.repeat}</span>`
-            : '';
-
-          groupBlockHeader.innerHTML = `
-            <div class="group-block-header-info">
-              <span class="group-drag-handle" title="Arraste para reposicionar o grupo inteiro na peça">⠿</span>
-              <span class="group-block-header-badge" style="background:${gColor}25; color:${gColor}">
-                ${iconSvg('tag', { size: 12 })} Seção / Grupo
-              </span>
-              <span class="group-block-header-title">${grp.name}</span>
-              <span class="group-block-header-range">c. ${grp.startMeasure + 1} a ${grp.endMeasure + 1} (${count} ${count === 1 ? 'compasso' : 'compassos'})</span>
-              <span class="group-block-header-time" title="Tempo total desta seção na peça: ${groupDurationStr}">${iconSvg('clock', { size: 13 })} ${groupDurationStr}</span>
-              ${groupRepeatTagHtml}
-            </div>
-            <div class="group-block-header-actions">
-              <div class="group-repeat-stepper-wrap" title="Número de vezes que esta seção se repete na peça">
-                <span class="card-stepper-label">Repetir:</span>
-                <div class="repeat-stepper">
-                  <button type="button" class="btn-repeat-step btn-group-repeat-minus" title="Diminuir repetições do grupo">-</button>
-                  <input type="number" class="input-card-repeat input-group-repeat" min="1" max="999" value="${grp.repeat || 1}" title="Número de vezes que esta seção se repete">
-                  <button type="button" class="btn-repeat-step btn-group-repeat-plus" title="Aumentar repetições do grupo">+</button>
-                </div>
-              </div>
-              <button type="button" class="btn-group-block-action btn-move-group-left" title="Mover seção inteira para trás (←)" ${grp.startMeasure === 0 ? 'disabled style="opacity:0.35;pointer-events:none"' : ''}>
-                ${iconSvg('arrow-left', { size: 13 })} Mover
-              </button>
-              <button type="button" class="btn-group-block-action btn-move-group-right" title="Mover seção inteira para frente (→)" ${grp.endMeasure >= measures.length - 1 ? 'disabled style="opacity:0.35;pointer-events:none"' : ''}>
-                Mover ${iconSvg('arrow-right', { size: 13 })}
-              </button>
-              <button type="button" class="btn-group-block-action btn-ungroup-action" title="Desagrupar esta seção">
-                ${iconSvg('trash-2', { size: 13 })} Desagrupar
-              </button>
-            </div>
-          `;
-
-          const btnGrpRepMinus = groupBlockHeader.querySelector('.btn-group-repeat-minus');
-          const btnGrpRepPlus = groupBlockHeader.querySelector('.btn-group-repeat-plus');
-          const inputGrpRep = groupBlockHeader.querySelector('.input-group-repeat');
-          if (inputGrpRep) {
-            const updateGrpRep = (newVal) => {
-              const val = Math.max(1, Math.min(999, parseInt(newVal, 10) || 1));
-              if (val !== grp.repeat) {
-                state.updateGroup(grp.id, { repeat: val });
-                this.renderMeasuresList();
-              }
-            };
-            inputGrpRep.addEventListener('click', (e) => e.stopPropagation());
-            inputGrpRep.addEventListener('mousedown', (e) => e.stopPropagation());
-            inputGrpRep.addEventListener('change', (e) => { e.stopPropagation(); updateGrpRep(e.target.value); });
-            inputGrpRep.addEventListener('blur', (e) => { e.stopPropagation(); updateGrpRep(e.target.value); });
-            btnGrpRepMinus?.addEventListener('click', (e) => {
-              e.stopPropagation();
-              const cur = parseInt(inputGrpRep.value, 10) || 1;
-              if (cur > 1) updateGrpRep(cur - 1);
-            });
-            btnGrpRepPlus?.addEventListener('click', (e) => {
-              e.stopPropagation();
-              const cur = parseInt(inputGrpRep.value, 10) || 1;
-              if (cur < 999) updateGrpRep(cur + 1);
-            });
-          }
-
-          groupBlockHeader.querySelector('.btn-move-group-left')?.addEventListener('click', (e) => {
-            e.stopPropagation();
-            if (state.moveGroupLeft(grp.id)) {
-              this.renderMeasuresList();
-              this.showToast(`Seção '${grp.name}' movida para trás!`, '🏷️');
-            }
-          });
-
-          groupBlockHeader.querySelector('.btn-move-group-right')?.addEventListener('click', (e) => {
-            e.stopPropagation();
-            if (state.moveGroupRight(grp.id)) {
-              this.renderMeasuresList();
-              this.showToast(`Seção '${grp.name}' movida para frente!`, '🏷️');
-            }
-          });
-
-          groupBlockHeader.querySelector('.btn-ungroup-action')?.addEventListener('click', (e) => {
-            e.stopPropagation();
-            state.removeGroup(grp.id);
-            this.renderMeasuresList();
-            this.showToast(`Seção '${grp.name}' desagrupada.`, '✕');
-          });
-
-          grid.appendChild(groupBlockHeader);
-        }
 
         const card = this.createMeasureCardElement(m, actualIdx, null);
         card.dataset.itemIndex = itemIdx;

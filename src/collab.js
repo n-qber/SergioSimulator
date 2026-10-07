@@ -495,7 +495,8 @@ class CollabService {
                 name: (it.name || 'Seção').trim(),
                 color: it.color || '#3b82f6',
                 repeat: Math.max(1, Math.min(999, parseInt(it.repeat, 10) || 1)),
-                repeatVariable: it.repeatVariable ? String(it.repeatVariable).trim() : null
+                repeatVariable: it.repeatVariable ? String(it.repeatVariable).trim() : null,
+                collapsed: Boolean(it.collapsed)
               };
             }
             return {
@@ -1044,7 +1045,7 @@ class CollabService {
             const varsStr = JSON.stringify(it.variableValues || {});
             return `B:${it.id || ''}:${it.name || ''}:${it.sourcePieceId || ''}:${it.isLinked ? 1 : 0}:${it.repeat || 1}:${it.tempoMode || 'inherit'}:${it.bpm || ''}:${it.ratioNum || 1}/${it.ratioDen || 1}:${varsStr}:${innerMeasures}`;
           } else if (it.type === 'section') {
-            return `S:${it.id || ''}:${it.name || ''}:${it.color || ''}:${it.repeat || 1}:${it.repeatVariable || ''}`;
+            return `S:${it.id || ''}:${it.name || ''}:${it.color || ''}:${it.repeat || 1}:${it.repeatVariable || ''}:${it.collapsed ? 1 : 0}`;
           } else {
             const m = it.measure || it;
             return `M:${m.id || ''}:${m.nickname || ''}:${m.beats || 4}:${m.beatUnit || 4}:${m.tempoMode || 'ratio'}:${m.ratioNum || 1}/${m.ratioDen || 1}:${m.customBpm || 120}:${m.color || ''}:${m.repeat || 1}:${m.repeatVariable || ''}`;
