@@ -120,20 +120,37 @@ class SergioApp {
     // Pré-gera a peça toda na memória RAM (~5ms)
     this.preparePieceAudio();
 
-    // Pré-ativação do AudioContext no primeiro toque/clique do usuário
-    const unlockAudio = () => {
-      audio.init();
-      window.removeEventListener('pointerdown', unlockAudio);
-      window.removeEventListener('keydown', unlockAudio);
+    // Pré-ativação universal do AudioContext em múltiplos eventos de toque/clique (iOS Safari e Android)
+    const unlockAudioHandler = () => {
+      audio.unlock();
+      if (audio.ctx && audio.ctx.state === 'running') {
+        window.removeEventListener('touchstart', unlockAudioHandler);
+        window.removeEventListener('touchend', unlockAudioHandler);
+        window.removeEventListener('pointerdown', unlockAudioHandler);
+        window.removeEventListener('click', unlockAudioHandler);
+        window.removeEventListener('keydown', unlockAudioHandler);
+      }
     };
-    window.addEventListener('pointerdown', unlockAudio);
-    window.addEventListener('keydown', unlockAudio);
+    window.addEventListener('touchstart', unlockAudioHandler, { passive: true });
+    window.addEventListener('touchend', unlockAudioHandler, { passive: true });
+    window.addEventListener('pointerdown', unlockAudioHandler, { passive: true });
+    window.addEventListener('click', unlockAudioHandler, { passive: true });
+    window.addEventListener('keydown', unlockAudioHandler, { passive: true });
 
-    // Sincronização em segundo plano: o listener em tempo real já cobre mudanças remotas,
-    // então aqui só fazemos um refresh ao voltar para a aba/reconectar (throttled no collab).
+    // Sincronização em segundo plano e reativação de áudio ao voltar para a aba no mobile
     const backgroundSync = () => {
-      if (!document.hidden && this.authService && this.authService.isLoggedIn()) {
-        this.handleSyncBossas(false);
+      if (!document.hidden) {
+        audio.unlock();
+        if (this.isPlaying && audio.ctx && audio.ctx.state !== 'running') {
+          audio.init().then(() => {
+            if (this.isPlaying) {
+              this.startAudioSource(this.getCurrentPlaybackTime());
+            }
+          }).catch(() => {});
+        }
+        if (this.authService && this.authService.isLoggedIn()) {
+          this.handleSyncBossas(false);
+        }
       }
     };
     document.addEventListener('visibilitychange', backgroundSync);
@@ -594,23 +611,35 @@ class SergioApp {
   // =========================================================================
 
   async preparePieceAudio(forceRestart = false) {
-    if (this.isRenderingBuffer) {
+    if (this._renderBufferPromise) {
       this.pendingBufferRegen = true;
+      await this._renderBufferPromise;
+      if (this.pendingBufferRegen) {
+        this.pendingBufferRegen = false;
+        return this.preparePieceAudio(forceRestart);
+      }
+      if (this.isPlaying && forceRestart && audio.ctx) {
+        const curTime = this.getCurrentPlaybackTime();
+        this.startAudioSource(curTime);
+      }
       return;
     }
-    this.isRenderingBuffer = true;
 
-    try {
-      this.pieceAudioBuffer = await audio.renderPieceBuffer(
-        state.measureTimings,
-        state.totalDuration,
-        audio.soundType
-      );
-    } catch (err) {
-      console.error("Erro ao pré-renderizar buffer de áudio:", err);
-    } finally {
-      this.isRenderingBuffer = false;
-    }
+    this._renderBufferPromise = (async () => {
+      try {
+        this.pieceAudioBuffer = await audio.renderPieceBuffer(
+          state.measureTimings,
+          state.totalDuration,
+          audio.soundType
+        );
+      } catch (err) {
+        console.error("Erro ao pré-renderizar buffer de áudio:", err);
+      } finally {
+        this._renderBufferPromise = null;
+      }
+    })();
+
+    await this._renderBufferPromise;
 
     if (this.pendingBufferRegen) {
       this.pendingBufferRegen = false;
@@ -624,7 +653,15 @@ class SergioApp {
   }
 
   startAudioSource(offsetSeconds) {
-    if (!audio.ctx || !this.pieceAudioBuffer) return;
+    if (!audio.ctx) return;
+    if (!this.pieceAudioBuffer) {
+      this.preparePieceAudio().then(() => {
+        if (this.isPlaying && this.pieceAudioBuffer) {
+          this.startAudioSource(offsetSeconds);
+        }
+      });
+      return;
+    }
     const offset = Math.max(0, Math.min(state.totalDuration, offsetSeconds));
 
     // Lookahead de 25ms para sincronização precisa entre o hardware de áudio e a tela
@@ -653,6 +690,7 @@ class SergioApp {
 
   async startPlayback() {
     if (state.measures.length === 0) return;
+    audio.unlock();
     await audio.init();
     if (this.isPlaying) return;
 
@@ -662,6 +700,12 @@ class SergioApp {
 
     if (!this.pieceAudioBuffer || (audio.ctx && this.pieceAudioBuffer.sampleRate !== audio.ctx.sampleRate)) {
       await this.preparePieceAudio();
+    }
+
+    if (audio.ctx && audio.ctx.state !== 'running') {
+      try {
+        await audio.ctx.resume();
+      } catch (_) {}
     }
 
     this.isPlaying = true;
@@ -678,6 +722,7 @@ class SergioApp {
   }
 
   togglePlayPause() {
+    audio.unlock();
     if (this.isPlaying) {
       this.pausePlayback();
     } else {
@@ -1005,7 +1050,10 @@ class SergioApp {
     this.dom.tabNavPiece?.addEventListener('click', () => this.setMobileTab('piece'));
     this.dom.tabNavBossas?.addEventListener('click', () => this.setMobileTab('bossas'));
 
-    this.dom.btnFloatingPlay?.addEventListener('click', () => this.togglePlayPause());
+    this.dom.btnFloatingPlay?.addEventListener('click', () => {
+      audio.unlock();
+      this.togglePlayPause();
+    });
   }
 
   setMobileTab(tab) {
@@ -1333,7 +1381,10 @@ class SergioApp {
     });
 
     // Transporte
-    this.dom.btnPlayPause.addEventListener('click', () => this.togglePlayPause());
+    this.dom.btnPlayPause.addEventListener('click', () => {
+      audio.unlock();
+      this.togglePlayPause();
+    });
     this.dom.btnStopRewind.addEventListener('click', () => this.stopPlayback());
 
     this.dom.btnPrevMeasure.addEventListener('click', () => {

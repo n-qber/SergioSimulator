@@ -16,34 +16,102 @@ class PercussionAudioEngine {
     this.volume = 0.8;
     this.soundType = "woodblock"; // 'woodblock', 'clave', 'click', 'beep'
     this.clickCache = {};
+    this._silentAudio = null;
 
     if (typeof window !== 'undefined') {
       try {
-        const AudioCtx = window.AudioContext || window.webkitAudioContext;
-        if (AudioCtx) {
-          this.ctx = new AudioCtx({ latencyHint: 'interactive' });
-          this.masterGain = this.ctx.createGain();
-          this.masterGain.gain.setValueAtTime(this.isMuted ? 0 : this.volume, this.ctx.currentTime);
-          this.masterGain.connect(this.ctx.destination);
-        }
+        this.createContext();
+      } catch (_) {}
+    }
+  }
+
+  createContext() {
+    if (typeof window === 'undefined') return null;
+    if (this.ctx && this.ctx.state !== 'closed') return this.ctx;
+
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return null;
+
+    let ctx = null;
+    try {
+      ctx = new AudioCtx({ latencyHint: 'interactive' });
+    } catch (_) {
+      try {
+        ctx = new AudioCtx();
+      } catch (e) {
+        console.warn('Falha ao instanciar AudioContext:', e);
+      }
+    }
+
+    if (ctx) {
+      this.ctx = ctx;
+      try {
+        this.masterGain = ctx.createGain();
+        this.masterGain.gain.setValueAtTime(this.isMuted ? 0 : this.volume, ctx.currentTime);
+        this.masterGain.connect(ctx.destination);
+      } catch (_) {}
+    }
+    return this.ctx;
+  }
+
+  /**
+   * Desbloqueio universal para Mobile (iOS Safari / WebKit e Android Chrome):
+   * 1. Ativa audioSession 'playback' (iOS 15+)
+   * 2. Toca um micro-som HTML5 silencioso (faz o iOS Safari ignorar a chave física de mudo do iPhone)
+   * 3. Executa resume() no AudioContext
+   * 4. Toca um buffer mudo de 1 amostra via WebAudio (conecta o hardware no WebKit)
+   */
+  unlock() {
+    if (typeof window === 'undefined') return;
+
+    // 1. iOS 15+ AudioSession API para ignorar chave física de mudo
+    if (typeof navigator !== 'undefined' && 'audioSession' in navigator) {
+      try {
+        navigator.audioSession.type = 'playback';
+      } catch (_) {}
+    }
+
+    // 2. Elemento <audio> silencioso para contornar chave de mudo no iOS
+    try {
+      if (!this._silentAudio) {
+        this._silentAudio = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAP8A');
+        this._silentAudio.preload = 'auto';
+      }
+      this._silentAudio.play().catch(() => {});
+    } catch (_) {}
+
+    // 3. Garante contexto de áudio instanciado
+    if (!this.ctx || this.ctx.state === 'closed') {
+      this.createContext();
+    }
+
+    if (this.ctx) {
+      // 4. Resume se não estiver rodando (cobre 'suspended' e 'interrupted' no iOS)
+      if (this.ctx.state !== 'running') {
+        try {
+          this.ctx.resume().catch(() => {});
+        } catch (_) {}
+      }
+
+      // 5. Buffer mudo de 1 amostra para forçar o WebKit a ligar o DAC no primeiro toque
+      try {
+        const dummyBuf = this.ctx.createBuffer(1, 1, 22050);
+        const dummySrc = this.ctx.createBufferSource();
+        dummySrc.buffer = dummyBuf;
+        dummySrc.connect(this.ctx.destination);
+        dummySrc.start(0);
       } catch (_) {}
     }
   }
 
   async init() {
-    if (!this.ctx) {
-      const AudioCtx = window.AudioContext || window.webkitAudioContext;
-      if (AudioCtx) {
-        this.ctx = new AudioCtx({ latencyHint: 'interactive' });
-        this.masterGain = this.ctx.createGain();
-        this.masterGain.gain.setValueAtTime(this.isMuted ? 0 : this.volume, this.ctx.currentTime);
-        this.masterGain.connect(this.ctx.destination);
-      }
-    }
-    if (this.ctx && this.ctx.state === "suspended") {
+    this.unlock();
+    if (this.ctx && this.ctx.state !== 'running') {
       try {
         await this.ctx.resume();
-      } catch (_) {}
+      } catch (err) {
+        console.warn('AudioContext resume falhou:', err);
+      }
     }
     return this.ctx;
   }
@@ -51,14 +119,22 @@ class PercussionAudioEngine {
   setVolume(val) {
     this.volume = Math.max(0, Math.min(1, parseFloat(val) || 0.8));
     if (this.masterGain && this.ctx) {
-      this.masterGain.gain.setValueAtTime(this.isMuted ? 0 : this.volume, this.ctx.currentTime);
+      try {
+        this.masterGain.gain.setValueAtTime(this.isMuted ? 0 : this.volume, this.ctx.currentTime);
+      } catch (_) {
+        this.masterGain.gain.value = this.isMuted ? 0 : this.volume;
+      }
     }
   }
 
   setMuted(muted) {
     this.isMuted = !!muted;
     if (this.masterGain && this.ctx) {
-      this.masterGain.gain.setValueAtTime(this.isMuted ? 0 : this.volume, this.ctx.currentTime);
+      try {
+        this.masterGain.gain.setValueAtTime(this.isMuted ? 0 : this.volume, this.ctx.currentTime);
+      } catch (_) {
+        this.masterGain.gain.value = this.isMuted ? 0 : this.volume;
+      }
     }
   }
 
@@ -67,8 +143,41 @@ class PercussionAudioEngine {
   }
 
   /**
+   * Síntese matemática PCM direta de clique como fallback 100% à prova de falhas em qualquer mobile
+   */
+  generateFallbackClick(isAccent, numSamples, sampleRate, soundType) {
+    const data = new Float32Array(numSamples);
+    const baseFreq = isAccent ? 1080 : 740;
+    const decay = isAccent ? 45 : 60;
+    const gainMax = isAccent ? 0.95 : 0.65;
+
+    for (let i = 0; i < numSamples; i++) {
+      const t = i / sampleRate;
+      const env = Math.exp(-t * decay);
+      let sample = 0;
+      if (soundType === 'beep') {
+        const freq = isAccent ? 1200 : 800;
+        sample = Math.sin(2 * Math.PI * freq * t);
+      } else if (soundType === 'clave') {
+        const f1 = isAccent ? 2500 : 1950;
+        const f2 = isAccent ? 3000 : 2350;
+        sample = 0.5 * Math.sin(2 * Math.PI * f1 * t) + 0.5 * Math.sin(2 * Math.PI * f2 * t);
+      } else if (soundType === 'click') {
+        const freq = Math.max(150, (isAccent ? 1600 : 900) - (t * 30000));
+        sample = Math.asin(Math.sin(2 * Math.PI * freq * t)) * (2 / Math.PI);
+      } else {
+        // woodblock padrão
+        const freq = baseFreq * (1 + 0.6 * Math.exp(-t * 120));
+        sample = Math.sin(2 * Math.PI * freq * t);
+      }
+      data[i] = sample * env * gainMax;
+    }
+    return data;
+  }
+
+  /**
    * Pré-sintetiza e cacheia formas de onda one-shot (acento e normal) para um timbre e taxa de amostragem.
-   * Executado uma única vez por timbre em ~0.5ms via mini OfflineAudioContext de 80ms.
+   * Executado uma única vez por timbre em ~0.5ms via mini OfflineAudioContext de 80ms, com fallback PCM direto.
    */
   async getClickSamples(soundType, sampleRate) {
     const key = `${soundType}_${sampleRate}`;
@@ -78,25 +187,40 @@ class PercussionAudioEngine {
 
     const clickDuration = 0.08;
     const numSamples = Math.ceil(clickDuration * sampleRate);
-    const OfflineCtx = window.OfflineAudioContext || window.webkitOfflineAudioContext;
 
-    // 1. Renderiza forma de onda do acento (tempo 1)
-    const ctxAccent = new OfflineCtx(1, numSamples, sampleRate);
-    this.synthesizeSound(ctxAccent, ctxAccent.destination, 0, true, soundType);
-    const bufAccent = await ctxAccent.startRendering();
+    try {
+      const OfflineCtx = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+      if (OfflineCtx) {
+        // 1. Renderiza forma de onda do acento (tempo 1)
+        const ctxAccent = new OfflineCtx(1, numSamples, sampleRate);
+        this.synthesizeSound(ctxAccent, ctxAccent.destination, 0, true, soundType);
+        const bufAccent = await ctxAccent.startRendering();
 
-    // 2. Renderiza forma de onda normal (tempos 2, 3, 4...)
-    const ctxNormal = new OfflineCtx(1, numSamples, sampleRate);
-    this.synthesizeSound(ctxNormal, ctxNormal.destination, 0, false, soundType);
-    const bufNormal = await ctxNormal.startRendering();
+        // 2. Renderiza forma de onda normal (tempos 2, 3, 4...)
+        const ctxNormal = new OfflineCtx(1, numSamples, sampleRate);
+        this.synthesizeSound(ctxNormal, ctxNormal.destination, 0, false, soundType);
+        const bufNormal = await ctxNormal.startRendering();
 
-    const result = {
-      accent: new Float32Array(bufAccent.getChannelData(0)),
-      normal: new Float32Array(bufNormal.getChannelData(0))
+        if (bufAccent && bufNormal) {
+          const result = {
+            accent: new Float32Array(bufAccent.getChannelData(0)),
+            normal: new Float32Array(bufNormal.getChannelData(0))
+          };
+          this.clickCache[key] = result;
+          return result;
+        }
+      }
+    } catch (err) {
+      console.warn("OfflineAudioContext falhou no aparelho, usando síntese PCM direta:", err);
+    }
+
+    // Fallback matemático PCM caso OfflineAudioContext falhe no aparelho
+    const fallbackResult = {
+      accent: this.generateFallbackClick(true, numSamples, sampleRate, soundType),
+      normal: this.generateFallbackClick(false, numSamples, sampleRate, soundType)
     };
-
-    this.clickCache[key] = result;
-    return result;
+    this.clickCache[key] = fallbackResult;
+    return fallbackResult;
   }
 
   /**
@@ -114,16 +238,28 @@ class PercussionAudioEngine {
     const safeDuration = Math.max(0.5, totalDuration + 0.4);
     const numSamples = Math.ceil(safeDuration * sampleRate);
 
-    // Cria o AudioBuffer diretamente no contexto de áudio do sistema
-    let renderedBuffer;
-    if (this.ctx && typeof this.ctx.createBuffer === 'function') {
-      renderedBuffer = this.ctx.createBuffer(1, numSamples, sampleRate);
-    } else if (typeof AudioBuffer === 'function') {
-      renderedBuffer = new AudioBuffer({ length: numSamples, numberOfChannels: 1, sampleRate: sampleRate });
-    } else {
-      const OfflineCtx = window.OfflineAudioContext || window.webkitOfflineAudioContext;
-      const dummyCtx = new OfflineCtx(1, numSamples, sampleRate);
-      renderedBuffer = dummyCtx.createBuffer(1, numSamples, sampleRate);
+    // Cria o AudioBuffer diretamente no contexto de áudio do sistema com proteção contra falhas
+    let renderedBuffer = null;
+    try {
+      if (this.ctx && typeof this.ctx.createBuffer === 'function') {
+        renderedBuffer = this.ctx.createBuffer(1, numSamples, sampleRate);
+      }
+    } catch (_) {}
+
+    if (!renderedBuffer && typeof AudioBuffer === 'function') {
+      try {
+        renderedBuffer = new AudioBuffer({ length: numSamples, numberOfChannels: 1, sampleRate: sampleRate });
+      } catch (_) {}
+    }
+
+    if (!renderedBuffer) {
+      try {
+        const OfflineCtx = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+        if (OfflineCtx) {
+          const dummyCtx = new OfflineCtx(1, numSamples, sampleRate);
+          renderedBuffer = dummyCtx.createBuffer(1, numSamples, sampleRate);
+        }
+      } catch (_) {}
     }
 
     if (!renderedBuffer) return null;
@@ -165,10 +301,16 @@ class PercussionAudioEngine {
 
   /**
    * Toca o buffer pré-renderizado a partir de um ponto no tempo (em segundos)
-   * com suporte a agendamento antecipado (lookahead) para eliminação completa de jitter.
+   * com suporte a agendamento antecipado (lookahead) e proteção contra timers expirados no mobile.
    */
   play(buffer, offset = 0, speed = 1.0, loop = false, loopEnd = 0, onEnded = null, when = 0) {
     if (!this.ctx || !buffer) return;
+
+    if (this.ctx.state !== 'running') {
+      try {
+        this.ctx.resume().catch(() => {});
+      } catch (_) {}
+    }
 
     this.stop();
 
@@ -191,15 +333,16 @@ class PercussionAudioEngine {
     };
 
     const startOffset = Math.max(0, Math.min(buffer.duration - 0.001, offset));
-    const startTime = (when && when > 0) ? when : this.ctx.currentTime;
+    // Garante que o startTime nunca fique no passado em relação ao relógio de hardware
+    const effectiveStartTime = Math.max(this.ctx.currentTime, (when && when > 0) ? when : this.ctx.currentTime);
 
     // Se não for loop e houver loopEnd, agenda a parada exata no final da peça (excluindo cauda de 0.4s)
     if (!loop && loopEnd > 0 && loopEnd > startOffset) {
       const playDuration = (loopEnd - startOffset) / speed;
-      source.start(startTime, startOffset);
-      source.stop(startTime + playDuration);
+      source.start(effectiveStartTime, startOffset);
+      source.stop(effectiveStartTime + playDuration);
     } else {
-      source.start(startTime, startOffset);
+      source.start(effectiveStartTime, startOffset);
     }
 
     this.sourceNode = source;
